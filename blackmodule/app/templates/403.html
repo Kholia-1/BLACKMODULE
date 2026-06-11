@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Accès refusé</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+        }
+
+        .card {
+            background: white;
+            max-width: 520px;
+            width: 100%;
+            border-radius: 14px;
+            padding: 34px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+
+        .code {
+            font-size: 60px;
+            font-weight: bold;
+            color: #991b1b;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            color: #111827;
+            margin: 0 0 12px;
+            font-size: 26px;
+        }
+
+        p {
+            color: #4b5563;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 18px;
+            background: #111827;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            margin: 5px;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="page">
+    <div class="card">
+        <div class="code">403</div>
+
+        <h1>Accès refusé</h1>
+
+        <p>
+            Vous n’avez pas les droits nécessaires pour accéder à cette page.
+            Veuillez contacter un administrateur si vous pensez qu’il s’agit d’une erreur.
+        </p>
+
+        <a class="btn" href="/web/dashboard">Retour au dashboard</a>
+        <a class="btn btn-secondary" href="/web/logout">Se déconnecter</a>
+    </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Mise à jour des listes</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+            max-width: 1100px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 20px;
+        }
+
+        p {
+            color: #4b5563;
+            line-height: 1.6;
+        }
+
+        button {
+            margin-top: 16px;
+            padding: 13px 18px;
+            background: #111827;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1f2937;
+        }
+
+        .message-success {
+            background: #dcfce7;
+            color: #166534;
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .message-error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .result {
+            margin-top: 18px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #374151;
+            line-height: 1.7;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Tableau de bord général</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    {% if message %}
+        {% if success %}
+            <div class="message-success">{{ message }}</div>
+        {% else %}
+            <div class="message-error">{{ message }}</div>
+        {% endif %}
+    {% endif %}
+
+    <div class="grid">
+
+        <div class="card">
+            <span class="badge">OFAC SDN XML</span>
+            <h2>Mise à jour OFAC SDN</h2>
+
+            <p>
+                Télécharge le fichier officiel <strong>sdn.xml</strong>, calcule son hash,
+                vérifie s’il a déjà été importé, puis met à jour la base si nécessaire.
+            </p>
+
+            <form method="post" action="/web/list-updates/ofac-sdn">
+                <button type="submit">Lancer la mise à jour OFAC SDN</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <span class="badge">OFAC Consolidated XML</span>
+            <h2>Mise à jour OFAC Consolidated</h2>
+
+            <p>
+                Télécharge le fichier officiel Consolidated Advanced XML,
+                puis insère ou met à jour les entrées dans BLACKMODULE.
+            </p>
+
+            <form method="post" action="/web/list-updates/ofac-consolidated">
+                <button type="submit">Lancer la mise à jour OFAC Consolidated</button>
+            </form>
+        </div>
+
+        <div class="card">
+    <h2>France Gel des Avoirs</h2>
+    <p>
+        Mise à jour automatique prévue quotidiennement à 02:30 UTC.
+        En cas d’indisponibilité du site officiel, l’échec est journalisé et l’import manuel reste disponible.
+    </p>
+
+    <form method="post" action="/web/list-updates/france-gel">
+        <button type="submit">Lancer mise à jour France Gel</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Union Européenne</h2>
+    <p>
+        Mise à jour automatique hebdomadaire prévue chaque lundi à 03:00 UTC.
+    </p>
+
+    <form method="post" action="/web/list-updates/eu">
+        <button type="submit">Lancer mise à jour UE</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>ONU UNSC</h2>
+    <p>
+        Mise à jour automatique hebdomadaire prévue chaque lundi à 03:15 UTC.
+    </p>
+
+    <form method="post" action="/web/list-updates/un">
+        <button type="submit">Lancer mise à jour ONU</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>OFSI / UKSL</h2>
+    <p>
+        Mise à jour mensuelle prévue. Source officielle à finaliser selon le format UK Sanctions List.
+    </p>
+
+    <button type="button" disabled>À finaliser</button>
+</div>
+
+    </div>
+
+    {% if result %}
+        <div class="card" style="margin-top: 24px;">
+            <h2>Résultat de la mise à jour</h2>
+
+            <div class="result">
+                <strong>Source :</strong> {{ result.source_liste }}<br>
+                <strong>Fichier :</strong> {{ result.filename }}<br>
+                <strong>Type :</strong> {{ result.file_type }}<br>
+                <strong>Total :</strong> {{ result.total_records }}<br>
+                <strong>Insérés :</strong> {{ result.inserted_records }}<br>
+                <strong>Mis à jour :</strong> {{ result.updated_records }}<br>
+                <strong>Doublons :</strong> {{ result.duplicate_records }}<br>
+                <strong>Rejetés :</strong> {{ result.rejected_records }}<br>
+                <strong>Statut :</strong> {{ result.status }}<br>
+                <strong>Importé par :</strong> {{ result.imported_by }}<br>
+                <strong>Date :</strong> {{ result.imported_at.strftime('%Y-%m-%d %H:%M:%S') if result.imported_at else "-" }}
+            </div>
+        </div>
+    {% endif %}
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+
+# Variables sensibles
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Bases de données et dumps
+*.sqlite
+*.db
+*.dump
+*.backup
+*.sql
+
+# Fichiers générés
+exports/
+uploads/
+tmp/
+temp/
+reports/
+
+# IDE
+.idea/
+.vscode/
+
+# Système
+.DS_Store
+Thumbs.db
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# Documents sensibles générés
+*.pdf
+*.docx
+*.xlsx
+*.pptx

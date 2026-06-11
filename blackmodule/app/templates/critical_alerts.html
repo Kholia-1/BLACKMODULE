@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Alertes critiques</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 22px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        .metric-title {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #111827;
+        }
+
+        .metric-danger {
+            color: #991b1b;
+        }
+
+        .metric-warning {
+            color: #92400e;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+        }
+
+        form {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        select, button, .btn-link {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            font-size: 14px;
+        }
+
+        button {
+            background: #111827;
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-link {
+            background: #e5e7eb;
+            color: #111827;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+            background: white;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #111827;
+            white-space: nowrap;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .badge-exacte {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-probable {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-status {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            form {
+                display: block;
+            }
+
+            select, button, .btn-link {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Supervision des alertes critiques</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+<a class="btn-link"
+   href="/api/exports/alerts-excel?critical_only=1&niveau_alerte={{ niveau_alerte or '' }}&statut={{ statut or '' }}">
+    Exporter Excel alertes critiques
+</a>
+
+    <div class="grid">
+        <div class="card">
+            <div class="metric-title">Total alertes critiques</div>
+            <div class="metric-value metric-danger">{{ total_critical }}</div>
+        </div>
+
+        <div class="card">
+            <div class="metric-title">Alertes exactes</div>
+            <div class="metric-value metric-danger">{{ exact_count }}</div>
+        </div>
+
+        <div class="card">
+            <div class="metric-title">Alertes probables</div>
+            <div class="metric-value metric-warning">{{ probable_count }}</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Filtres</h2>
+
+        <form method="get" action="/web/critical-alerts">
+            <select name="niveau_alerte">
+                <option value="">Tous les niveaux</option>
+                <option value="ALERTE_EXACTE" {% if niveau_alerte == "ALERTE_EXACTE" %}selected{% endif %}>
+                    ALERTE_EXACTE
+                </option>
+                <option value="ALERTE_PROBABLE" {% if niveau_alerte == "ALERTE_PROBABLE" %}selected{% endif %}>
+                    ALERTE_PROBABLE
+                </option>
+            </select>
+
+            <select name="statut">
+                <option value="">Tous les statuts actifs</option>
+                <option value="GENEREE" {% if statut == "GENEREE" %}selected{% endif %}>GENEREE</option>
+                <option value="EN_COURS" {% if statut == "EN_COURS" %}selected{% endif %}>EN_COURS</option>
+                <option value="ESCALADEE" {% if statut == "ESCALADEE" %}selected{% endif %}>ESCALADEE</option>
+                <option value="CONFIRMEE" {% if statut == "CONFIRMEE" %}selected{% endif %}>CONFIRMEE</option>
+            </select>
+
+            <button type="submit">Filtrer</button>
+            <a class="btn-link" href="/web/critical-alerts">Réinitialiser</a>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Liste des alertes critiques</h2>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Référence client</th>
+                        <th>Nom client</th>
+                        <th>Score</th>
+                        <th>Niveau</th>
+                        <th>Statut</th>
+                        <th>Source</th>
+                        <th>Type matching</th>
+                        <th>Action</th>
+                        <th>Traitement</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for alert in alerts %}
+                    <tr>
+                        <td>{{ alert.created_at.strftime('%Y-%m-%d %H:%M:%S') if alert.created_at else "-" }}</td>
+                        <td>{{ alert.client_reference }}</td>
+                        <td>
+                            {{ alert.client_prenom or "" }}
+                            {{ alert.client_nom or "" }}
+                        </td>
+                        <td>{{ alert.matching_score }}</td>
+                        <td>
+                            {% if alert.niveau_alerte == "ALERTE_EXACTE" %}
+                                <span class="badge badge-exacte">{{ alert.niveau_alerte }}</span>
+                            {% else %}
+                                <span class="badge badge-probable">{{ alert.niveau_alerte }}</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge badge-status">{{ alert.statut }}</span></td>
+                        <td>{{ alert.source_liste }}</td>
+                        <td>{{ alert.matching_type }}</td>
+                        <td>{{ alert.action_recommandee }}</td>
+                        <td>
+                            <a href="/web/alerts/{{ alert.id }}/treat">Traiter</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="10">Aucune alerte critique active.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

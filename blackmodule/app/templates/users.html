@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Utilisateurs</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 20px;
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            color: #374151;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        button {
+            margin-top: 18px;
+            padding: 11px 15px;
+            background: #111827;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1f2937;
+        }
+
+        .btn-danger {
+            background: #991b1b;
+        }
+
+        .btn-danger:hover {
+            background: #7f1d1d;
+        }
+
+        .btn-success {
+            background: #166534;
+        }
+
+        .btn-success:hover {
+            background: #14532d;
+        }
+
+        .message {
+            background: #dcfce7;
+            color: #166534;
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            min-width: 950px;
+            border-collapse: collapse;
+            margin-top: 14px;
+            background: white;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #111827;
+            white-space: nowrap;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .badge-admin {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-superviseur {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-operateur {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-lecteur {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .badge-active {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        @media (max-width: 1000px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Tableau de bord général</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    {% if message %}
+        <div class="message">{{ message }}</div>
+    {% endif %}
+
+    <div class="grid">
+
+        <div class="card">
+            <h2>Créer un utilisateur</h2>
+
+            <form method="post" action="/web/users/create">
+                <label>Nom d'utilisateur</label>
+                <input type="text" name="username" required>
+
+                <label>Nom complet</label>
+                <input type="text" name="full_name">
+
+                <label>Email</label>
+                <input type="email" name="email">
+
+                <label>Mot de passe</label>
+                <input type="password" name="password" required>
+
+                <label>Rôle</label>
+                <select name="role" required>
+                    <option value="LECTEUR">LECTEUR</option>
+                    <option value="OPERATEUR">OPERATEUR</option>
+                    <option value="SUPERVISEUR">SUPERVISEUR</option>
+                    <option value="ADMIN">ADMIN</option>
+                </select>
+
+                <button type="submit">Créer l'utilisateur</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Liste des utilisateurs</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Utilisateur</th>
+                            <th>Nom complet</th>
+                            <th>Email</th>
+                            <th>Rôle</th>
+                            <th>Statut</th>
+                            <th>Date création</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.full_name if user.full_name else "-" }}</td>
+                            <td>{{ user.email if user.email else "-" }}</td>
+
+                            <td>
+                                {% if user.role == "ADMIN" %}
+                                    <span class="badge badge-admin">{{ user.role }}</span>
+                                {% elif user.role == "SUPERVISEUR" %}
+                                    <span class="badge badge-superviseur">{{ user.role }}</span>
+                                {% elif user.role == "OPERATEUR" %}
+                                    <span class="badge badge-operateur">{{ user.role }}</span>
+                                {% else %}
+                                    <span class="badge badge-lecteur">{{ user.role }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if user.statut == "ACTIF" %}
+                                    <span class="badge badge-active">ACTIF</span>
+                                {% else %}
+                                    <span class="badge badge-inactive">INACTIF</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else "-" }}
+                            </td>
+
+                            <td>
+                            <a href="/web/users/{{ user.id }}/edit" style="display:inline-block; padding:10px 14px; background:#111827; color:white; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:8px;">
+                                Modifier</a>
+
+                            <form method="post" action="/web/users/{{ user.id }}/toggle-status">
+                                {% if user.statut == "ACTIF" %}
+                                    <button class="btn-danger" type="submit">Désactiver</button>
+                                {% else %}
+                                    <button class="btn-success" type="submit">Activer</button>
+                                {% endif %}
+                            </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Mon profil</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .container {
+            padding: 30px 40px;
+            max-width: 900px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 26px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+        }
+
+        .profile-row {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 14px;
+            padding: 13px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #374151;
+        }
+
+        .value {
+            color: #111827;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .badge-admin {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-superviseur {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-operateur {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-lecteur {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .btn {
+            display: inline-block;
+            margin-top: 18px;
+            padding: 11px 15px;
+            border-radius: 8px;
+            background: #111827;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        @media (max-width: 800px) {
+            .profile-row {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Profil utilisateur connecté</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    <div class="card">
+        <h2>Mon profil</h2>
+
+        <div class="profile-row">
+            <div class="label">Nom utilisateur</div>
+            <div class="value">{{ user.username }}</div>
+        </div>
+
+        <div class="profile-row">
+            <div class="label">Nom complet</div>
+            <div class="value">{{ user.full_name if user.full_name else "-" }}</div>
+        </div>
+
+        <div class="profile-row">
+            <div class="label">Email</div>
+            <div class="value">{{ user.email if user.email else "-" }}</div>
+        </div>
+
+        <div class="profile-row">
+            <div class="label">Rôle</div>
+            <div class="value">
+                <span class="badge badge-{{ user.role|lower }}">
+                    {{ user.role }}
+                </span>
+            </div>
+        </div>
+
+        <div class="profile-row">
+            <div class="label">Statut</div>
+            <div class="value">{{ user.statut }}</div>
+        </div>
+
+        <div class="profile-row">
+            <div class="label">Date création</div>
+            <div class="value">
+                {{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else "-" }}
+            </div>
+        </div>
+
+        <a class="btn" href="/web/change-password">Modifier mon mot de passe</a>
+    </div>
+
+</div>
+
+</body>
+</html>

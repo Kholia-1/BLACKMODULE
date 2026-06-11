@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdnList>
+    <sdnEntry>
+        <uid>1001</uid>
+        <lastName>KAMGA</lastName>
+        <firstName>PAUL</firstName>
+        <sdnType>Individual</sdnType>
+        <programList>
+            <program>TEST SANCTION PROGRAM</program>
+        </programList>
+        <akaList>
+            <aka>
+                <uid>2001</uid>
+                <type>a.k.a.</type>
+                <category>strong</category>
+                <lastName>KAMGA PAULO</lastName>
+            </aka>
+        </akaList>
+        <nationalityList>
+            <nationality>
+                <uid>3001</uid>
+                <country>CAMEROON</country>
+                <mainEntry>true</mainEntry>
+            </nationality>
+        </nationalityList>
+        <dateOfBirthList>
+            <dateOfBirthItem>
+                <uid>4001</uid>
+                <dateOfBirth>1968-11-02</dateOfBirth>
+                <mainEntry>true</mainEntry>
+            </dateOfBirthItem>
+        </dateOfBirthList>
+        <idList>
+            <id>
+                <uid>5001</uid>
+                <idType>Passport</idType>
+                <idNumber>P456789</idNumber>
+                <idCountry>CAMEROON</idCountry>
+            </id>
+        </idList>
+    </sdnEntry>
+
+    <sdnEntry>
+        <uid>1002</uid>
+        <lastName>ALPHA TRADING LTD</lastName>
+        <sdnType>Entity</sdnType>
+        <programList>
+            <program>TEST ENTITY SANCTION</program>
+        </programList>
+        <akaList>
+            <aka>
+                <uid>2002</uid>
+                <type>a.k.a.</type>
+                <category>weak</category>
+                <lastName>ALPHA TRADE</lastName>
+            </aka>
+        </akaList>
+    </sdnEntry>
+</sdnList>

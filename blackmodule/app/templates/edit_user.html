@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Modifier utilisateur</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+            max-width: 700px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 26px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            color: #374151;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 12px 18px;
+            background: #111827;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-link {
+            display: inline-block;
+            margin-left: 10px;
+            padding: 12px 18px;
+            background: #e5e7eb;
+            color: #111827;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .info {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 14px;
+            border-radius: 10px;
+            color: #374151;
+            margin-bottom: 18px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Tableau de bord général</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    <div class="card">
+        <h2>Modifier l’utilisateur</h2>
+
+        <div class="info">
+            <strong>Utilisateur :</strong> {{ user.username }}<br>
+            <strong>Date création :</strong> {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else "-" }}
+        </div>
+
+        <form method="post" action="/web/users/{{ user.id }}/edit">
+            <label>Nom d'utilisateur</label>
+            <input type="text" value="{{ user.username }}" disabled>
+
+            <label>Nom complet</label>
+            <input type="text" name="full_name" value="{{ user.full_name or '' }}">
+
+            <label>Email</label>
+            <input type="email" name="email" value="{{ user.email or '' }}">
+
+            <label>Rôle</label>
+            <select name="role" required>
+                <option value="LECTEUR" {% if user.role == "LECTEUR" %}selected{% endif %}>LECTEUR</option>
+                <option value="OPERATEUR" {% if user.role == "OPERATEUR" %}selected{% endif %}>OPERATEUR</option>
+                <option value="SUPERVISEUR" {% if user.role == "SUPERVISEUR" %}selected{% endif %}>SUPERVISEUR</option>
+                <option value="ADMIN" {% if user.role == "ADMIN" %}selected{% endif %}>ADMIN</option>
+            </select>
+
+            <label>Statut</label>
+            <select name="statut" required>
+                <option value="ACTIF" {% if user.statut == "ACTIF" %}selected{% endif %}>ACTIF</option>
+                <option value="INACTIF" {% if user.statut == "INACTIF" %}selected{% endif %}>INACTIF</option>
+            </select>
+
+            <button type="submit">Enregistrer les modifications</button>
+            <a class="btn-link" href="/web/users">Retour</a>
+        </form>
+    </div>
+
+</div>
+
+</body>
+</html>

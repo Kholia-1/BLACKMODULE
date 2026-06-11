@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Connexion</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #111827;
+            margin: 0;
+            padding: 0;
+        }
+
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-card {
+            background: white;
+            width: 380px;
+            border-radius: 14px;
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        }
+
+        h1 {
+            margin: 0;
+            color: #111827;
+            font-size: 28px;
+        }
+
+        p {
+            color: #6b7280;
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 22px;
+            padding: 13px;
+            background: #111827;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        button:hover {
+            background: #1f2937;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .hint {
+            margin-top: 18px;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="login-container">
+    <div class="login-card">
+        <h1>BLACKMODULE</h1>
+        <p>Connexion au module de conformité</p>
+
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/web/login">
+            <label>Nom d'utilisateur</label>
+            <input type="text" name="username" required>
+
+            <label>Mot de passe</label>
+            <input type="password" name="password" required>
+
+            <button type="submit">Se connecter</button>
+        </form>
+
+    </div>
+</div>
+
+</body>
+</html>

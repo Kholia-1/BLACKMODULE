@@ -1,0 +1,341 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Alertes</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 20px;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-bar a {
+            text-decoration: none;
+            background: #e5e7eb;
+            color: #111827;
+            padding: 9px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .filter-bar a.active {
+            background: #111827;
+            color: white;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            vertical-align: top;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .badge-exacte {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-probable {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-possible {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-status {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .badge-confirmed {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-false {
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 8px 11px;
+            border-radius: 8px;
+            background: #111827;
+            color: white;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background: #1f2937;
+        }
+
+        .empty {
+            color: #6b7280;
+            font-size: 14px;
+            padding: 20px 0;
+        }
+
+        .message {
+            padding: 14px 16px;
+            border-radius: 10px;
+            background: #dcfce7;
+            color: #166534;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 9px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Suivi, filtrage et traitement des alertes</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+
+<div class="container">
+
+    {% if message %}
+        <div class="message">{{ message }}</div>
+    {% endif %}
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
+        <h2>Liste des alertes</h2>
+
+        <a class="btn-link"
+           href="/api/exports/alerts-excel?statut={{ current_status or '' }}&niveau_alerte={{ niveau_alerte or '' }}&source_liste={{ source_liste or '' }}&client_reference={{ client_reference or '' }}&date_from={{ date_from or '' }}&date_to={{ date_to or '' }}">
+            Exporter Excel </a>
+    </div>
+
+        <div class="filter-bar">
+    <a href="/web/alerts" class="{% if not current_status and not niveau_alerte and not source_liste and not client_reference and not date_from and not date_to %}active{% endif %}">
+        Toutes
+    </a>
+    <a href="/web/alerts?statut=GENEREE" class="{% if current_status == 'GENEREE' %}active{% endif %}">Générées</a>
+    <a href="/web/alerts?statut=EN_COURS" class="{% if current_status == 'EN_COURS' %}active{% endif %}">En cours</a>
+    <a href="/web/alerts?statut=CONFIRMEE" class="{% if current_status == 'CONFIRMEE' %}active{% endif %}">Confirmées</a>
+    <a href="/web/alerts?statut=FAUX_POSITIF" class="{% if current_status == 'FAUX_POSITIF' %}active{% endif %}">Faux positifs</a>
+    <a href="/web/alerts?statut=CLOTUREE" class="{% if current_status == 'CLOTUREE' %}active{% endif %}">Clôturées</a>
+</div>
+
+<form method="get" action="/web/alerts" class="advanced-filter">
+    <select name="statut">
+        <option value="">Tous les statuts</option>
+        <option value="GENEREE" {% if current_status == "GENEREE" %}selected{% endif %}>GENEREE</option>
+        <option value="EN_COURS" {% if current_status == "EN_COURS" %}selected{% endif %}>EN_COURS</option>
+        <option value="FAUX_POSITIF" {% if current_status == "FAUX_POSITIF" %}selected{% endif %}>FAUX_POSITIF</option>
+        <option value="CONFIRMEE" {% if current_status == "CONFIRMEE" %}selected{% endif %}>CONFIRMEE</option>
+        <option value="ESCALADEE" {% if current_status == "ESCALADEE" %}selected{% endif %}>ESCALADEE</option>
+        <option value="CLOTUREE" {% if current_status == "CLOTUREE" %}selected{% endif %}>CLOTUREE</option>
+    </select>
+
+    <select name="niveau_alerte">
+        <option value="">Tous les niveaux</option>
+        <option value="ALERTE_EXACTE" {% if niveau_alerte == "ALERTE_EXACTE" %}selected{% endif %}>ALERTE_EXACTE</option>
+        <option value="ALERTE_PROBABLE" {% if niveau_alerte == "ALERTE_PROBABLE" %}selected{% endif %}>ALERTE_PROBABLE</option>
+        <option value="ALERTE_POSSIBLE" {% if niveau_alerte == "ALERTE_POSSIBLE" %}selected{% endif %}>ALERTE_POSSIBLE</option>
+    </select>
+
+    <select name="source_liste">
+        <option value="">Toutes les sources</option>
+        <option value="AFB_PPE" {% if source_liste == "AFB_PPE" %}selected{% endif %}>AFB_PPE</option>
+        <option value="OFAC_SDN" {% if source_liste == "OFAC_SDN" %}selected{% endif %}>OFAC_SDN</option>
+        <option value="OFAC_CONSOLIDATED" {% if source_liste == "OFAC_CONSOLIDATED" %}selected{% endif %}>OFAC_CONSOLIDATED</option>
+        <option value="ONU" {% if source_liste == "ONU" %}selected{% endif %}>ONU</option>
+        <option value="UE" {% if source_liste == "UE" %}selected{% endif %}>UE</option>
+        <option value="OFSI" {% if source_liste == "OFSI" %}selected{% endif %}>OFSI</option>
+        <option value="FR_GEL" {% if source_liste == "FR_GEL" %}selected{% endif %}>FR_GEL</option>
+    </select>
+
+    <input type="text" name="client_reference" placeholder="Référence client" value="{{ client_reference or '' }}">
+
+    <input type="date" name="date_from" value="{{ date_from or '' }}">
+    <input type="date" name="date_to" value="{{ date_to or '' }}">
+
+    <button type="submit">Filtrer</button>
+    <a class="btn-reset" href="/web/alerts">Réinitialiser</a>
+</form>
+
+        {% if alerts and alerts|length > 0 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Client</th>
+                        <th>Score</th>
+                        <th>Niveau</th>
+                        <th>Statut</th>
+                        <th>Source</th>
+                        <th>Type matching</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for alert in alerts %}
+                    <tr>
+                        <td>{{ alert.client_reference if alert.client_reference else "-" }}</td>
+                        <td>
+                            {% if alert.client_prenom or alert.client_nom %}
+                                {{ alert.client_prenom if alert.client_prenom else "" }}
+                                {{ alert.client_nom if alert.client_nom else "" }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ alert.matching_score }}</td>
+
+                        <td>
+                            {% if alert.niveau_alerte == "ALERTE_EXACTE" %}
+                                <span class="badge badge-exacte">{{ alert.niveau_alerte }}</span>
+                            {% elif alert.niveau_alerte == "ALERTE_PROBABLE" %}
+                                <span class="badge badge-probable">{{ alert.niveau_alerte }}</span>
+                            {% else %}
+                                <span class="badge badge-possible">{{ alert.niveau_alerte }}</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if alert.statut == "CONFIRMEE" %}
+                                <span class="badge badge-confirmed">{{ alert.statut }}</span>
+                            {% elif alert.statut == "FAUX_POSITIF" %}
+                                <span class="badge badge-false">{{ alert.statut }}</span>
+                            {% else %}
+                                <span class="badge badge-status">{{ alert.statut }}</span>
+                            {% endif %}
+                        </td>
+
+                        <td>{{ alert.source_liste }}</td>
+                        <td>{{ alert.matching_type }}</td>
+                        <td>{{ alert.created_at }}</td>
+                       <td>
+                            {% set user = request.session.get("user") %}
+                            {% set role = user.get("role") if user else "" %}
+
+                            {% if role in ["ADMIN", "SUPERVISEUR"] %}
+                                <a class="btn" href="/web/alerts/{{ alert.id }}/treat">Traiter</a>
+                            {% else %}
+                                <span class="badge badge-status">Lecture seule</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="empty">Aucune alerte trouvée.</div>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>

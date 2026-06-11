@@ -1,0 +1,9 @@
+nom,prenom,date_naissance,nationalite,pays,num_passeport,motif_sanction,date_inscription,statut
+DOE,JOHN,1980-05-12,CAMEROUNAISE,CAMEROUN,P123456,Client PPE de test,2025-06-01,ACTIF
+SMITH,ROBERT,1975-03-20,CAMEROUNAISE,CAMEROUN,P987654,Surveillance renforcée,2025-06-01,ACTIF
+KAMGA,PAUL,1968-11-02,CAMEROUNAISE,CAMEROUN,P456789,Personne politiquement exposée,2025-06-10,ACTIF
+MBARGA,ALAIN,1972-08-15,CAMEROUNAISE,CAMEROUN,P999111,Client PPE test supplémentaire,2025-06-15,ACTIF
+
+
+
+

@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Imports</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+            max-width: 1100px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 20px;
+        }
+
+        h3 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 17px;
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            color: #374151;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 13px 18px;
+            background: #111827;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1f2937;
+        }
+
+        .result-success {
+            background: #dcfce7;
+            color: #166534;
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .result-error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .help {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 16px;
+            border-radius: 10px;
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.7;
+            margin-top: 20px;
+        }
+
+        code {
+            background: #e5e7eb;
+            padding: 2px 5px;
+            border-radius: 5px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+            background: white;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #111827;
+            white-space: nowrap;
+        }
+
+        .badge-csv {
+            display: inline-block;
+            background: #dcfce7;
+            color: #166534;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+
+        .badge-xml {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Importation manuelle des listes de sanctions</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    {% if message %}
+        {% if success %}
+            <div class="result-success">{{ message }}</div>
+        {% else %}
+            <div class="result-error">{{ message }}</div>
+        {% endif %}
+    {% endif %}
+
+    <div class="grid">
+
+        <div class="card">
+            <span class="badge-csv">AFB PPE · CSV</span>
+            <h2>Importer la liste PPE AFB</h2>
+
+            <form method="post" action="/web/imports/afb-ppe-csv" enctype="multipart/form-data">
+                <label>Importé par</label>
+                <input type="text" name="imported_by" value="bello.etienne" required>
+
+                <label>Fichier CSV</label>
+                <input type="file" name="file" accept=".csv" required>
+
+                <button type="submit">Importer le fichier CSV</button>
+            </form>
+
+            <div class="help">
+                <strong>Format CSV attendu :</strong><br>
+                <code>nom, prenom, date_naissance, nationalite, pays, num_passeport, motif_sanction, date_inscription, statut</code>
+                <br><br>
+                Exemple :<br>
+                <code>DOE,JOHN,1980-05-12,CAMEROUNAISE,CAMEROUN,P123456,Client PPE de test,2025-06-01,ACTIF</code>
+            </div>
+        </div>
+
+        <div class="card">
+            <span class="badge-xml">OFAC SDN · XML</span>
+            <h2>Importer la liste OFAC SDN</h2>
+
+            <form method="post" action="/web/imports/ofac-sdn-xml" enctype="multipart/form-data">
+                <label>Importé par</label>
+                <input type="text" name="imported_by" value="bello.etienne" required>
+
+                <label>Fichier XML OFAC SDN</label>
+                <input type="file" name="file" accept=".xml" required>
+
+                <button type="submit">Importer le fichier XML</button>
+            </form>
+
+            <div class="help">
+                <strong>Format attendu :</strong><br>
+                Fichier XML OFAC SDN contenant des balises comme :
+                <br>
+                <code>sdnEntry</code>, <code>firstName</code>, <code>lastName</code>, <code>sdnType</code>, <code>akaList</code>, <code>dateOfBirthList</code>, <code>idList</code>.
+                <br><br>
+                Les données seront normalisées dans <code>sanction_entries</code> avec la source <code>OFAC_SDN</code>.
+            </div>
+        </div>
+
+            <div class="card">
+        <span class="badge-xml">ONU · XML</span>
+        <h2>Importer la liste ONU</h2>
+
+        <form method="post" action="/web/imports/un-xml" enctype="multipart/form-data">
+            <label>Importé par</label>
+            <input type="text" name="imported_by" value="bello.etienne" required>
+
+            <label>Fichier XML ONU</label>
+            <input type="file" name="file" accept=".xml" required>
+
+            <button type="submit">Importer le fichier XML ONU</button>
+        </form>
+
+        <div class="help">
+            <strong>Format attendu :</strong><br>
+            Fichier XML ONU contenant des balises comme :
+            <br>
+            <code>INDIVIDUAL</code>, <code>FIRST_NAME</code>, <code>SECOND_NAME</code>,
+            <code>INDIVIDUAL_ALIAS</code>, <code>INDIVIDUAL_DATE_OF_BIRTH</code>,
+            <code>INDIVIDUAL_DOCUMENT</code>, <code>ENTITY</code>.
+            <br><br>
+            Les données seront normalisées dans <code>sanction_entries</code> avec la source <code>ONU</code>.
+        </div>
+    </div>
+
+        <div class="card">
+        <span class="badge-csv">Union Européenne · CSV</span>
+        <h2>Importer la liste Union Européenne</h2>
+
+        <form method="post" action="/web/imports/eu-csv" enctype="multipart/form-data">
+            <label>Importé par</label>
+            <input type="text" name="imported_by" value="bello.etienne" required>
+
+            <label>Fichier CSV UE</label>
+            <input type="file" name="file" accept=".csv" required>
+
+            <button type="submit">Importer le fichier CSV UE</button>
+        </form>
+
+        <div class="help">
+            <strong>Format attendu :</strong><br>
+            <code>nom, prenom, nom_complet, type_entite, date_naissance, nationalite, pays, num_passeport, motif_sanction, date_inscription, statut, alias</code>
+            <br><br>
+            Les alias multiples doivent être séparés par un point-virgule : <code>J DUPONT;JEAN D.</code>
+        </div>
+    </div>
+
+        <div class="card">
+    <span class="badge-xml">Union Européenne · XML</span>
+    <h2>Importer la liste Union Européenne XML</h2>
+
+    <form method="post" action="/web/imports/eu-xml" enctype="multipart/form-data">
+        <label>Importé par</label>
+        <input type="text" name="imported_by" value="admin" required>
+
+        <label>Fichier XML UE</label>
+        <input type="file" name="file" accept=".xml" required>
+
+        <button type="submit">Importer le fichier XML UE</button>
+    </form>
+
+    <div class="help">
+        <strong>Format attendu :</strong><br>
+        Fichier XML Union Européenne contenant des balises comme :
+        <br>
+        <code>sanctionEntity</code>, <code>subjectType</code>,
+        <code>nameAlias</code>, <code>wholeName</code>,
+        <code>citizenship</code>, <code>birthdate</code>,
+        <code>identification</code>.
+        <br><br>
+        Les données seront normalisées dans <code>sanction_entries</code>
+        avec la source <code>UE</code>.
+    </div>
+</div>
+
+
+            <div class="card">
+        <span class="badge-csv">OFSI UK · CSV</span>
+        <h2>Importer la liste OFSI UK</h2>
+
+        <form method="post" action="/web/imports/ofsi-csv" enctype="multipart/form-data">
+            <label>Importé par</label>
+            <input type="text" name="imported_by" value="bello.etienne" required>
+
+            <label>Fichier CSV OFSI UK</label>
+            <input type="file" name="file" accept=".csv" required>
+
+            <button type="submit">Importer le fichier CSV OFSI</button>
+        </form>
+
+        <div class="help">
+            <strong>Format attendu :</strong><br>
+            <code>nom_complet, type_entite, date_naissance, nationalite, pays, num_passeport, adresse, motif_sanction, date_inscription, statut, alias</code>
+            <br><br>
+            Les alias multiples doivent être séparés par un point-virgule : <code>W BROWN;BILLY BROWN</code>
+        </div>
+    </div>
+
+        <div class="card">
+    <span class="badge-csv">OFSI UK · Excel</span>
+    <h2>Importer la liste OFSI UK Excel</h2>
+
+    <form method="post" action="/web/imports/ofsi-excel" enctype="multipart/form-data">
+        <label>Importé par</label>
+        <input type="text" name="imported_by" value="bello.etienne" required>
+
+        <label>Fichier Excel OFSI UK</label>
+        <input type="file" name="file" accept=".xls,.xlsx" required>
+
+        <button type="submit">Importer le fichier Excel OFSI</button>
+    </form>
+
+    <div class="help">
+        <strong>Format attendu :</strong><br>
+        Colonnes Excel :
+        <code>nom_complet, type_entite, date_naissance, nationalite, pays, num_passeport, adresse, motif_sanction, date_inscription, statut, alias</code>
+        <br><br>
+        Les alias multiples doivent être séparés par un point-virgule :
+        <code>E MILLER;ED MILLER</code>
+    </div>
+</div>
+
+        <div class="card">
+    <span class="badge-xml">OFAC Consolidated · XML</span>
+    <h2>Importer la liste OFAC Consolidated</h2>
+
+    <form method="post" action="/web/imports/ofac-consolidated-xml" enctype="multipart/form-data">
+        <label>Importé par</label>
+        <input type="text" name="imported_by" value="bello.etienne" required>
+
+        <label>Fichier XML OFAC Consolidated</label>
+        <input type="file" name="file" accept=".xml" required>
+
+        <button type="submit">Importer OFAC Consolidated XML</button>
+    </form>
+
+    <div class="help">
+        <strong>Format attendu :</strong><br>
+        Fichier XML OFAC Consolidated contenant des balises similaires à :
+        <br>
+        <code>sdnEntry</code>, <code>firstName</code>, <code>lastName</code>,
+        <code>sdnType</code>, <code>akaList</code>, <code>dateOfBirthList</code>,
+        <code>idList</code>.
+        <br><br>
+        Les données seront normalisées dans <code>sanction_entries</code> avec la source
+        <code>OFAC_CONSOLIDATED</code>.
+    </div>
+</div>
+
+        <div class="card">
+    <span class="badge-xml">France Gel des Avoirs · JSON</span>
+    <h2>Importer la liste France Gel des Avoirs</h2>
+
+    <form method="post" action="/web/imports/france-gel-json" enctype="multipart/form-data">
+        <label>Importé par</label>
+        <input type="text" name="imported_by" value="bello.etienne" required>
+
+        <label>Fichier JSON France Gel</label>
+        <input type="file" name="file" accept=".json" required>
+
+        <button type="submit">Importer France Gel JSON</button>
+    </form>
+
+    <div class="help">
+        <strong>Format attendu :</strong><br>
+        <code>nom, prenom, nom_complet, type_entite, date_naissance, nationalite, pays, num_passeport, decision, date_inscription, statut, alias</code>
+        <br><br>
+        Les alias peuvent être une liste JSON :
+        <code>["P DURAND", "PIERRE D."]</code>
+    </div>
+</div>
+
+        <div class="card">
+    <span class="badge-xml">France Gel des Avoirs · XML</span>
+    <h2>Importer la liste France Gel XML</h2>
+
+    <form method="post" action="/web/imports/france-gel-xml" enctype="multipart/form-data">
+        <label>Importé par</label>
+        <input type="text" name="imported_by" value="admin" required>
+
+        <label>Fichier XML France Gel</label>
+        <input type="file" name="file" accept=".xml" required>
+
+        <button type="submit">Importer France Gel XML</button>
+    </form>
+
+    <div class="help">
+        <strong>Format attendu :</strong><br>
+        Fichier XML contenant les informations de gel des avoirs :
+        <br>
+        <code>nom</code>, <code>prenom</code>, <code>alias</code>,
+        <code>dateNaissance</code>, <code>nationalite</code>,
+        <code>passeport</code>, <code>decision</code>.
+        <br><br>
+        Les données seront normalisées dans <code>sanction_entries</code>
+        avec la source <code>FR_GEL</code>.
+    </div>
+</div>
+
+
+    </div>
+
+    {% if result %}
+    <div class="card">
+        <h2>Résultat du dernier import</h2>
+
+        <div class="table-wrapper">
+            <table>
+                <tr>
+                    <th>Source</th>
+                    <td>{{ result.source_liste }}</td>
+                </tr>
+                <tr>
+                    <th>Fichier</th>
+                    <td>{{ result.filename }}</td>
+                </tr>
+                <tr>
+                    <th>Type</th>
+                    <td>{{ result.file_type }}</td>
+                </tr>
+                <tr>
+                    <th>Total lignes</th>
+                    <td>{{ result.total_records }}</td>
+                </tr>
+                <tr>
+                    <th>Insérées</th>
+                    <td>{{ result.inserted_records }}</td>
+                </tr>
+                <tr>
+                    <th>Mises à jour</th>
+                    <td>{{ result.updated_records }}</td>
+                </tr>
+                <tr>
+                    <th>Doublons</th>
+                    <td>{{ result.duplicate_records }}</td>
+                </tr>
+                <tr>
+                    <th>Rejetées</th>
+                    <td>{{ result.rejected_records }}</td>
+                </tr>
+                <tr>
+                    <th>Statut</th>
+                    <td>{{ result.status }}</td>
+                </tr>
+                <tr>
+                    <th>Importé par</th>
+                    <td>{{ result.imported_by }}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+</body>
+</html>

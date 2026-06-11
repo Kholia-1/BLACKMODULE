@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<registre>
+    <personne>
+        <nom>DURAND</nom>
+        <prenom>PIERRE</prenom>
+        <nomComplet>PIERRE DURAND</nomComplet>
+        <type>PERSONNE_PHYSIQUE</type>
+        <dateNaissance>1972-09-01</dateNaissance>
+        <nationalite>FRANCAISE</nationalite>
+        <pays>FRANCE</pays>
+        <numPasseport>FRP123456</numPasseport>
+        <decision>Décision de gel des avoirs XML test</decision>
+        <dateInscription>2025-03-01</dateInscription>
+        <statut>ACTIF</statut>
+        <alias>P DURAND</alias>
+        <alias>PIERRE D.</alias>
+    </personne>
+
+    <entite>
+        <nom>EURO FINANCE HOLDING</nom>
+        <nomComplet>EURO FINANCE HOLDING</nomComplet>
+        <type>PERSONNE_MORALE</type>
+        <pays>FRANCE</pays>
+        <decision>Entité soumise à mesure de gel des avoirs XML test</decision>
+        <dateInscription>2024-10-12</dateInscription>
+        <statut>ACTIF</statut>
+        <alias>EF HOLDING</alias>
+    </entite>
+</registre>

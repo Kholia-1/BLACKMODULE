@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - API externe</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 22px;
+        }
+
+        h3 {
+            color: #111827;
+            margin-bottom: 8px;
+        }
+
+        p {
+            color: #374151;
+            line-height: 1.6;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-dark {
+            background: #111827;
+            color: white;
+        }
+
+        code, pre {
+            background: #0f172a;
+            color: #e5e7eb;
+            border-radius: 8px;
+            font-family: Consolas, monospace;
+        }
+
+        code {
+            padding: 3px 6px;
+        }
+
+        pre {
+            padding: 16px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #111827;
+            vertical-align: top;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        .endpoint-path {
+            font-family: Consolas, monospace;
+            font-size: 13px;
+        }
+
+        @media (max-width: 1000px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>API externe sécurisée pour intégration avec d’autres systèmes</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    <div class="grid">
+        <div class="grid">
+
+    <div class="card">
+        <h2>Total appels API</h2>
+        <p>
+            <span class="badge badge-dark">{{ total_api_calls }}</span>
+        </p>
+        <p>Nombre total d’appels journalisés sur l’API externe.</p>
+    </div>
+
+    <div class="card">
+        <h2>Vérifications client</h2>
+        <p>
+            <span class="badge badge-success">{{ total_api_screenings }}</span>
+        </p>
+        <p>Nombre de filtrages clients lancés via l’API externe.</p>
+    </div>
+
+</div>
+
+<div class="grid">
+
+    <div class="card">
+        <h2>Consultations alertes</h2>
+        <p>
+            <span class="badge badge-info">{{ total_api_alerts_views }}</span>
+        </p>
+        <p>Nombre de consultations d’alertes client via API.</p>
+    </div>
+
+    <div class="card">
+        <h2>Consultations techniques</h2>
+        <p>
+            <span class="badge badge-warning">{{ total_api_technical_views }}</span>
+        </p>
+        <p>Consultations du statut API et de la documentation technique.</p>
+    </div>
+
+</div>
+
+<div class="card">
+    <h2>Dernier appel API</h2>
+
+    {% if last_api_call %}
+        <p>
+            <strong>Date :</strong>
+            {{ last_api_call.created_at.strftime('%Y-%m-%d %H:%M:%S') if last_api_call.created_at else "-" }}
+        </p>
+        <p>
+            <strong>Action :</strong>
+            <span class="badge badge-info">{{ last_api_call.action }}</span>
+        </p>
+        <p>
+            <strong>Description :</strong>
+            {{ last_api_call.description }}
+        </p>
+    {% else %}
+        <p>Aucun appel API enregistré pour le moment.</p>
+    {% endif %}
+</div>
+
+        <div class="card">
+            <h2>Statut API</h2>
+
+            <p>
+                <span class="badge badge-success">OPÉRATIONNELLE</span>
+            </p>
+
+            <p>
+                L’API externe permet à une application tierce de lancer une vérification client
+                contre les listes de sanctions actives de BLACKMODULE.
+            </p>
+
+            <p>
+                Toutes les requêtes doivent être authentifiées avec le header :
+            </p>
+
+            <p>
+                <code>{{ api_key_label }}: {{ api_key_value }}</code>
+            </p>
+        </div>
+
+        <div class="card">
+            <h2>Sécurité</h2>
+
+            <p>
+                L’accès à l’API est protégé par une clé API.
+                La clé réelle est stockée côté serveur dans le fichier <code>.env</code>
+                et n’est jamais affichée en clair dans l’interface.
+            </p>
+
+            <p>
+                Chaque appel métier est journalisé dans le module d’audit afin d’assurer
+                la traçabilité des consultations et des vérifications.
+            </p>
+        </div>
+
+    </div>
+
+    <div class="card">
+        <h2>Endpoints disponibles</h2>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Méthode</th>
+                        <th>Endpoint</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for endpoint in endpoints %}
+                    <tr>
+                        <td>
+                            {% if endpoint.method == "GET" %}
+                                <span class="badge badge-info">GET</span>
+                            {% elif endpoint.method == "POST" %}
+                                <span class="badge badge-success">POST</span>
+                            {% else %}
+                                <span class="badge badge-dark">{{ endpoint.method }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="endpoint-path">{{ endpoint.path }}</td>
+                        <td>{{ endpoint.description }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="grid">
+
+        <div class="card">
+            <h2>Exemple de requête</h2>
+
+<pre>curl.exe -X POST "http://127.0.0.1:8000/api/external/check-client" ^
+  -H "Content-Type: application/json" ^
+  -H "X-API-KEY: BLACKMODULE-API-KEY-2026" ^
+  -d "{
+    \"client_reference\": \"API-TEST-001\",
+    \"nom\": \"DURAND\",
+    \"prenom\": \"PIERRE\",
+    \"date_naissance\": \"1972-09-01\",
+    \"nationalite\": \"FRANCAISE\",
+    \"num_passeport\": \"FRP123456\"
+  }"</pre>
+        </div>
+
+        <div class="card">
+            <h2>Exemple de réponse</h2>
+
+<pre>{
+  "success": true,
+  "request_id": "REQ-20260609-153045",
+  "timestamp": "2026-06-09T15:30:45",
+  "client": {
+    "client_reference": "API-TEST-001",
+    "nom_complet": "PIERRE DURAND"
+  },
+  "screening_result": {
+    "status": "ALERTE_EXACTE",
+    "highest_score": 100.0,
+    "action_recommandee": "BLOQUER_OPERATION",
+    "matches_count": 1
+  },
+  "message": "Vérification client terminée."
+}</pre>
+        </div>
+
+    </div>
+
+    <div class="card">
+        <h2>Derniers appels API</h2>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Utilisateur</th>
+                        <th>Action</th>
+                        <th>Entité</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% if recent_api_logs %}
+                        {% for log in recent_api_logs %}
+                        <tr>
+                            <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else "-" }}</td>
+                            <td>{{ log.user_identifier }}</td>
+                            <td><span class="badge badge-info">{{ log.action }}</span></td>
+                            <td>{{ log.entity_type }}</td>
+                            <td>{{ log.description }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5">Aucun appel API récent trouvé.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

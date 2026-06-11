@@ -1,0 +1,3 @@
+nom_complet,type_entite,date_naissance,nationalite,pays,num_passeport,adresse,motif_sanction,date_inscription,statut,alias
+WILLIAM BROWN,PERSONNE_PHYSIQUE,1965-06-12,BRITANNIQUE,UNITED KINGDOM,UKP123456,London UK,OFSI financial sanctions test,2025-02-11,ACTIF,W BROWN;BILLY BROWN
+BRAVO SHIPPING LTD,PERSONNE_MORALE,,,,,Liverpool UK,OFSI entity sanctions test,2024-10-03,ACTIF,BRAVO SHIP;BRAVO MARITIME

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Journal d'audit</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 20px;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        input, select {
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 14px;
+            background: #111827;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1f2937;
+        }
+
+        .btn-link {
+            padding: 10px 14px;
+            background: #e5e7eb;
+            color: #111827;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            min-width: 1150px;
+            border-collapse: collapse;
+            margin-top: 14px;
+            background: white;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #111827;
+            vertical-align: top;
+        }
+
+        .nowrap {
+            white-space: nowrap;
+        }
+
+        .description {
+            min-width: 380px;
+            line-height: 1.5;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+            white-space: nowrap;
+        }
+
+        .badge-action {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-user {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-entity {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .empty {
+            color: #6b7280;
+            font-size: 14px;
+            padding: 20px 0;
+        }
+
+        .summary {
+            color: #4b5563;
+            font-size: 14px;
+        }
+
+        @media (max-width: 800px) {
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .search-form {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            input, select, button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Tableau de bord général</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+<a class="btn-link"
+   href="/api/exports/audit-logs-excel?action={{ action or '' }}&user_identifier={{ user_identifier or '' }}&entity_type={{ entity_type or '' }}&date_from={{ date_from or '' }}&date_to={{ date_to or '' }}">
+    Exporter Excel
+</a>
+
+    <div class="card">
+        <div class="top-bar">
+            <div>
+                <h2>Journal d'audit</h2>
+                <div class="summary">
+                    Total affiché : {{ logs|length }} trace(s)
+                </div>
+            </div>
+
+<form class="filter-form" method="get" action="/web/audit-logs">
+    <input
+        type="text"
+        name="user_identifier"
+        placeholder="Utilisateur..."
+        value="{{ user_identifier or '' }}"
+    >
+
+    <input
+        type="text"
+        name="action"
+        placeholder="Action : LOGIN, ACCESS_DENIED..."
+        value="{{ action or '' }}"
+    >
+
+    <input
+        type="text"
+        name="entity_type"
+        placeholder="Entité : User, Alert, WebRoute..."
+        value="{{ entity_type or '' }}"
+    >
+
+    <input
+        type="date"
+        name="date_from"
+        value="{{ date_from or '' }}"
+    >
+
+    <input
+        type="date"
+        name="date_to"
+        value="{{ date_to or '' }}"
+    >
+
+    <button type="submit">Filtrer</button>
+    <a class="btn-link" href="/web/audit-logs">Réinitialiser</a>
+</form>
+        </div>
+
+        {% if logs and logs|length > 0 %}
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date/heure</th>
+                            <th>Utilisateur</th>
+                            <th>Action</th>
+                            <th>Type entité</th>
+                            <th>ID entité</th>
+                            <th>Adresse IP</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td class="nowrap">
+                                {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else "-" }}
+                            </td>
+
+                            <td>
+                                <span class="badge badge-user">
+                                    {{ log.user_identifier if log.user_identifier else "-" }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="badge badge-action">
+                                    {{ log.action if log.action else "-" }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="badge badge-entity">
+                                    {{ log.entity_type if log.entity_type else "-" }}
+                                </span>
+                            </td>
+
+                            <td class="nowrap">
+                                {{ log.entity_id if log.entity_id else "-" }}
+                            </td>
+
+                            <td class="nowrap">
+                                {{ log.ip_address if log.ip_address else "-" }}
+                            </td>
+
+                            <td class="description">
+                                {{ log.description if log.description else "-" }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty">Aucune trace d’audit trouvée.</div>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>

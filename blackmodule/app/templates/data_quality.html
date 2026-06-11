@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Qualité des données</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 22px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        .metric-title {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #111827;
+        }
+
+        .metric-danger {
+            color: #991b1b;
+        }
+
+        .metric-success {
+            color: #166534;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #111827;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .section-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 1000px) {
+            .grid, .section-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Contrôle qualité des données importées</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+  <a class="btn-link" href="/api/exports/data-quality-excel">
+    Exporter Excel qualité des données </a>
+
+    <div class="grid">
+        <div class="card">
+            <div class="metric-title">Total sanctions</div>
+            <div class="metric-value">{{ total_sanctions }}</div>
+        </div>
+
+        <div class="card">
+            <div class="metric-title">Score qualité</div>
+            <div class="metric-value {% if quality_score >= 90 %}metric-success{% else %}metric-danger{% endif %}">
+                {{ quality_score }}%
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="metric-title">Sans nom complet</div>
+            <div class="metric-value {% if missing_full_name > 0 %}metric-danger{% endif %}">
+                {{ missing_full_name }}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="metric-title">Sans hash signature</div>
+            <div class="metric-value {% if missing_hash > 0 %}metric-danger{% endif %}">
+                {{ missing_hash }}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="metric-title">Sans source</div>
+            <div class="metric-value {% if missing_source > 0 %}metric-danger{% endif %}">
+                {{ missing_source }}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="metric-title">Sans statut</div>
+            <div class="metric-value {% if missing_status > 0 %}metric-danger{% endif %}">
+                {{ missing_status }}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="metric-title">Noms trop courts</div>
+            <div class="metric-value {% if short_names > 0 %}metric-danger{% endif %}">
+                {{ short_names }}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="metric-title">Doublons hash</div>
+            <div class="metric-value {% if duplicate_hash_count > 0 %}metric-danger{% endif %}">
+                {{ duplicate_hash_count }}
+            </div>
+        </div>
+    </div>
+
+    <div class="section-grid">
+        <div class="card">
+            <h2>Répartition par source</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Nombre</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for source, count in source_stats %}
+                    <tr>
+                        <td>
+                            {% if source %}
+                                <span class="badge">{{ source }}</span>
+                            {% else %}
+                                <span class="badge badge-danger">SOURCE VIDE</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>Synthèse conformité</h2>
+
+            {% if quality_score >= 90 and missing_full_name == 0 and missing_hash == 0 %}
+                <p>
+                    <span class="badge badge-success">QUALITÉ ACCEPTABLE</span>
+                </p>
+                <p>
+                    Les données importées sont globalement exploitables pour les contrôles de filtrage.
+                </p>
+            {% else %}
+                <p>
+                    <span class="badge badge-danger">ANOMALIES À TRAITER</span>
+                </p>
+                <p>
+                    Certaines entrées présentent des anomalies. Il est recommandé de vérifier les parseurs
+                    et les fichiers sources concernés.
+                </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Entrées problématiques récentes</h2>
+
+        {% if recent_problem_entries %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Nom complet</th>
+                        <th>Nom</th>
+                        <th>Statut</th>
+                        <th>Hash</th>
+                        <th>Date création</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in recent_problem_entries %}
+                    <tr>
+                        <td>{{ item.source_liste if item.source_liste else "-" }}</td>
+                        <td>{{ item.nom_complet if item.nom_complet else "-" }}</td>
+                        <td>{{ item.nom if item.nom else "-" }}</td>
+                        <td>{{ item.statut if item.statut else "-" }}</td>
+                        <td>{{ item.hash_signature if item.hash_signature else "-" }}</td>
+                        <td>{{ item.created_at.strftime('%Y-%m-%d %H:%M:%S') if item.created_at else "-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>
+                <span class="badge badge-success">Aucune anomalie critique détectée.</span>
+            </p>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>

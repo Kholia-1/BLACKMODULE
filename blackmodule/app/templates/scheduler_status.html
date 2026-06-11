@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - État Scheduler</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 22px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 18px;
+            background: #111827;
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #111827;
+            white-space: nowrap;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        .status-line {
+            margin-bottom: 16px;
+            line-height: 1.7;
+        }
+
+        @media (max-width: 1000px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>État du scheduler automatique multi-listes</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    <div class="grid">
+
+        <div class="card">
+            <h2>Scheduler automatique</h2>
+
+            <div class="status-line">
+                <strong>Statut :</strong><br>
+                {% if scheduler_status.running %}
+                    <span class="badge badge-success">ACTIF</span>
+                {% else %}
+                    <span class="badge badge-warning">INACTIF</span>
+                {% endif %}
+            </div>
+
+            <div class="status-line">
+                <strong>Nombre de jobs programmés :</strong><br>
+                {{ scheduler_status.jobs|length if scheduler_status.jobs else 0 }}
+            </div>
+
+            <a class="btn" href="/web/list-updates">
+                Lancer une mise à jour manuelle
+            </a>
+        </div>
+
+        <div class="card">
+            <h2>Jobs programmés</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID Job</th>
+                            <th>Prochaine exécution</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% if scheduler_status.jobs %}
+                            {% for job in scheduler_status.jobs %}
+                            <tr>
+                                <td>
+                                    <span class="badge badge-info">{{ job.id }}</span>
+                                </td>
+                                <td>
+                                    {{ job.next_run_time if job.next_run_time else "-" }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="2">Aucun job scheduler détecté.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card">
+        <h2>Listes surveillées</h2>
+
+        <p>
+            Le scheduler automatique surveille les listes officielles selon leur fréquence de publication.
+        </p>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Format</th>
+                        <th>Fréquence</th>
+                        <th>Heure UTC</th>
+                        <th>Mode</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in monitored_lists %}
+                    <tr>
+                        <td>
+                            <span class="badge badge-info">{{ item.source }}</span>
+                        </td>
+                        <td>{{ item.format }}</td>
+                        <td>{{ item.frequence }}</td>
+                        <td>{{ item.heure }}</td>
+                        <td>{{ item.mode }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Dernières mises à jour</h2>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date import</th>
+                        <th>Source</th>
+                        <th>Fichier</th>
+                        <th>Type</th>
+                        <th>Total</th>
+                        <th>Insérés</th>
+                        <th>Mis à jour</th>
+                        <th>Doublons</th>
+                        <th>Rejetés</th>
+                        <th>Statut</th>
+                        <th>Importé par</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% if latest_imports %}
+                        {% for item in latest_imports %}
+                        <tr>
+                            <td>{{ item.imported_at.strftime('%Y-%m-%d %H:%M:%S') if item.imported_at else "-" }}</td>
+                            <td><span class="badge badge-info">{{ item.source_liste }}</span></td>
+                            <td>{{ item.filename }}</td>
+                            <td>{{ item.file_type }}</td>
+                            <td>{{ item.total_records }}</td>
+                            <td>{{ item.inserted_records }}</td>
+                            <td>{{ item.updated_records }}</td>
+                            <td>{{ item.duplicate_records }}</td>
+                            <td>{{ item.rejected_records }}</td>
+                            <td>
+                                {% if item.status == "SUCCESS" %}
+                                    <span class="badge badge-success">{{ item.status }}</span>
+                                {% elif item.status == "FAILED" %}
+                                    <span class="badge badge-warning">{{ item.status }}</span>
+                                {% else %}
+                                    <span class="badge badge-info">{{ item.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.imported_by }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="11">Aucune mise à jour trouvée.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

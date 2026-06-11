@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Historique des imports</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 20px;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .summary {
+            color: #4b5563;
+            font-size: 14px;
+        }
+
+        .filter-form {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        input, select {
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 14px;
+            background: #111827;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1f2937;
+        }
+
+        .btn-link {
+            padding: 10px 14px;
+            background: #e5e7eb;
+            color: #111827;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            min-width: 1250px;
+            border-collapse: collapse;
+            margin-top: 14px;
+            background: white;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #111827;
+            vertical-align: top;
+        }
+
+        .nowrap {
+            white-space: nowrap;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+            white-space: nowrap;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-source {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .error {
+            color: #991b1b;
+            max-width: 350px;
+            line-height: 1.5;
+        }
+
+        .empty {
+            color: #6b7280;
+            font-size: 14px;
+            padding: 20px 0;
+        }
+
+        @media (max-width: 800px) {
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .filter-form {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            input, select, button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Tableau de bord général</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    <div class="card">
+        <div class="top-bar">
+            <div>
+                <h2>Historique des imports</h2>
+                <div class="summary">
+                    Total affiché : {{ imports|length }} import(s)
+                </div>
+            </div>
+
+            <form class="filter-form" method="get" action="/web/import-history">
+                <select name="source_liste">
+                    <option value="">Toutes les sources</option>
+
+                    <option value="AFB_PPE" {% if source_liste == "AFB_PPE" %}selected{% endif %}>AFB_PPE</option>
+                    <option value="OFAC_SDN" {% if source_liste == "OFAC_SDN" %}selected{% endif %}>OFAC_SDN</option>
+                    <option value="OFAC_CONSOLIDATED" {% if source_liste == "OFAC_CONSOLIDATED" %}selected{% endif %}>OFAC_CONSOLIDATED</option>
+                    <option value="ONU" {% if source_liste == "ONU" %}selected{% endif %}>ONU</option>
+                    <option value="UE" {% if source_liste == "UE" %}selected{% endif %}>UE</option>
+                    <option value="OFSI" {% if source_liste == "OFSI" %}selected{% endif %}>OFSI</option>
+                    <option value="FR_GEL" {% if source_liste == "FR_GEL" %}selected{% endif %}>FR_GEL</option>
+                </select>
+
+                <select name="status">
+                    <option value="">Tous les statuts</option>
+                    <option value="SUCCESS" {% if status == "SUCCESS" %}selected{% endif %}>SUCCESS</option>
+                    <option value="FAILED" {% if status == "FAILED" %}selected{% endif %}>FAILED</option>
+                    <option value="PENDING" {% if status == "PENDING" %}selected{% endif %}>PENDING</option>
+                </select>
+
+                <input type="text" name="imported_by" placeholder="Importé par..." value="{{ imported_by or '' }}">
+
+                <button type="submit">Filtrer</button>
+                <a class="btn-link" href="/web/import-history">Réinitialiser</a>
+            </form>
+        </div>
+
+        {% if imports and imports|length > 0 %}
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date import</th>
+                            <th>Source</th>
+                            <th>Fichier</th>
+                            <th>Type</th>
+                            <th>Total</th>
+                            <th>Insérés</th>
+                            <th>Mis à jour</th>
+                            <th>Doublons</th>
+                            <th>Rejetés</th>
+                            <th>Statut</th>
+                            <th>Importé par</th>
+                            <th>Erreur</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for item in imports %}
+                        <tr>
+                            <td class="nowrap">
+                                {{ item.imported_at.strftime('%Y-%m-%d %H:%M:%S') if item.imported_at else "-" }}
+                            </td>
+
+                            <td>
+                                <span class="badge badge-source">
+                                    {{ item.source_liste if item.source_liste else "-" }}
+                                </span>
+                            </td>
+
+                            <td>{{ item.filename if item.filename else "-" }}</td>
+                            <td class="nowrap">{{ item.file_type if item.file_type else "-" }}</td>
+
+                            <td>{{ item.total_records if item.total_records is not none else 0 }}</td>
+                            <td>{{ item.inserted_records if item.inserted_records is not none else 0 }}</td>
+                            <td>{{ item.updated_records if item.updated_records is not none else 0 }}</td>
+                            <td>{{ item.duplicate_records if item.duplicate_records is not none else 0 }}</td>
+                            <td>{{ item.rejected_records if item.rejected_records is not none else 0 }}</td>
+
+                            <td>
+                                {% if item.status == "SUCCESS" %}
+                                    <span class="badge badge-success">SUCCESS</span>
+                                {% elif item.status == "FAILED" %}
+                                    <span class="badge badge-failed">FAILED</span>
+                                {% else %}
+                                    <span class="badge badge-pending">{{ item.status if item.status else "-" }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td class="nowrap">{{ item.imported_by if item.imported_by else "-" }}</td>
+
+                            <td class="error">
+                                {{ item.error_message if item.error_message else "-" }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty">Aucun historique d’import trouvé.</div>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>

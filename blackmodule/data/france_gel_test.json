@@ -1,0 +1,30 @@
+[
+  {
+    "nom": "DURAND",
+    "prenom": "PIERRE",
+    "nom_complet": "PIERRE DURAND",
+    "type_entite": "PERSONNE_PHYSIQUE",
+    "date_naissance": "1972-09-01",
+    "nationalite": "FRANCAISE",
+    "pays": "FRANCE",
+    "num_passeport": "FRP123456",
+    "decision": "Décision de gel des avoirs test",
+    "date_inscription": "2025-03-01",
+    "statut": "ACTIF",
+    "alias": ["P DURAND", "PIERRE D."]
+  },
+  {
+    "nom": "DELTA FINANCE SA",
+    "prenom": null,
+    "nom_complet": "DELTA FINANCE SA",
+    "type_entite": "PERSONNE_MORALE",
+    "date_naissance": null,
+    "nationalite": null,
+    "pays": "FRANCE",
+    "num_passeport": null,
+    "decision": "Entité soumise à mesure de gel des avoirs test",
+    "date_inscription": "2024-09-17",
+    "statut": "ACTIF",
+    "alias": ["DELTA FINANCE", "DFS"]
+  }
+]

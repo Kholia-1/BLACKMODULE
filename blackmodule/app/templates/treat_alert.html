@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Traitement Alerte</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+            max-width: 900px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 20px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 10px 18px;
+            font-size: 14px;
+        }
+
+        .label {
+            color: #6b7280;
+            font-weight: bold;
+        }
+
+        .value {
+            color: #111827;
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            color: #374151;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        select, textarea, input {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 13px 18px;
+            background: #111827;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1f2937;
+        }
+
+        .back {
+            display: inline-block;
+            margin-left: 12px;
+            color: #374151;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        @media (max-width: 700px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Tableau de bord général</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    <div class="card">
+        <h2>Détails de l'alerte</h2>
+
+        <div class="info-grid">
+            <div class="label">Référence client</div>
+            <div class="value">{{ alert.client_reference }}</div>
+
+            <div class="label">Client</div>
+            <div class="value">{{ alert.client_prenom }} {{ alert.client_nom }}</div>
+
+            <div class="label">Score</div>
+            <div class="value">{{ alert.matching_score }}</div>
+
+            <div class="label">Niveau</div>
+            <div class="value">{{ alert.niveau_alerte }}</div>
+
+            <div class="label">Statut actuel</div>
+            <div class="value">{{ alert.statut }}</div>
+
+            <div class="label">Source</div>
+            <div class="value">{{ alert.source_liste }}</div>
+
+            <div class="label">Type matching</div>
+            <div class="value">{{ alert.matching_type }}</div>
+
+            <div class="label">Action recommandée</div>
+            <div class="value">{{ alert.action_recommandee }}</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Traiter l'alerte</h2>
+
+        <form method="post" action="/web/alerts/{{ alert.id }}/treat">
+
+            <label>Nouveau statut</label>
+            <select name="statut" required>
+                <option value="EN_COURS">EN_COURS</option>
+                <option value="FAUX_POSITIF">FAUX_POSITIF</option>
+                <option value="CONFIRMEE">CONFIRMEE</option>
+                <option value="ESCALADEE">ESCALADEE</option>
+                <option value="CLOTUREE">CLOTUREE</option>
+            </select>
+
+            <label>Traité par</label>
+            <input type="text" name="treated_by" value="bello.etienne" required>
+
+            <label>Commentaire de traitement</label>
+            <textarea name="treatment_comment" placeholder="Explique ici la décision prise..." required></textarea>
+
+            <button type="submit">Enregistrer le traitement</button>
+            <a class="back" href="/web/alerts">Retour aux alertes</a>
+        </form>
+    </div>
+
+</div>
+
+</body>
+</html>

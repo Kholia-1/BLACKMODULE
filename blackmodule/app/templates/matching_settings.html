@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Paramètres de matching</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+            max-width: 950px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 26px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            color: #374151;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 12px 18px;
+            background: #111827;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .message-success {
+            background: #dcfce7;
+            color: #166534;
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+            font-weight: bold;
+        }
+
+        .message-error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+            font-weight: bold;
+        }
+
+        .info {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 16px;
+            border-radius: 10px;
+            color: #374151;
+            line-height: 1.7;
+            margin-top: 18px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Paramétrage des seuils de matching</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+    <a class="btn-link" href="/api/exports/matching-settings-excel">
+    Exporter Excel paramètres de matching
+</a>
+
+    {% if message %}
+        {% if success %}
+            <div class="message-success">{{ message }}</div>
+        {% else %}
+            <div class="message-error">{{ message }}</div>
+        {% endif %}
+    {% endif %}
+
+    <div class="card">
+        <h2>Seuils de classification</h2>
+
+        <form method="post" action="/web/matching-settings">
+            <div class="grid">
+                <div>
+                    <label>Seuil Alerte Exacte</label>
+                    <input type="number" step="0.1" min="0" max="100" name="exact_threshold"
+                           value="{{ settings.exact_threshold }}" required>
+                </div>
+
+                <div>
+                    <label>Seuil Alerte Probable</label>
+                    <input type="number" step="0.1" min="0" max="100" name="probable_threshold"
+                           value="{{ settings.probable_threshold }}" required>
+                </div>
+
+                <div>
+                    <label>Seuil Alerte Possible</label>
+                    <input type="number" step="0.1" min="0" max="100" name="possible_threshold"
+                           value="{{ settings.possible_threshold }}" required>
+                </div>
+            </div>
+
+            <button type="submit">Enregistrer les paramètres</button>
+        </form>
+
+        <form method="post" action="/web/matching-settings/reset"
+      onsubmit="return confirm('Confirmer la restauration des seuils par défaut ?');">
+    <button type="submit" style="background:#6b7280;">
+        Restaurer les seuils par défaut
+    </button>
+</form>
+
+        <div class="info">
+            <strong>Règle obligatoire :</strong><br>
+            <code>0 ≤ Alerte Possible ≤ Alerte Probable ≤ Alerte Exacte ≤ 100</code>
+            <br><br>
+
+            <span class="badge">Alerte exacte</span>
+            score supérieur ou égal au seuil exact : opération bloquée.
+            <br>
+
+            <span class="badge">Alerte probable</span>
+            score supérieur ou égal au seuil probable : revue conformité.
+            <br>
+
+            <span class="badge">Alerte possible</span>
+            score supérieur ou égal au seuil possible : surveillance renforcée.
+        </div>
+    </div>
+
+    <div class="card">
+    <h2>Historique récent des modifications</h2>
+
+    <p>
+        Les dernières modifications des seuils sont enregistrées dans le journal d’audit.
+    </p>
+
+    <a class="btn-link" href="/web/audit-logs?action=UPDATE_MATCHING_SETTINGS">
+        Voir tout l’historique dans l’audit
+    </a>
+
+    {% if history_logs and history_logs|length > 0 %}
+        <table style="width:100%; border-collapse:collapse; margin-top:16px;">
+            <thead>
+                <tr>
+                    <th style="text-align:left; background:#f3f4f6; padding:10px;">Date</th>
+                    <th style="text-align:left; background:#f3f4f6; padding:10px;">Utilisateur</th>
+                    <th style="text-align:left; background:#f3f4f6; padding:10px;">Description</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for log in history_logs %}
+                <tr>
+                    <td style="padding:10px; border-bottom:1px solid #e5e7eb;">
+                        {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else "-" }}
+                    </td>
+                    <td style="padding:10px; border-bottom:1px solid #e5e7eb;">
+                        {{ log.user_identifier if log.user_identifier else "-" }}
+                    </td>
+                    <td style="padding:10px; border-bottom:1px solid #e5e7eb;">
+                        {{ log.description if log.description else "-" }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>
+            Aucune modification enregistrée pour le moment.
+        </p>
+    {% endif %}
+</div>
+
+    <div class="card">
+        <h2>Dernière modification</h2>
+
+        <p>
+            <strong>Modifié par :</strong>
+            {{ settings.updated_by if settings.updated_by else "-" }}
+        </p>
+
+        <p>
+            <strong>Date :</strong>
+            {{ settings.updated_at.strftime('%Y-%m-%d %H:%M:%S') if settings.updated_at else "-" }}
+        </p>
+    </div>
+
+</div>
+
+</body>
+</html>

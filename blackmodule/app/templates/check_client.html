@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Vérification Client</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #111827;
+            font-size: 20px;
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            color: #374151;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        button {
+            margin-top: 20px;
+            width: 100%;
+            padding: 13px;
+            background: #111827;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1f2937;
+        }
+
+        .result-box {
+            margin-bottom: 22px;
+            padding: 18px;
+            border-radius: 10px;
+        }
+
+        .safe {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .exacte {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .probable {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .possible {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .result-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .result-info {
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .badge-exacte {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-probable {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-possible {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .empty {
+            color: #6b7280;
+            font-size: 14px;
+            padding: 14px 0;
+        }
+
+        @media (max-width: 1000px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p><p>Vérification client et matching sanctions/PPE</p></p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    <div class="card">
+    <h2>Seuils actifs de matching</h2>
+
+    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+        <div>
+            <strong>Alerte exacte</strong><br>
+            Score ≥ {{ settings.exact_threshold if settings else 90 }}
+        </div>
+
+        <div>
+            <strong>Alerte probable</strong><br>
+            Score ≥ {{ settings.probable_threshold if settings else 75 }}
+        </div>
+
+        <div>
+            <strong>Alerte possible</strong><br>
+            Score ≥ {{ settings.possible_threshold if settings else 60 }}
+        </div>
+    </div>
+</div>
+
+    <div class="layout">
+
+        <div class="card">
+            <h2>Rechercher un client</h2>
+
+            <form method="post" action="/web/check-client">
+                <label>Référence client</label>
+                <input type="text" name="client_reference" placeholder="Ex : CLI001" value="{{ form.client_reference or '' }}">
+
+                <label>Nom</label>
+                <input type="text" name="nom" placeholder="Ex : KAMGA" required value="{{ form.nom or '' }}">
+
+                <label>Prénom</label>
+                <input type="text" name="prenom" placeholder="Ex : PAUL" value="{{ form.prenom or '' }}">
+
+                <label>Date de naissance</label>
+                <input type="date" name="date_naissance" value="{{ form.date_naissance or '' }}">
+
+                <label>Nationalité</label>
+                <input type="text" name="nationalite" placeholder="Ex : CAMEROUNAISE" value="{{ form.nationalite or '' }}">
+
+                <label>Numéro de passeport</label>
+                <input type="text" name="num_passeport" placeholder="Ex : P456789" value="{{ form.num_passeport or '' }}">
+
+                <button type="submit">Lancer le matching</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Résultat du screening</h2>
+
+            {% if result %}
+
+                {% if result.status == "ALERTE_EXACTE" %}
+                    <div class="result-box exacte">
+                {% elif result.status == "ALERTE_PROBABLE" %}
+                    <div class="result-box probable">
+                {% elif result.status == "ALERTE_POSSIBLE" %}
+                    <div class="result-box possible">
+                {% else %}
+                    <div class="result-box safe">
+                {% endif %}
+
+                    <div class="result-title">{{ result.status }}</div>
+
+                    <div class="result-info">
+                        <strong>Client :</strong> {{ result.client_name }}<br>
+                        <strong>Référence :</strong> {{ result.client_reference }}<br>
+                        <strong>Score maximum :</strong> {{ result.highest_score }} %<br>
+                        <strong>Action recommandée :</strong> {{ result.action }}<br>
+                        <strong>Alertes générées :</strong>
+                        {{ result.generated_alerts_count if result.generated_alerts_count is defined else 0 }}<br>
+                        <strong>Alertes déjà existantes :</strong>
+                        {{ result.existing_alerts_count if result.existing_alerts_count is defined else 0 }}
+                    </div>
+                </div>
+
+                <h2>Correspondances trouvées</h2>
+
+                {% if result.matches and result.matches|length > 0 %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nom listé</th>
+                                <th>Source</th>
+                                <th>Score</th>
+                                <th>Type matching</th>
+                                <th>Niveau</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for match in result.matches %}
+                            <tr>
+                                <td>{{ match.listed_name }}</td>
+                                <td>{{ match.source_liste }}</td>
+                                <td>{{ match.score }}</td>
+                                <td>{{ match.matching_type }}</td>
+                                <td>
+                                    {% if match.niveau_alerte == "ALERTE_EXACTE" %}
+                                        <span class="badge badge-exacte">{{ match.niveau_alerte }}</span>
+                                    {% elif match.niveau_alerte == "ALERTE_PROBABLE" %}
+                                        <span class="badge badge-probable">{{ match.niveau_alerte }}</span>
+                                    {% else %}
+                                        <span class="badge badge-possible">{{ match.niveau_alerte }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ match.action_recommandee }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty">Aucune correspondance significative trouvée.</div>
+                {% endif %}
+
+            {% else %}
+                <div class="empty">
+                    Saisis les informations du client à gauche, puis clique sur <strong>Lancer le matching</strong>.
+                </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

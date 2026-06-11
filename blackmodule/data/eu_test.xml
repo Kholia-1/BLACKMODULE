@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<consolidatedList>
+    <sanctionEntity>
+        <subjectType>person</subjectType>
+        <nameAlias>
+            <wholeName>JEAN DUPONT</wholeName>
+        </nameAlias>
+        <nameAlias>
+            <wholeName>J DUPONT</wholeName>
+        </nameAlias>
+        <birthdate>1975-04-12</birthdate>
+        <citizenship>FRANCE</citizenship>
+        <identification>
+            <passportNumber>EU123456</passportNumber>
+        </identification>
+        <regulationSummary>Sanction UE test</regulationSummary>
+        <publicationDate>2025-06-01</publicationDate>
+    </sanctionEntity>
+
+    <sanctionEntity>
+        <subjectType>enterprise</subjectType>
+        <nameAlias>
+            <wholeName>ALPHA GLOBAL TRADING</wholeName>
+        </nameAlias>
+        <nameAlias>
+            <wholeName>AGT</wholeName>
+        </nameAlias>
+        <country>GERMANY</country>
+        <regulationSummary>Entité UE test</regulationSummary>
+        <publicationDate>2024-11-20</publicationDate>
+    </sanctionEntity>
+</consolidatedList>

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdnList>
+    <sdnEntry>
+        <uid>9001</uid>
+        <lastName>NGONO</lastName>
+        <firstName>DAVID</firstName>
+        <sdnType>Individual</sdnType>
+
+        <programList>
+            <program>OFAC CONSOLIDATED TEST PROGRAM</program>
+        </programList>
+
+        <akaList>
+            <aka>
+                <uid>9101</uid>
+                <type>a.k.a.</type>
+                <category>strong</category>
+                <lastName>DAVE NGONO</lastName>
+            </aka>
+        </akaList>
+
+        <nationalityList>
+            <nationality>
+                <uid>9201</uid>
+                <country>CAMEROON</country>
+                <mainEntry>true</mainEntry>
+            </nationality>
+        </nationalityList>
+
+        <dateOfBirthList>
+            <dateOfBirthItem>
+                <uid>9301</uid>
+                <dateOfBirth>1982-07-14</dateOfBirth>
+                <mainEntry>true</mainEntry>
+            </dateOfBirthItem>
+        </dateOfBirthList>
+
+        <idList>
+            <id>
+                <uid>9401</uid>
+                <idType>Passport</idType>
+                <idNumber>OFC999888</idNumber>
+                <idCountry>CAMEROON</idCountry>
+            </id>
+        </idList>
+    </sdnEntry>
+
+    <sdnEntry>
+        <uid>9002</uid>
+        <lastName>SUNRISE MINING CORP</lastName>
+        <sdnType>Entity</sdnType>
+
+        <programList>
+            <program>OFAC CONSOLIDATED ENTITY TEST</program>
+        </programList>
+
+        <akaList>
+            <aka>
+                <uid>9102</uid>
+                <type>a.k.a.</type>
+                <category>weak</category>
+                <lastName>SUNRISE MINING</lastName>
+            </aka>
+        </akaList>
+    </sdnEntry>
+</sdnList>

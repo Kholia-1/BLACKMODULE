@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Dashboard</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #d1d5db;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 22px;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+        }
+
+        .card-title {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 30px;
+            font-weight: bold;
+            color: #111827;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 22px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            overflow-x: auto;
+        }
+
+        .section h2 {
+            margin-top: 0;
+            font-size: 20px;
+            color: #111827;
+        }
+
+        table {
+            width: 100%;
+            min-width: 950px;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background: white;
+        }
+
+        th {
+            text-align: left;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #111827;
+            background: white;
+            white-space: nowrap;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .exacte {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .probable {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .possible {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .nav {
+            margin-top: 15px;
+        }
+
+        .nav a {
+            color: #93c5fd;
+            margin-right: 18px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        @media (max-width: 1000px) {
+            .cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .cards {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Tableau de bord général</p>
+
+    {% include "partials/navbar.html" %}
+</div>
+
+<div class="container">
+
+    <div class="cards">
+        <div class="card">
+            <div class="card-title">Sanctions totales</div>
+            <div class="card-value">{{ total_sanctions }}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Sanctions actives</div>
+            <div class="card-value">{{ active_sanctions }}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Alertes totales</div>
+            <div class="card-value">{{ total_alerts }}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Journaux d'audit</div>
+            <div class="card-value">{{ total_audit_logs }}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Alertes générées</div>
+            <div class="card-value">{{ alerts_generee }}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Alertes confirmées</div>
+            <div class="card-value">{{ alerts_confirmee }}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Faux positifs</div>
+            <div class="card-value">{{ alerts_faux_positif }}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Alertes exactes</div>
+            <div class="card-value">{{ alertes_exactes }}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Dernières alertes générées</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Référence client</th>
+                    <th>Nom client</th>
+                    <th>Score</th>
+                    <th>Niveau</th>
+                    <th>Statut</th>
+                    <th>Source</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+
+<tbody>
+    {% for alert in recent_alerts %}
+    <tr>
+        <td>{{ alert.client_reference if alert.client_reference else "-" }}</td>
+
+        <td>
+            {% if alert.client_prenom or alert.client_nom %}
+                {{ alert.client_prenom if alert.client_prenom else "" }}
+                {{ alert.client_nom if alert.client_nom else "" }}
+            {% else %}
+                -
+            {% endif %}
+        </td>
+
+        <td>
+            {{ alert.matching_score if alert.matching_score is not none else "-" }}
+        </td>
+
+        <td>
+            {% if alert.niveau_alerte == "ALERTE_EXACTE" %}
+                <span class="badge exacte">{{ alert.niveau_alerte }}</span>
+            {% elif alert.niveau_alerte == "ALERTE_PROBABLE" %}
+                <span class="badge probable">{{ alert.niveau_alerte }}</span>
+            {% elif alert.niveau_alerte == "ALERTE_POSSIBLE" %}
+                <span class="badge possible">{{ alert.niveau_alerte }}</span>
+            {% else %}
+                <span class="badge status">{{ alert.niveau_alerte if alert.niveau_alerte else "-" }}</span>
+            {% endif %}
+        </td>
+
+        <td>
+            <span class="badge status">
+                {{ alert.statut if alert.statut else "-" }}
+            </span>
+        </td>
+
+        <td>{{ alert.source_liste if alert.source_liste else "-" }}</td>
+
+        <td>
+            {{ alert.created_at.strftime('%Y-%m-%d %H:%M') if alert.created_at else "-" }}
+        </td>
+    </tr>
+    {% endfor %}
+</tbody>
+        </table>
+    </div>
+
+</div>
+
+</body>
+</html>
