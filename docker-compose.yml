@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16
+    container_name: blackmodule_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: blackmodule
+      POSTGRES_USER: blackmodule_user
+      POSTGRES_PASSWORD: blackmodule_password
+    volumes:
+      - blackmodule_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  app:
+    build: .
+    container_name: blackmodule_app
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://blackmodule_user:blackmodule_password@db:5432/blackmodule
+      SECRET_KEY: CHANGE_ME_SECRET_KEY
+      BLACKMODULE_API_KEY: CHANGE_ME_API_KEY
+    ports:
+      - "8000:8000"
+
+volumes:
+  blackmodule_postgres_data:
