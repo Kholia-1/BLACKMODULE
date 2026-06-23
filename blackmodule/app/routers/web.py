@@ -25,14 +25,16 @@ from app.services.import_service import (
     import_ofsi_excel,
     import_ofac_consolidated_xml,
     import_france_gel_json,
-    import_france_gel_xml
+    import_france_gel_xml,
+    import_uksl_csv
 )
 from app.services.list_update_service import (
     auto_update_ofac_sdn,
     auto_update_ofac_consolidated,
     auto_update_france_gel,
     auto_update_eu_xml,
-    auto_update_un_xml
+    auto_update_un_xml,
+    auto_update_uksl_csv
 )
 from app.scheduler import get_scheduler_status
 from app.services.matching_settings_service import (
@@ -184,6 +186,19 @@ def web_dashboard(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(request=request, name="dashboard.html", context=context)
 
 
+def calculate_age(birth_date):
+    if not birth_date:
+        return None
+
+    today = datetime.utcnow().date()
+
+    return (
+        today.year
+        - birth_date.year
+        - ((today.month, today.day) < (birth_date.month, birth_date.day))
+    )
+
+
 @router.get("/check-client")
 def check_client_page(
     request: Request,
@@ -221,8 +236,13 @@ def check_client_submit(
     client_reference: Optional[str] = Form(None),
     nom: str = Form(...),
     prenom: Optional[str] = Form(None),
+    type_piece: Optional[str] = Form(None),
+    num_piece: Optional[str] = Form(None),
     date_naissance: Optional[str] = Form(None),
+    age: Optional[str] = Form(None),
+    ville_residence: Optional[str] = Form(None),
     nationalite: Optional[str] = Form(None),
+    pays_residence: Optional[str] = Form(None),
     num_passeport: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
@@ -250,9 +270,26 @@ def check_client_submit(
         except ValueError:
             parsed_date = None
 
+    computed_age = calculate_age(parsed_date)
+
+    if age:
+        try:
+            client_age = int(age)
+        except ValueError:
+            client_age = computed_age
+    else:
+        client_age = computed_age
+
     # Génération automatique référence client si vide
     if not client_reference or not client_reference.strip():
         client_reference = f"WEB-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+
+    document_reference = None
+
+    if num_passeport and num_passeport.strip():
+        document_reference = num_passeport.strip()
+    elif num_piece and num_piece.strip():
+        document_reference = num_piece.strip()
 
     client = ClientCheckRequest(
         client_reference=client_reference,
@@ -260,7 +297,7 @@ def check_client_submit(
         prenom=prenom,
         date_naissance=parsed_date,
         nationalite=nationalite,
-        num_passeport=num_passeport,
+        num_passeport=document_reference,
     )
 
     client_full_name = build_full_name(client.prenom, client.nom)
@@ -286,11 +323,11 @@ def check_client_submit(
         final_score = name_score
         matching_type = "FUZZY_NAME"
 
-        # Matching passeport exact
+        # Matching document exact : passeport, CNI ou autre pièce
         if client.num_passeport and sanction.num_passeport:
             if client.num_passeport.strip().upper() == sanction.num_passeport.strip().upper():
                 final_score = 100.0
-                matching_type = "EXACT_PASSPORT"
+                matching_type = "EXACT_DOCUMENT"
 
         # Matching nom + date de naissance
         if client.date_naissance and sanction.date_naissance:
@@ -311,6 +348,15 @@ def check_client_submit(
                 "sanction_id": sanction.id,
                 "source_liste": sanction.source_liste,
                 "listed_name": listed_name,
+                "sanction_nom": sanction.nom,
+                "sanction_prenom": sanction.prenom,
+                "sanction_nom_complet": sanction.nom_complet,
+                "sanction_type_entite": sanction.type_entite,
+                "sanction_date_naissance": sanction.date_naissance.isoformat() if sanction.date_naissance else None,
+                "sanction_nationalite": sanction.nationalite,
+                "sanction_pays": sanction.pays,
+                "sanction_num_passeport": sanction.num_passeport,
+                "sanction_motif": sanction.motif_sanction,
                 "score": final_score,
                 "matching_type": matching_type,
                 "niveau_alerte": niveau_alerte,
@@ -375,6 +421,19 @@ def check_client_submit(
     result = {
         "client_reference": client.client_reference,
         "client_name": client_full_name,
+        "client_details": {
+            "client_reference": client.client_reference,
+            "nom": nom.upper() if nom else None,
+            "prenom": prenom.upper() if prenom else None,
+            "type_piece": type_piece.upper() if type_piece else None,
+            "num_piece": num_piece.upper() if num_piece else None,
+            "num_passeport": num_passeport.upper() if num_passeport else None,
+            "date_naissance": parsed_date.isoformat() if parsed_date else None,
+            "age": client_age,
+            "ville_residence": ville_residence.upper() if ville_residence else None,
+            "nationalite": nationalite.upper() if nationalite else None,
+            "pays_residence": pays_residence.upper() if pays_residence else None,
+        },
         "status": global_status,
         "highest_score": highest_score,
         "action": global_action,
@@ -387,8 +446,13 @@ def check_client_submit(
         "client_reference": client_reference,
         "nom": nom,
         "prenom": prenom,
+        "type_piece": type_piece,
+        "num_piece": num_piece,
         "date_naissance": date_naissance,
+        "age": age,
+        "ville_residence": ville_residence,
         "nationalite": nationalite,
+        "pays_residence": pays_residence,
         "num_passeport": num_passeport,
     }
 
@@ -734,6 +798,124 @@ async def web_import_ofsi_csv(request: Request, imported_by: str = Form(...), fi
         return templates.TemplateResponse(request=request, name="imports.html", context={"request": request, "message": "Format invalide. Veuillez importer un fichier CSV OFSI UK.", "success": False, "result": None})
     return await process_web_import(request, db, file, current_username(request, imported_by), "OFSI", "CSV", import_ofsi_csv, "Import CSV OFSI UK effectué avec succès.", "WEB_IMPORT_OFSI_CSV")
 
+
+@router.post("/imports/uksl-csv")
+async def web_import_uksl_csv(
+    request: Request,
+    imported_by: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+
+    if not require_role(request, ["ADMIN"]):
+        log_access_denied(
+            db=db,
+            request=request,
+            route="/web/imports",
+            description="Tentative d'accès refusée à l'import UKSL."
+        )
+        return forbidden_page(request)
+
+    current_user = get_current_user(request)
+    imported_by = current_user.get("username") if current_user else imported_by
+
+    if not file.filename.lower().endswith(".csv"):
+        return templates.TemplateResponse(
+            request=request,
+            name="imports.html",
+            context={
+                "request": request,
+                "message": "Format invalide. Veuillez importer un fichier CSV UK Sanctions List.",
+                "success": False,
+                "result": None
+            }
+        )
+
+    import_batch = ImportBatch(
+        source_liste="UKSL",
+        filename=file.filename,
+        file_type="CSV",
+        status="PENDING",
+        imported_by=imported_by
+    )
+
+    db.add(import_batch)
+    db.flush()
+
+    try:
+        file_content = await file.read()
+
+        result = import_uksl_csv(
+            db=db,
+            file_content=file_content
+        )
+
+        import_batch.total_records = result["total_records"]
+        import_batch.inserted_records = result["inserted_records"]
+        import_batch.updated_records = result["updated_records"]
+        import_batch.duplicate_records = result["duplicate_records"]
+        import_batch.rejected_records = result["rejected_records"]
+        import_batch.status = "SUCCESS"
+
+        write_audit_log(
+            db=db,
+            user_identifier=imported_by,
+            action="WEB_IMPORT_UKSL_CSV",
+            entity_type="ImportBatch",
+            entity_id=str(import_batch.id),
+            description=(
+                f"Import CSV UK Sanctions List depuis l'interface web terminé. "
+                f"Total : {import_batch.total_records}, "
+                f"Insérés : {import_batch.inserted_records}, "
+                f"Mis à jour : {import_batch.updated_records}, "
+                f"Rejetés : {import_batch.rejected_records}."
+            ),
+            ip_address=request.client.host if request.client else None
+        )
+
+        db.commit()
+        db.refresh(import_batch)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="imports.html",
+            context={
+                "request": request,
+                "message": "Import CSV UK Sanctions List effectué avec succès.",
+                "success": True,
+                "result": import_batch
+            }
+        )
+
+    except Exception as e:
+        import_batch.status = "FAILED"
+        import_batch.error_message = str(e)
+
+        write_audit_log(
+            db=db,
+            user_identifier=imported_by,
+            action="WEB_IMPORT_UKSL_CSV_FAILED",
+            entity_type="ImportBatch",
+            entity_id=str(import_batch.id),
+            description=f"Échec import CSV UKSL depuis l'interface web : {str(e)}",
+            ip_address=request.client.host if request.client else None
+        )
+
+        db.commit()
+        db.refresh(import_batch)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="imports.html",
+            context={
+                "request": request,
+                "message": f"Erreur pendant l'import UKSL : {str(e)}",
+                "success": False,
+                "result": import_batch
+            }
+        )
 
 @router.post("/imports/ofsi-excel")
 async def web_import_ofsi_excel(request: Request, imported_by: str = Form(...), file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -1136,6 +1318,88 @@ def web_list_updates_page(request: Request, db: Session = Depends(get_db)):
         return denied_response
     return templates.TemplateResponse(request=request, name="list_updates.html", context={"request": request, "message": None, "success": None, "result": None})
 
+@router.get("/list-updates/uksl")
+def web_auto_update_uksl_get_redirect(
+    request: Request
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+
+    return RedirectResponse(
+        url="/web/list-updates",
+        status_code=303
+    )
+
+
+@router.post("/list-updates/uksl")
+def web_update_uksl(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    denied_response = require_admin_or_403(
+        request,
+        db,
+        "/web/list-updates/uksl",
+        "Tentative d'accès refusée à la mise à jour UKSL."
+    )
+
+    if denied_response:
+        return denied_response
+
+    try:
+        result_data = auto_update_uksl_csv(
+            db=db,
+            imported_by=current_username(request)
+        )
+
+        batch = None
+
+        if isinstance(result_data, dict) and result_data.get("batch_id"):
+            batch = db.query(ImportBatch).filter(
+                ImportBatch.id == result_data.get("batch_id")
+            ).first()
+
+        if not batch:
+            batch = db.query(ImportBatch).filter(
+                ImportBatch.source_liste == "UKSL"
+            ).order_by(
+                ImportBatch.imported_at.desc()
+            ).first()
+
+        if isinstance(result_data, dict) and result_data.get("success") is False:
+            return templates.TemplateResponse(
+                request=request,
+                name="list_updates.html",
+                context={
+                    "request": request,
+                    "message": result_data.get("message", "Erreur pendant la mise à jour UKSL."),
+                    "success": False,
+                    "result": batch
+                }
+            )
+
+        return templates.TemplateResponse(
+            request=request,
+            name="list_updates.html",
+            context={
+                "request": request,
+                "message": "Mise à jour UKSL exécutée avec succès.",
+                "success": True,
+                "result": batch
+            }
+        )
+
+    except Exception as e:
+        return templates.TemplateResponse(
+            request=request,
+            name="list_updates.html",
+            context={
+                "request": request,
+                "message": f"Erreur pendant la mise à jour UKSL : {str(e)}",
+                "success": False,
+                "result": None
+            }
+        )
 
 @router.post("/list-updates/ofac-sdn")
 def web_update_ofac_sdn(request: Request, db: Session = Depends(get_db)):
@@ -2035,3 +2299,4 @@ def web_external_api_page(
             "last_api_call": last_api_call,
         }
     )
+

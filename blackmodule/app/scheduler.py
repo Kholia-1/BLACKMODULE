@@ -7,6 +7,7 @@ from app.services.list_update_service import (
     auto_update_france_gel,
     auto_update_eu_xml,
     auto_update_un_xml,
+    auto_update_uksl_csv
 )
 
 
@@ -89,6 +90,17 @@ def start_scheduler():
         args=["ONU UNSC", auto_update_un_xml, "WEEKLY_SCHEDULER"]
     )
 
+    def run_uksl_update_job():
+        db = SessionLocal()
+
+        try:
+            auto_update_uksl_csv(
+                db=db,
+                imported_by="SCHEDULER"
+            )
+        finally:
+            db.close()
+
     scheduler.start()
 
     print("[BLACKMODULE] Scheduler multi-listes actif.")
@@ -107,3 +119,4 @@ def get_scheduler_status():
         "running": scheduler.running,
         "jobs": jobs
     }
+

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>BLACKMODULE - Mise à jour des listes</title>
-
+<link rel="stylesheet" href="/static/css/styles.css">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -150,6 +150,9 @@
 
 <div class="container">
 
+
+
+
     {% if message %}
         {% if success %}
             <div class="message-success">{{ message }}</div>
@@ -225,10 +228,15 @@
 <div class="card">
     <h2>OFSI / UKSL</h2>
     <p>
-        Mise à jour mensuelle prévue. Source officielle à finaliser selon le format UK Sanctions List.
+        Mise à jour de la <strong>UK Sanctions List</strong>, source officielle actuelle
+        des désignations UK.
     </p>
 
-    <button type="button" disabled>À finaliser</button>
+    <form method="post" action="/web/list-updates/uksl">
+        <button type="submit">
+            Mettre à jour UKSL maintenant
+        </button>
+    </form>
 </div>
 
     </div>

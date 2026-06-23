@@ -23,7 +23,7 @@ services:
       SECRET_KEY: CHANGE_ME_SECRET_KEY
       BLACKMODULE_API_KEY: CHANGE_ME_API_KEY
     ports:
-      - "8000:8000"
+      - "10000:10000"
 
 volumes:
   blackmodule_postgres_data:

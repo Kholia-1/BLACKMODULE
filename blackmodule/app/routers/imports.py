@@ -17,7 +17,8 @@ from app.services.import_service import (
     import_ofsi_excel,
     import_ofac_consolidated_xml,
     import_france_gel_json,
-    import_france_gel_xml
+    import_france_gel_xml,
+    import_uksl_csv
 )
 from app.services.list_update_service import (
     auto_update_ofac_sdn,
@@ -381,6 +382,88 @@ async def upload_france_gel_xml(
     )
 
 
+@router.post("/uksl-csv", response_model=ImportBatchResponse)
+async def upload_uksl_csv(
+    file: UploadFile = File(...),
+    imported_by: str = "SYSTEM",
+    db: Session = Depends(get_db)
+):
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(
+            status_code=400,
+            detail="Format invalide. Veuillez importer un fichier CSV UK Sanctions List."
+        )
+
+    import_batch = ImportBatch(
+        source_liste="UKSL",
+        filename=file.filename,
+        file_type="CSV",
+        status="PENDING",
+        imported_by=imported_by
+    )
+
+    db.add(import_batch)
+    db.flush()
+
+    try:
+        file_content = await file.read()
+
+        result = import_uksl_csv(
+            db=db,
+            file_content=file_content
+        )
+
+        import_batch.total_records = result["total_records"]
+        import_batch.inserted_records = result["inserted_records"]
+        import_batch.updated_records = result["updated_records"]
+        import_batch.duplicate_records = result["duplicate_records"]
+        import_batch.rejected_records = result["rejected_records"]
+        import_batch.status = "SUCCESS"
+
+        write_audit_log(
+            db=db,
+            user_identifier=imported_by,
+            action="IMPORT_UKSL_CSV",
+            entity_type="ImportBatch",
+            entity_id=str(import_batch.id),
+            description=(
+                f"Import CSV UKSL terminé. "
+                f"Total : {import_batch.total_records}, "
+                f"Insérés : {import_batch.inserted_records}, "
+                f"Mis à jour : {import_batch.updated_records}, "
+                f"Rejetés : {import_batch.rejected_records}."
+            ),
+            ip_address=None
+        )
+
+        db.commit()
+        db.refresh(import_batch)
+
+        return import_batch
+
+    except Exception as e:
+        import_batch.status = "FAILED"
+        import_batch.error_message = str(e)
+
+        write_audit_log(
+            db=db,
+            user_identifier=imported_by,
+            action="IMPORT_UKSL_CSV_FAILED",
+            entity_type="ImportBatch",
+            entity_id=str(import_batch.id),
+            description=f"Échec import CSV UKSL : {str(e)}",
+            ip_address=None
+        )
+
+        db.commit()
+        db.refresh(import_batch)
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
+
 @router.post("/auto-update/ofac-sdn", response_model=ImportBatchResponse)
 def manual_auto_update_ofac_sdn(
     imported_by: str = "MANUAL_ADMIN",
@@ -569,4 +652,23 @@ def manual_auto_update_un(
         raise HTTPException(
             status_code=400,
             detail=f"Erreur mise à jour automatique ONU : {repr(e)}"
+
         )
+
+@router.post("/auto-update/uksl")
+def api_auto_update_uksl(
+    imported_by: str = "MANUAL_ADMIN",
+    db: Session = Depends(get_db)
+):
+    result = auto_update_uksl_csv(
+        db=db,
+        imported_by=imported_by
+    )
+
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("message")
+        )
+
+    return result

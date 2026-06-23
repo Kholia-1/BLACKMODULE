@@ -1,12 +1,90 @@
 <style>
+    :root {
+        --afri-red: #D22630;
+        --afri-red-dark: #A61924;
+        --afri-black: #111111;
+        --afri-dark: #2B2B2B;
+        --afri-gray-900: #1F1F1F;
+        --afri-gray-700: #4B5563;
+        --afri-gray-500: #6B7280;
+        --afri-gray-300: #D1D5DB;
+        --afri-gray-200: #E5E7EB;
+        --afri-gray-100: #F3F4F6;
+        --afri-gray-bg: #F4F5F7;
+        --afri-white: #FFFFFF;
+        --afri-shadow: rgba(17, 17, 17, 0.08);
+    }
+
+    /* =====================================================
+       BASE GLOBALE
+       ===================================================== */
+
+    body {
+        background: var(--afri-gray-bg) !important;
+        color: var(--afri-black) !important;
+        font-family: Arial, sans-serif !important;
+        margin: 0;
+    }
+
+    a {
+        color: var(--afri-red);
+        text-decoration: none;
+    }
+
+    a:hover {
+        color: var(--afri-red-dark);
+        text-decoration: none;
+    }
+
+    /* =====================================================
+       HEADER GLOBAL
+       ===================================================== */
+
+    .header,
+    .page-header,
+    .main-header,
+    .app-header {
+        background: var(--afri-black) !important;
+        background-color: var(--afri-black) !important;
+        color: var(--afri-white) !important;
+        padding: 22px 40px !important;
+        border-bottom: 5px solid var(--afri-red) !important;
+        box-shadow: 0 4px 16px rgba(17, 17, 17, 0.18) !important;
+    }
+
+    .header h1,
+    .page-header h1,
+    .main-header h1,
+    .app-header h1 {
+        color: var(--afri-white) !important;
+        font-weight: 900 !important;
+        margin: 0 !important;
+        font-size: 28px !important;
+        letter-spacing: 0.3px !important;
+    }
+
+    .header p,
+    .page-header p,
+    .main-header p,
+    .app-header p {
+        color: var(--afri-gray-300) !important;
+        margin: 8px 0 0 !important;
+        font-size: 14px !important;
+    }
+
+    /* =====================================================
+       BARRE UTILISATEUR
+       ===================================================== */
+
     .top-user-bar {
-        margin-top: 14px;
-        margin-bottom: 12px;
-        padding: 10px 14px;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 10px;
-        color: #e5e7eb;
+        margin-top: 16px;
+        margin-bottom: 14px;
+        padding: 12px 16px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-left: 5px solid var(--afri-red);
+        border-radius: 8px;
+        color: var(--afri-white);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -15,66 +93,487 @@
         font-size: 14px;
     }
 
+    .top-user-bar strong {
+        color: var(--afri-white);
+        font-weight: 900;
+    }
+
+    .user-info-label {
+        color: var(--afri-gray-300);
+        margin-right: 4px;
+    }
+
     .role-badge {
         display: inline-block;
-        padding: 5px 10px;
-        border-radius: 20px;
+        padding: 6px 12px;
+        border-radius: 4px;
         font-size: 12px;
-        font-weight: bold;
-        letter-spacing: 0.3px;
+        font-weight: 900;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        border: 1px solid transparent;
     }
 
     .role-admin {
-        background: #fee2e2;
-        color: #991b1b;
+        background: var(--afri-red);
+        color: var(--afri-white);
+        border-color: var(--afri-red);
     }
 
     .role-superviseur {
-        background: #fef3c7;
-        color: #92400e;
+        background: var(--afri-black);
+        color: var(--afri-white);
+        border-color: var(--afri-gray-700);
     }
 
     .role-operateur {
-        background: #dbeafe;
-        color: #1e40af;
+        background: var(--afri-gray-100);
+        color: var(--afri-black);
+        border-color: var(--afri-gray-300);
     }
 
-    .role-lecteur {
-        background: #dcfce7;
-        color: #166534;
+    .role-lecteur,
+    .role- {
+        background: var(--afri-gray-200);
+        color: var(--afri-black);
+        border-color: var(--afri-gray-300);
     }
+
+    /* =====================================================
+       MENU PRINCIPAL
+       ===================================================== */
 
     .nav {
-        margin-top: 15px;
+        margin-top: 14px;
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 8px;
         align-items: center;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
     }
 
     .nav a {
-        color: #93c5fd;
-        text-decoration: none;
-        font-weight: bold;
-        font-size: 14px;
-        padding: 7px 10px;
-        border-radius: 8px;
+        color: var(--afri-white) !important;
+        text-decoration: none !important;
+        font-weight: 800;
+        font-size: 13px;
+        padding: 9px 12px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
     }
 
     .nav a:hover {
-        background: rgba(147, 197, 253, 0.12);
-        color: #bfdbfe;
+        background: var(--afri-red) !important;
+        color: var(--afri-white) !important;
+        border-color: var(--afri-red) !important;
+        transform: translateY(-1px);
+    }
+
+    .nav a.active {
+        background: var(--afri-red) !important;
+        color: var(--afri-white) !important;
+        border-color: var(--afri-red) !important;
+    }
+
+    .nav a.logout-link {
+        background: rgba(210, 38, 48, 0.18);
+        border-color: rgba(210, 38, 48, 0.45);
+        color: var(--afri-white) !important;
+    }
+
+    .nav a.logout-link:hover {
+        background: var(--afri-red-dark) !important;
+        border-color: var(--afri-red-dark) !important;
+    }
+
+    /* =====================================================
+       CONTENEURS ET CARTES
+       ===================================================== */
+
+    .container,
+    .content,
+    .main-content,
+    .page-content {
+        background: var(--afri-gray-bg) !important;
+    }
+
+    .card,
+    .panel,
+    .box,
+    .stat-card,
+    .summary-card {
+        background: var(--afri-white) !important;
+        color: var(--afri-black) !important;
+        border: 1px solid var(--afri-gray-200) !important;
+        box-shadow: 0 6px 18px var(--afri-shadow) !important;
+        border-radius: 10px !important;
+    }
+
+    .card h1,
+    .card h2,
+    .card h3,
+    .panel h1,
+    .panel h2,
+    .panel h3,
+    .box h1,
+    .box h2,
+    .box h3 {
+        color: var(--afri-black) !important;
+    }
+
+    /* =====================================================
+       FORMULAIRES
+       ===================================================== */
+
+    input,
+    select,
+    textarea {
+        background: var(--afri-white) !important;
+        color: var(--afri-black) !important;
+        border: 1px solid var(--afri-gray-300) !important;
+        border-radius: 6px !important;
+        box-sizing: border-box !important;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+        outline: none !important;
+        border-color: var(--afri-red) !important;
+        box-shadow: 0 0 0 3px rgba(210, 38, 48, 0.14) !important;
+    }
+
+    /* =====================================================
+       BOUTONS PRINCIPAUX
+       ===================================================== */
+
+    button,
+    .btn,
+    .btn-primary,
+    input[type="submit"] {
+        background: var(--afri-red) !important;
+        color: var(--afri-white) !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-weight: 800 !important;
+        text-decoration: none !important;
+        cursor: pointer !important;
+    }
+
+    button:hover,
+    .btn:hover,
+    .btn-primary:hover,
+    input[type="submit"]:hover {
+        background: var(--afri-red-dark) !important;
+        color: var(--afri-white) !important;
+        text-decoration: none !important;
+    }
+
+    .btn-reset,
+    .btn-secondary,
+    .reset-link {
+        background: var(--afri-gray-200) !important;
+        color: var(--afri-black) !important;
+        border: 1px solid var(--afri-gray-300) !important;
+        border-radius: 6px !important;
+        font-weight: 800 !important;
+        text-decoration: none !important;
+    }
+
+    .btn-reset:hover,
+    .btn-secondary:hover,
+    .reset-link:hover {
+        background: var(--afri-gray-300) !important;
+        color: var(--afri-black) !important;
+        text-decoration: none !important;
+    }
+
+    /* =====================================================
+       BOUTONS D'EXPORT / ACTIONS SECONDAIRES
+       Corrige les anciens boutons .btn-link mal affichés.
+       ===================================================== */
+
+    .btn-link,
+    .export-action-btn,
+    .btn-export,
+    .export-btn,
+    .btn-excel {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+
+        width: auto !important;
+        min-width: 150px !important;
+        min-height: 38px !important;
+
+        padding: 10px 16px !important;
+        margin: 0 10px 16px 0 !important;
+
+        background: var(--afri-white) !important;
+        color: var(--afri-black) !important;
+
+        border: 1px solid var(--afri-gray-300) !important;
+        border-left: 5px solid var(--afri-red) !important;
+        border-radius: 8px !important;
+
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        line-height: 1.2 !important;
+
+        text-decoration: none !important;
+        white-space: nowrap !important;
+
+        box-shadow: 0 4px 12px var(--afri-shadow) !important;
+        cursor: pointer !important;
+
+        transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease !important;
+    }
+
+    .btn-link::before,
+    .export-action-btn::before,
+    .btn-export::before,
+    .export-btn::before,
+    .btn-excel::before {
+        content: "⬇" !important;
+        width: 22px !important;
+        height: 22px !important;
+        min-width: 22px !important;
+        border-radius: 50% !important;
+        background: var(--afri-red) !important;
+        color: var(--afri-white) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 12px !important;
+        font-weight: 900 !important;
+        text-decoration: none !important;
+    }
+
+    .btn-link:hover,
+    .export-action-btn:hover,
+    .btn-export:hover,
+    .export-btn:hover,
+    .btn-excel:hover {
+        background: var(--afri-red) !important;
+        color: var(--afri-white) !important;
+        border-color: var(--afri-red) !important;
+        border-left-color: var(--afri-black) !important;
+        text-decoration: none !important;
+        box-shadow: 0 6px 16px rgba(210, 38, 48, 0.25) !important;
+        transform: translateY(-1px) !important;
+    }
+
+    .btn-link:hover::before,
+    .export-action-btn:hover::before,
+    .btn-export:hover::before,
+    .export-btn:hover::before,
+    .btn-excel:hover::before {
+        background: var(--afri-white) !important;
+        color: var(--afri-red) !important;
+    }
+
+    /* Les boutons du menu ne doivent jamais prendre le style export */
+    .nav .btn-link,
+    .nav .export-action-btn,
+    .nav .btn-export,
+    .nav .export-btn,
+    .nav .btn-excel {
+        min-width: auto !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        padding: 9px 12px !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: var(--afri-white) !important;
+        border: 1px solid rgba(255, 255, 255, 0.10) !important;
+        border-left: 1px solid rgba(255, 255, 255, 0.10) !important;
+        box-shadow: none !important;
+    }
+
+    .nav .btn-link::before,
+    .nav .export-action-btn::before,
+    .nav .btn-export::before,
+    .nav .export-btn::before,
+    .nav .btn-excel::before {
+        content: none !important;
+    }
+
+    /* =====================================================
+       FILTRES
+       ===================================================== */
+
+    .advanced-filter,
+    .filter-box,
+    .filters,
+    .search-box {
+        background: #FAFAFA !important;
+        border: 1px solid var(--afri-gray-200) !important;
+        border-radius: 8px !important;
+    }
+
+    .advanced-filter button,
+    .filter-box button,
+    .filters button,
+    .search-box button {
+        background: var(--afri-black) !important;
+        color: var(--afri-white) !important;
+    }
+
+    .advanced-filter button:hover,
+    .filter-box button:hover,
+    .filters button:hover,
+    .search-box button:hover {
+        background: var(--afri-red) !important;
+        color: var(--afri-white) !important;
+    }
+
+    /* =====================================================
+       TABLEAUX
+       ===================================================== */
+
+    table {
+        background: var(--afri-white) !important;
+        border: 1px solid var(--afri-gray-200) !important;
+        border-collapse: collapse !important;
+    }
+
+    th {
+        background: var(--afri-gray-100) !important;
+        color: var(--afri-black) !important;
+        font-weight: 800 !important;
+    }
+
+    td {
+        background: var(--afri-white) !important;
+        color: var(--afri-dark) !important;
+        border-bottom: 1px solid var(--afri-gray-200) !important;
+    }
+
+    tr:hover td {
+        background: #FAFAFA !important;
+    }
+
+    /* =====================================================
+       BADGES / STATUTS
+       ===================================================== */
+
+    .badge,
+    .status-badge {
+        border-radius: 4px !important;
+        font-weight: 800 !important;
+        text-decoration: none !important;
+    }
+
+    .badge-exacte,
+    .badge-danger,
+    .badge-critical,
+    .critical,
+    .danger {
+        background: var(--afri-red) !important;
+        color: var(--afri-white) !important;
+    }
+
+    .badge-probable,
+    .badge-warning,
+    .warning {
+        background: var(--afri-black) !important;
+        color: var(--afri-white) !important;
+    }
+
+    .badge-possible,
+    .badge-info,
+    .info {
+        background: var(--afri-gray-200) !important;
+        color: var(--afri-black) !important;
+    }
+
+    .badge-success,
+    .badge-ok,
+    .success,
+    .ok {
+        background: var(--afri-gray-100) !important;
+        color: var(--afri-black) !important;
+        border: 1px solid var(--afri-gray-300) !important;
+    }
+
+    /* =====================================================
+       RESULT BOX
+       ===================================================== */
+
+    .result-box.exacte {
+        background: #FFF1F2 !important;
+        color: #7F1D1D !important;
+        border-left: 6px solid var(--afri-red) !important;
+    }
+
+    .result-box.probable {
+        background: var(--afri-gray-100) !important;
+        color: var(--afri-black) !important;
+        border-left: 6px solid var(--afri-black) !important;
+    }
+
+    .result-box.possible {
+        background: #F9FAFB !important;
+        color: var(--afri-black) !important;
+        border-left: 6px solid var(--afri-gray-500) !important;
+    }
+
+    .result-box.safe {
+        background: #F9FAFB !important;
+        color: var(--afri-black) !important;
+        border-left: 6px solid var(--afri-black) !important;
+    }
+
+    /* =====================================================
+       MESSAGES VIDES
+       ===================================================== */
+
+    .empty {
+        color: var(--afri-gray-500) !important;
+        background: #FAFAFA !important;
+        border: 1px dashed var(--afri-gray-300) !important;
+        border-radius: 8px !important;
+    }
+
+    /* =====================================================
+       RESPONSIVE
+       ===================================================== */
+
+    @media (max-width: 900px) {
+        .top-user-bar {
+            align-items: flex-start;
+        }
+
+        .nav {
+            gap: 6px;
+        }
+
+        .nav a {
+            font-size: 12px;
+            padding: 8px 10px;
+        }
+
+        .header,
+        .page-header,
+        .main-header,
+        .app-header {
+            padding: 20px !important;
+        }
     }
 </style>
 
-<div class="top-user-bar">
-    {% set user = request.session.get("user") %}
-    {% set role = user.get("role") if user else "" %}
-    {% set username = user.get("username") if user else "Utilisateur" %}
-    {% set full_name = user.get("full_name") if user else "" %}
+{% set user = request.session.get("user") %}
+{% set role = user.get("role") if user else "" %}
+{% set username = user.get("username") if user else "Utilisateur" %}
+{% set full_name = user.get("full_name") if user else "" %}
+{% set path = request.url.path %}
 
+<div class="top-user-bar">
     <div>
-        Connecté :
+        <span class="user-info-label">Connecté :</span>
         <strong>{{ full_name if full_name else username }}</strong>
     </div>
 
@@ -86,31 +585,77 @@
 </div>
 
 <div class="nav">
-    <a href="/web/dashboard">Dashboard</a>
+    <a href="/web/dashboard" class="{% if path == '/web/dashboard' %}active{% endif %}">
+        Dashboard
+    </a>
 
     {% if role in ["ADMIN", "SUPERVISEUR", "OPERATEUR"] %}
-        <a href="/web/check-client">Vérifier client</a>
+        <a href="/web/check-client" class="{% if path == '/web/check-client' %}active{% endif %}">
+            Vérifier client
+        </a>
     {% endif %}
 
-    <a href="/web/sanctions">Sanctions</a>
-    <a href="/web/alerts">Alertes</a>
+    <a href="/web/sanctions" class="{% if path == '/web/sanctions' %}active{% endif %}">
+        Sanctions
+    </a>
+
+    <a href="/web/alerts" class="{% if path == '/web/alerts' %}active{% endif %}">
+        Alertes
+    </a>
 
     {% if role == "ADMIN" %}
-        <a href="/web/imports">Imports</a>
-        <a href="/web/list-updates">MAJ listes</a>
-        <a href="/web/scheduler-status">Scheduler</a>
-        <a href="/web/users">Utilisateurs</a>
-        <a href="/web/external-api">API externe</a>
+        <a href="/web/imports" class="{% if path == '/web/imports' %}active{% endif %}">
+            Imports
+        </a>
+
+        <a href="/web/list-updates" class="{% if path == '/web/list-updates' %}active{% endif %}">
+            MAJ listes
+        </a>
+
+        <a href="/web/scheduler-status" class="{% if path == '/web/scheduler-status' %}active{% endif %}">
+            Scheduler
+        </a>
+
+        <a href="/web/users" class="{% if path == '/web/users' %}active{% endif %}">
+            Utilisateurs
+        </a>
+
+        <a href="/web/external-api" class="{% if path == '/web/external-api' %}active{% endif %}">
+            API externe
+        </a>
     {% endif %}
 
     {% if role in ["ADMIN", "SUPERVISEUR"] %}
-        <a href="/web/import-history">Historique</a>
-        <a href="/web/audit-logs">Audit</a>
-        <a href="/web/data-quality">Qualité</a>
-        <a href="/web/matching-settings">Paramètres Matching</a>
-        <a href="/web/critical-alerts">Alertes critiques</a>
+        <a href="/web/import-history" class="{% if path == '/web/import-history' %}active{% endif %}">
+            Historique
+        </a>
+
+        <a href="/web/audit-logs" class="{% if path == '/web/audit-logs' %}active{% endif %}">
+            Audit
+        </a>
+
+        <a href="/web/data-quality" class="{% if path == '/web/data-quality' %}active{% endif %}">
+            Qualité
+        </a>
+
+        <a href="/web/matching-settings" class="{% if path == '/web/matching-settings' %}active{% endif %}">
+            Paramètres Matching
+        </a>
+
+        <a href="/web/critical-alerts" class="{% if path == '/web/critical-alerts' %}active{% endif %}">
+            Alertes critiques
+        </a>
     {% endif %}
-    <a href="/web/profile">Profil</a>
-    <a href="/web/change-password">Mot de passe</a>
-    <a href="/web/logout">Déconnexion</a>
+
+    <a href="/web/profile" class="{% if path == '/web/profile' %}active{% endif %}">
+        Profil
+    </a>
+
+    <a href="/web/change-password" class="{% if path == '/web/change-password' %}active{% endif %}">
+        Mot de passe
+    </a>
+
+    <a href="/web/logout" class="logout-link">
+        Déconnexion
+    </a>
 </div>

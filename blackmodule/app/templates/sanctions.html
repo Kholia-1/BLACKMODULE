@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>BLACKMODULE - Liste des sanctions</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
 
     <style>
         body {
@@ -255,6 +256,10 @@
                     <option value="FR_GEL" {% if source_liste == "FR_GEL" %}selected{% endif %}>
                         FR_GEL
                     </option>
+                    <option value="UKSL" {% if source_liste == "UKSL" %}selected{% endif %}>
+                        OFSI / UKSL
+                    </option>
+
         </select>
 
                 <select name="statut">

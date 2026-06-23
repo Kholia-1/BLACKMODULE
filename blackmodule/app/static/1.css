@@ -1,0 +1,103 @@
+.btn-link {
+    display: inline-block;
+    padding: 10px 14px;
+    background: #111827;
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 14px;
+}
+
+.btn-link:hover {
+    background: #1f2937;
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+    margin-bottom: 24px;
+}
+
+.advanced-filter {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 20px;
+    background: #f9fafb;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+}
+
+.advanced-filter select,
+.advanced-filter input {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font-size: 14px;
+}
+
+.advanced-filter button {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: none;
+    background: #111827;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.btn-reset {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #e5e7eb;
+    color: #111827;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.client-summary,
+.result-summary,
+.comparison-section {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 24px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+}
+
+.client-summary h2,
+.result-summary h2,
+.comparison-section h2 {
+    margin-top: 0;
+    color: #111827;
+}
+
+.client-summary table,
+.comparison-section table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+}
+
+.client-summary th,
+.client-summary td,
+.comparison-section th,
+.comparison-section td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+    vertical-align: top;
+}
+
+.client-summary th,
+.comparison-section th {
+    background: #f3f4f6;
+    color: #111827;
+}

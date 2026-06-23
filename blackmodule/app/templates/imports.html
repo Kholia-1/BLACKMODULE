@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>BLACKMODULE - Imports</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
 
     <style>
         body {
@@ -372,29 +373,31 @@
         </div>
     </div>
 
-        <div class="card">
-    <span class="badge-csv">OFSI UK · Excel</span>
-    <h2>Importer la liste OFSI UK Excel</h2>
+<div class="card">
+    <span class="badge-csv">OFSI / UKSL · CSV</span>
+    <h2>Importer la UK Sanctions List</h2>
 
-    <form method="post" action="/web/imports/ofsi-excel" enctype="multipart/form-data">
+    <form method="post" action="/web/imports/uksl-csv" enctype="multipart/form-data">
         <label>Importé par</label>
         <input type="text" name="imported_by" value="bello.etienne" required>
 
-        <label>Fichier Excel OFSI UK</label>
-        <input type="file" name="file" accept=".xls,.xlsx" required>
+        <label>Fichier CSV UK Sanctions List</label>
+        <input type="file" name="file" accept=".csv" required>
 
-        <button type="submit">Importer le fichier Excel OFSI</button>
+        <button type="submit">Importer UKSL CSV</button>
     </form>
 
     <div class="help">
         <strong>Format attendu :</strong><br>
-        Colonnes Excel :
-        <code>nom_complet, type_entite, date_naissance, nationalite, pays, num_passeport, adresse, motif_sanction, date_inscription, statut, alias</code>
+        Fichier CSV officiel UK Sanctions List contenant notamment :
+        <br>
+        <code>Unique ID, OFSI Group ID, Name 1, Name 2, Name 3, Name 4, Name 5, Name 6, Date of Birth, Nationality, Passport Number, Regime Name, Sanctions Imposed</code>
         <br><br>
-        Les alias multiples doivent être séparés par un point-virgule :
-        <code>E MILLER;ED MILLER</code>
+        Les données seront normalisées dans <code>sanction_entries</code> avec la source
+        <code>UKSL</code>.
     </div>
 </div>
+
 
         <div class="card">
     <span class="badge-xml">OFAC Consolidated · XML</span>

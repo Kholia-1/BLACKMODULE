@@ -1,26 +1,83 @@
+:root {
+    --afri-red: #D22630;
+    --afri-red-dark: #A61924;
+    --afri-black: #111111;
+    --afri-dark: #2B2B2B;
+    --afri-gray-bg: #F4F5F7;
+    --afri-gray-light: #E5E7EB;
+    --afri-gray-border: #D1D5DB;
+    --afri-gray-text: #6B7280;
+    --afri-white: #FFFFFF;
+    --afri-shadow: rgba(17, 17, 17, 0.08);
+}
+
+/* =========================
+   BOUTONS / LIENS D'ACTION
+   ========================= */
+
 .btn-link {
     display: inline-block;
     padding: 10px 14px;
-    background: #111827;
-    color: white;
-    border-radius: 8px;
+    background: var(--afri-red);
+    color: var(--afri-white);
+    border-radius: 6px;
     text-decoration: none;
-    font-weight: bold;
+    font-weight: 800;
     font-size: 14px;
     margin-bottom: 14px;
+    border: none;
+    transition: background 0.2s ease, transform 0.1s ease;
 }
 
 .btn-link:hover {
-    background: #1f2937;
+    background: var(--afri-red-dark);
+    color: var(--afri-white);
 }
 
-.card {
-    background: white;
-    border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
-    margin-bottom: 24px;
+.btn-link:active {
+    transform: scale(0.98);
 }
+
+.btn-reset {
+    padding: 10px 14px;
+    border-radius: 6px;
+    background: var(--afri-gray-light);
+    color: var(--afri-black);
+    text-decoration: none;
+    font-weight: 800;
+    font-size: 14px;
+    border: 1px solid var(--afri-gray-border);
+}
+
+.btn-reset:hover {
+    background: #D9DDE3;
+    color: var(--afri-black);
+}
+
+/* =========================
+   CARTES
+   ========================= */
+
+.card {
+    background: var(--afri-white);
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: 0 6px 18px var(--afri-shadow);
+    margin-bottom: 24px;
+    border: 1px solid var(--afri-gray-light);
+}
+
+.card h2 {
+    margin-top: 0;
+    color: var(--afri-black);
+    font-weight: 800;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--afri-gray-light);
+}
+
+/* =========================
+   FILTRES AVANCÉS
+   ========================= */
 
 .advanced-filter {
     display: flex;
@@ -28,36 +85,247 @@
     flex-wrap: wrap;
     align-items: center;
     margin-bottom: 20px;
-    background: #f9fafb;
+    background: #FAFAFA;
     padding: 14px;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    border: 1px solid var(--afri-gray-light);
 }
 
 .advanced-filter select,
 .advanced-filter input {
     padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    border: 1px solid var(--afri-gray-border);
     font-size: 14px;
+    background: var(--afri-white);
+    color: var(--afri-black);
+}
+
+.advanced-filter select:focus,
+.advanced-filter input:focus {
+    outline: none;
+    border-color: var(--afri-red);
+    box-shadow: 0 0 0 3px rgba(210, 38, 48, 0.14);
 }
 
 .advanced-filter button {
     padding: 10px 14px;
-    border-radius: 8px;
+    border-radius: 6px;
     border: none;
-    background: #111827;
-    color: white;
-    font-weight: bold;
+    background: var(--afri-red);
+    color: var(--afri-white);
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.advanced-filter button:hover {
+    background: var(--afri-red-dark);
+}
+
+.advanced-filter button:active {
+    transform: scale(0.98);
+}
+
+/* =========================
+   RÉSUMÉ CLIENT / RÉSULTATS
+   ========================= */
+
+.client-summary,
+.result-summary,
+.comparison-section {
+    background: var(--afri-white);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 24px;
+    box-shadow: 0 6px 18px var(--afri-shadow);
+    border: 1px solid var(--afri-gray-light);
+}
+
+.client-summary h2,
+.result-summary h2,
+.comparison-section h2 {
+    margin-top: 0;
+    color: var(--afri-black);
+    font-weight: 800;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--afri-gray-light);
+}
+
+/* =========================
+   TABLEAUX
+   ========================= */
+
+.client-summary table,
+.comparison-section table,
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    border: 1px solid var(--afri-gray-light);
+}
+
+.client-summary th,
+.client-summary td,
+.comparison-section th,
+.comparison-section td,
+th,
+td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--afri-gray-light);
+    text-align: left;
+    vertical-align: top;
+    font-size: 14px;
+}
+
+.client-summary th,
+.comparison-section th,
+th {
+    background: #F3F4F6;
+    color: var(--afri-black);
+    font-weight: 800;
+}
+
+td {
+    color: var(--afri-dark);
+    background: var(--afri-white);
+}
+
+tr:hover td {
+    background: #FAFAFA;
+}
+
+/* =========================
+   BADGES / STATUTS
+   ========================= */
+
+.badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.badge-exacte,
+.badge-danger,
+.badge-critical {
+    background: var(--afri-red);
+    color: var(--afri-white);
+}
+
+.badge-probable,
+.badge-warning {
+    background: var(--afri-black);
+    color: var(--afri-white);
+}
+
+.badge-possible,
+.badge-info {
+    background: var(--afri-gray-light);
+    color: var(--afri-black);
+}
+
+.badge-success,
+.badge-ok {
+    background: #F3F4F6;
+    color: var(--afri-black);
+    border: 1px solid var(--afri-gray-border);
+}
+
+/* =========================
+   ZONES VIDES / MESSAGES
+   ========================= */
+
+.empty {
+    color: var(--afri-gray-text);
+    font-size: 14px;
+    padding: 16px;
+    background: #FAFAFA;
+    border: 1px dashed var(--afri-gray-border);
+    border-radius: 8px;
+}
+
+/* =========================
+   FORMULAIRES GÉNÉRIQUES
+   ========================= */
+
+input,
+select,
+textarea {
+    border: 1px solid var(--afri-gray-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+    background: var(--afri-white);
+    color: var(--afri-black);
+    box-sizing: border-box;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--afri-red);
+    box-shadow: 0 0 0 3px rgba(210, 38, 48, 0.14);
+}
+
+button {
+    background: var(--afri-red);
+    color: var(--afri-white);
+    border: none;
+    border-radius: 6px;
+    font-weight: 800;
     cursor: pointer;
 }
 
-.btn-reset {
-    padding: 10px 14px;
-    border-radius: 8px;
-    background: #e5e7eb;
-    color: #111827;
-    text-decoration: none;
-    font-weight: bold;
-    font-size: 14px;
+button:hover {
+    background: var(--afri-red-dark);
+}
+
+/* =========================
+   LIENS
+   ========================= */
+
+a {
+    color: var(--afri-red);
+}
+
+a:hover {
+    color: var(--afri-red-dark);
+}
+
+/* =========================
+   HEADER GLOBAL - CHARTE ROUGE NOIR BLANC GRIS
+   ========================= */
+
+.header,
+.page-header,
+.main-header,
+.app-header {
+    background: #111111 !important;
+    color: #FFFFFF !important;
+    padding: 22px 40px !important;
+    border-bottom: 5px solid #D22630 !important;
+    box-shadow: 0 4px 16px rgba(17, 17, 17, 0.18) !important;
+}
+
+.header h1,
+.page-header h1,
+.main-header h1,
+.app-header h1 {
+    color: #FFFFFF !important;
+    margin: 0 !important;
+    font-size: 28px !important;
+    font-weight: 800 !important;
+}
+
+.header p,
+.page-header p,
+.main-header p,
+.app-header p {
+    color: #D1D5DB !important;
+    margin: 8px 0 0 !important;
+    font-size: 14px !important;
 }

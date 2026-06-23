@@ -12,6 +12,8 @@ from app.services.parsers.eu_parser import parse_eu_csv, parse_eu_xml
 from app.services.parsers.ofsi_parser import parse_ofsi_csv, parse_ofsi_excel
 from app.services.parsers.ofac_consolidated_parser import parse_ofac_consolidated_xml
 from app.services.parsers.france_gel_parser import parse_france_gel_json, parse_france_gel_xml
+from app.services.parsers.uksl_parser import parse_uksl_csv
+
 
 
 def safe_text(value, max_length: int):
@@ -1175,6 +1177,143 @@ def import_eu_xml(
                     )
 
             inserted_records += 1
+
+    return {
+        "total_records": total_records,
+        "inserted_records": inserted_records,
+        "updated_records": updated_records,
+        "duplicate_records": duplicate_records,
+        "rejected_records": rejected_records
+    }
+
+def import_uksl_csv(db: Session, file_content: bytes) -> dict:
+    """
+    Import UK Sanctions List CSV.
+    Source normalisée en base : UKSL.
+
+    Correction importante :
+    - la UKSL contient plusieurs lignes pour une même entité ;
+    - certaines lignes produisent donc le même hash_signature ;
+    - on déduplique d'abord en mémoire avant insertion ;
+    - on vérifie ensuite la base par hash_signature avant d'ajouter une ligne.
+    """
+
+    entries = parse_uksl_csv(file_content)
+
+    total_records = len(entries)
+    inserted_records = 0
+    updated_records = 0
+    duplicate_records = 0
+    rejected_records = 0
+
+    unique_items = []
+    seen_hashes = set()
+
+    # 1) Déduplication interne du fichier UKSL avant tout db.add()
+    for item in entries:
+        try:
+            item = normalize_sanction_item_lengths(item)
+
+            nom = item.get("nom")
+            nom_complet = item.get("nom_complet")
+            hash_signature = item.get("hash_signature")
+
+            if not nom and not nom_complet:
+                rejected_records += 1
+                continue
+
+            if not hash_signature:
+                rejected_records += 1
+                continue
+
+            if hash_signature in seen_hashes:
+                duplicate_records += 1
+                continue
+
+            seen_hashes.add(hash_signature)
+            unique_items.append(item)
+
+        except Exception as e:
+            rejected_records += 1
+            print("ERREUR PREPARATION UKSL :", str(e))
+
+    # 2) Chargement des hash déjà présents en base pour éviter les UniqueViolation
+    existing_hashes = set()
+
+    if unique_items:
+        all_hashes = [
+            item.get("hash_signature")
+            for item in unique_items
+            if item.get("hash_signature")
+        ]
+
+        chunk_size = 1000
+
+        for start in range(0, len(all_hashes), chunk_size):
+            chunk = all_hashes[start:start + chunk_size]
+
+            rows = db.query(SanctionEntry.hash_signature).filter(
+                SanctionEntry.hash_signature.in_(chunk)
+            ).all()
+
+            for row in rows:
+                existing_hashes.add(row[0])
+
+    # 3) Insertion / mise à jour
+    for item in unique_items:
+        try:
+            hash_signature = item.get("hash_signature")
+
+            existing_entry = None
+
+            if hash_signature in existing_hashes:
+                with db.no_autoflush:
+                    existing_entry = db.query(SanctionEntry).filter(
+                        SanctionEntry.hash_signature == hash_signature
+                    ).first()
+
+            if existing_entry:
+                existing_entry.source_liste = "UKSL"
+                existing_entry.type_entite = item.get("type_entite")
+                existing_entry.nom = item.get("nom")
+                existing_entry.prenom = item.get("prenom")
+                existing_entry.nom_complet = item.get("nom_complet")
+                existing_entry.date_naissance = item.get("date_naissance")
+                existing_entry.nationalite = item.get("nationalite")
+                existing_entry.pays = item.get("pays")
+                existing_entry.num_passeport = item.get("num_passeport")
+                existing_entry.motif_sanction = item.get("motif_sanction")
+                existing_entry.date_inscription = item.get("date_inscription")
+                existing_entry.date_suppression = item.get("date_suppression")
+                existing_entry.statut = item.get("statut") or "ACTIF"
+                existing_entry.hash_signature = hash_signature
+
+                updated_records += 1
+
+            else:
+                new_entry = SanctionEntry(
+                    source_liste="UKSL",
+                    type_entite=item.get("type_entite"),
+                    nom=item.get("nom"),
+                    prenom=item.get("prenom"),
+                    nom_complet=item.get("nom_complet"),
+                    date_naissance=item.get("date_naissance"),
+                    nationalite=item.get("nationalite"),
+                    pays=item.get("pays"),
+                    num_passeport=item.get("num_passeport"),
+                    motif_sanction=item.get("motif_sanction"),
+                    date_inscription=item.get("date_inscription"),
+                    date_suppression=item.get("date_suppression"),
+                    statut=item.get("statut") or "ACTIF",
+                    hash_signature=hash_signature
+                )
+
+                db.add(new_entry)
+                inserted_records += 1
+
+        except Exception as e:
+            rejected_records += 1
+            print("ERREUR IMPORT UKSL :", str(e))
 
     return {
         "total_records": total_records,
