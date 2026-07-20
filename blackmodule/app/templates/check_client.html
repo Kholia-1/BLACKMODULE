@@ -62,10 +62,9 @@
     }
 
     .layout {
-        display: grid;
-        grid-template-columns: 430px 1fr;
+        display: flex;
+        flex-direction: column;
         gap: 24px;
-        align-items: start;
     }
 
     .card {
@@ -124,17 +123,43 @@
 
     .form-row {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0 14px;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0 16px;
     }
 
     .form-row label {
         margin-top: 14px;
     }
 
+    .form-actions {
+        margin-top: 22px;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .form-actions button {
+        width: auto;
+        min-width: 220px;
+        margin-top: 0;
+    }
+
+    @media (max-width: 1100px) {
+        .form-row {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
     @media (max-width: 640px) {
         .form-row {
             grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+            justify-content: stretch;
+        }
+
+        .form-actions button {
+            width: 100%;
         }
     }
 
@@ -385,7 +410,7 @@
 
     <div class="layout">
 
-        <!-- COLONNE GAUCHE : FORMULAIRE -->
+        <!-- FORMULAIRE -->
         <div class="card">
             <h2>Rechercher un client</h2>
 
@@ -394,13 +419,15 @@
                 <div class="form-section">
                     <div class="form-section-title">Identité</div>
 
-                    <label>Référence client</label>
-                    <input type="text"
-                           name="client_reference"
-                           placeholder="Ex : CLI001"
-                           value="{{ form.client_reference or '' }}">
-
                     <div class="form-row">
+                        <div>
+                            <label>Référence client</label>
+                            <input type="text"
+                                   name="client_reference"
+                                   placeholder="Ex : CLI001"
+                                   value="{{ form.client_reference or '' }}">
+                        </div>
+
                         <div>
                             <label>Nom</label>
                             <input type="text"
@@ -417,13 +444,7 @@
                                    placeholder="Ex : PAUL"
                                    value="{{ form.prenom or '' }}">
                         </div>
-                    </div>
-                </div>
 
-                <div class="form-section">
-                    <div class="form-section-title">Pièce d'identité</div>
-
-                    <div class="form-row">
                         <div>
                             <label>Type de pièce</label>
                             <select name="type_piece">
@@ -434,7 +455,13 @@
                                 <option value="AUTRE" {% if form.type_piece == "AUTRE" %}selected{% endif %}>Autre</option>
                             </select>
                         </div>
+                    </div>
+                </div>
 
+                <div class="form-section">
+                    <div class="form-section-title">Pièce d'identité &amp; date</div>
+
+                    <div class="form-row">
                         <div>
                             <label>Numéro de pièce</label>
                             <input type="text"
@@ -442,19 +469,15 @@
                                    placeholder="Ex : 123456789"
                                    value="{{ form.num_piece or '' }}">
                         </div>
-                    </div>
 
-                    <label>Numéro de passeport</label>
-                    <input type="text"
-                           name="num_passeport"
-                           placeholder="Ex : P456789"
-                           value="{{ form.num_passeport or '' }}">
-                </div>
+                        <div>
+                            <label>Numéro de passeport</label>
+                            <input type="text"
+                                   name="num_passeport"
+                                   placeholder="Ex : P456789"
+                                   value="{{ form.num_passeport or '' }}">
+                        </div>
 
-                <div class="form-section">
-                    <div class="form-section-title">Informations complémentaires</div>
-
-                    <div class="form-row">
                         <div>
                             <label>Date de naissance</label>
                             <input type="date"
@@ -470,6 +493,10 @@
                                    value="{{ form.age or '' }}">
                         </div>
                     </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="form-section-title">Résidence &amp; nationalité</div>
 
                     <div class="form-row">
                         <div>
@@ -487,20 +514,24 @@
                                    placeholder="Ex : CAMEROUNAISE"
                                    value="{{ form.nationalite or '' }}">
                         </div>
-                    </div>
 
-                    <label>Pays de résidence</label>
-                    <input type="text"
-                           name="pays_residence"
-                           placeholder="Ex : CAMEROUN"
-                           value="{{ form.pays_residence or '' }}">
+                        <div>
+                            <label>Pays de résidence</label>
+                            <input type="text"
+                                   name="pays_residence"
+                                   placeholder="Ex : CAMEROUN"
+                                   value="{{ form.pays_residence or '' }}">
+                        </div>
+                    </div>
                 </div>
 
-                <button type="submit">Lancer le matching</button>
+                <div class="form-actions">
+                    <button type="submit">Lancer le matching</button>
+                </div>
             </form>
         </div>
 
-        <!-- COLONNE DROITE : RESULTATS -->
+        <!-- RESULTATS -->
         <div class="card">
             <h2>Résultat du screening</h2>
 
@@ -697,7 +728,7 @@
 
             {% else %}
                 <div class="empty">
-                    Saisis les informations du client à gauche, puis clique sur <strong>Lancer le matching</strong>.
+                    Saisis les informations du client ci-dessus, puis clique sur <strong>Lancer le matching</strong>.
                 </div>
             {% endif %}
         </div>
