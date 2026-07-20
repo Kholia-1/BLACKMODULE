@@ -1,6 +1,6 @@
 import csv
 import hashlib
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from datetime import datetime, date
 from io import StringIO
 

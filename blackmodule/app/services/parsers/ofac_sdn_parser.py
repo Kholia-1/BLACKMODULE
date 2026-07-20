@@ -1,5 +1,5 @@
 import hashlib
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from datetime import datetime, date
 
 
@@ -250,7 +250,7 @@ def parse_ofac_sdn_xml(file_content: bytes) -> list[dict]:
             "num_passeport": num_passeport.upper() if num_passeport else None,
             "motif_sanction": motif_sanction,
             "date_inscription": None,
-            "date_suppression": date.today(),
+            "date_suppression": None,
             "statut": "ACTIF",
             "hash_signature": hash_signature,
             "aliases": aliases
