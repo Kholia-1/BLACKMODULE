@@ -1,5 +1,5 @@
 import unicodedata
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, process
 
 
 def normalize_text(value: str | None) -> str:
@@ -45,6 +45,33 @@ def calculate_name_score(client_name: str, listed_name: str) -> float:
         return 0.0
 
     return float(fuzz.token_sort_ratio(client_name, listed_name))
+
+
+def calculate_name_scores_batch(client_name: str, listed_names: list[str]) -> list[float]:
+    """
+    Calcule le score fuzzy d'un client contre une liste de noms blacklistés
+    en une seule passe vectorisée (rapidfuzz.process.cdist), au lieu d'un
+    appel Python par entrée. Résultats strictement identiques à des appels
+    répétés de calculate_name_score, mais nettement plus rapide sur de
+    grandes listes de sanctions.
+    """
+    client_name = normalize_text(client_name)
+
+    if not client_name or not listed_names:
+        return [0.0] * len(listed_names)
+
+    normalized_listed = [normalize_text(name) for name in listed_names]
+
+    scores = process.cdist(
+        [client_name],
+        normalized_listed,
+        scorer=fuzz.token_sort_ratio
+    )[0]
+
+    return [
+        float(score) if listed else 0.0
+        for score, listed in zip(scores, normalized_listed)
+    ]
 
 """
     Classification selon les seuils BLACKMODULE :

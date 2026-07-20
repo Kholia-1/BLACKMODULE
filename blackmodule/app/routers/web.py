@@ -13,7 +13,7 @@ from app.database import get_db
 from app.models import SanctionEntry, Alert, AuditLog, ImportBatch, User, MatchingSetting
 from app.schemas import ClientCheckRequest
 from app.services.auth_service import authenticate_user, hash_password, verify_password
-from app.services.matching_service import build_full_name, calculate_name_score, classify_alert
+from app.services.matching_service import build_full_name, calculate_name_scores_batch, classify_alert
 from app.services.audit_service import write_audit_log
 from app.services.import_service import (
     import_afb_ppe_csv,
@@ -306,6 +306,12 @@ def check_client_submit(
         SanctionEntry.statut == "ACTIF"
     ).all()
 
+    listed_names = [
+        sanction.nom_complet or build_full_name(sanction.prenom, sanction.nom)
+        for sanction in sanctions
+    ]
+    name_scores = calculate_name_scores_batch(client_full_name, listed_names)
+
     matches = []
     highest_score = 0.0
     global_status = "AUCUNE_ALERTE"
@@ -313,13 +319,7 @@ def check_client_submit(
     generated_alerts_count = 0
     existing_alerts_count = 0
 
-    for sanction in sanctions:
-        listed_name = sanction.nom_complet or build_full_name(
-            sanction.prenom,
-            sanction.nom
-        )
-
-        name_score = calculate_name_score(client_full_name, listed_name)
+    for sanction, listed_name, name_score in zip(sanctions, listed_names, name_scores):
         final_score = name_score
         matching_type = "FUZZY_NAME"
 
@@ -1496,11 +1496,18 @@ def web_scheduler_status(
             "mode": "Automatique + manuel"
         },
         {
-            "source": "OFSI / UKSL",
-            "format": "Excel / CSV",
+            "source": "UKSL",
+            "format": "CSV",
             "frequence": "Mensuelle",
             "heure": "1er du mois 03:30 UTC",
-            "mode": "À finaliser"
+            "mode": "Automatique + manuel"
+        },
+        {
+            "source": "OFSI",
+            "format": "Excel / CSV",
+            "frequence": "-",
+            "heure": "-",
+            "mode": "Manuel uniquement"
         }
     ]
 
@@ -1835,8 +1842,12 @@ def web_matching_settings_submit(
             context={
                 "request": request,
                 "settings": settings,
-                "message": "Paramètres de matching mis à jour avec succès.",
-                "success": True,
+                "message": (
+                    "Seuils invalides : l'ordre requis est "
+                    "0 ≤ possible ≤ probable ≤ exacte ≤ 100. "
+                    "Aucune modification n'a été enregistrée."
+                ),
+                "success": False,
                 "history_logs": history_logs
             }
         )

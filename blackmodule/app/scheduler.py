@@ -90,16 +90,16 @@ def start_scheduler():
         args=["ONU UNSC", auto_update_un_xml, "WEEKLY_SCHEDULER"]
     )
 
-    def run_uksl_update_job():
-        db = SessionLocal()
-
-        try:
-            auto_update_uksl_csv(
-                db=db,
-                imported_by="SCHEDULER"
-            )
-        finally:
-            db.close()
+    scheduler.add_job(
+        run_job,
+        trigger="cron",
+        day=1,
+        hour=3,
+        minute=30,
+        id="auto_update_uksl_csv",
+        replace_existing=True,
+        args=["UK Sanctions List", auto_update_uksl_csv, "MONTHLY_SCHEDULER"]
+    )
 
     scheduler.start()
 

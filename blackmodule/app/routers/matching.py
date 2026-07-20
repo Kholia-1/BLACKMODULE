@@ -6,7 +6,7 @@ from app.models import SanctionEntry, Alert
 from app.schemas import ClientCheckRequest, ClientCheckResponse, MatchResult
 from app.services.matching_service import (
     build_full_name,
-    calculate_name_score,
+    calculate_name_scores_batch,
     classify_alert
 )
 from app.services.audit_service import write_audit_log
@@ -31,20 +31,19 @@ def check_client(
         SanctionEntry.statut == "ACTIF"
     ).all()
 
+    listed_names = [
+        sanction.nom_complet or build_full_name(sanction.prenom, sanction.nom)
+        for sanction in sanctions
+    ]
+    name_scores = calculate_name_scores_batch(client_full_name, listed_names)
+
     matches = []
     highest_score = 0.0
     global_status = "AUCUNE_ALERTE"
     global_action = "OPERATION_AUTORISEE"
     generated_alerts_count = 0
 
-    for sanction in sanctions:
-        listed_name = sanction.nom_complet
-
-        if not listed_name:
-            listed_name = build_full_name(sanction.prenom, sanction.nom)
-
-        name_score = calculate_name_score(client_full_name, listed_name)
-
+    for sanction, listed_name, name_score in zip(sanctions, listed_names, name_scores):
         final_score = name_score
         matching_type = "FUZZY_NAME"
 
