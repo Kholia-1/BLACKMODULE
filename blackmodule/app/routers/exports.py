@@ -11,6 +11,7 @@ from app.database import get_db
 from sqlalchemy import func
 from app.models import Alert, SanctionEntry, AuditLog, MatchingSetting
 from app.services.audit_service import write_audit_log
+from app.services.api_auth import get_session_user, require_roles
 
 
 router = APIRouter(
@@ -28,7 +29,8 @@ def export_alerts_excel(
     date_from: str | None = None,
     date_to: str | None = None,
     critical_only: int | None = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_session_user)
 ):
     query = db.query(Alert)
     if critical_only == 1:
@@ -141,7 +143,7 @@ def export_alerts_excel(
 
     write_audit_log(
         db=db,
-        user_identifier="SYSTEM",
+        user_identifier=user.get("username"),
         action="EXPORT_ALERTS_EXCEL",
         entity_type="Alert",
         entity_id=None,
@@ -171,7 +173,8 @@ def export_alerts_excel(
 
 @router.get("/sanctions-excel")
 def export_sanctions_excel(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_session_user)
 ):
     sanctions = db.query(SanctionEntry).order_by(
         SanctionEntry.created_at.desc()
@@ -248,7 +251,7 @@ def export_sanctions_excel(
 
     write_audit_log(
         db=db,
-        user_identifier="SYSTEM",
+        user_identifier=user.get("username"),
         action="EXPORT_SANCTIONS_EXCEL",
         entity_type="SanctionEntry",
         entity_id=None,
@@ -279,7 +282,8 @@ def export_audit_logs_excel(
     entity_type: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR"))
 ):
     query = db.query(AuditLog)
 
@@ -370,7 +374,7 @@ def export_audit_logs_excel(
 
     write_audit_log(
         db=db,
-        user_identifier="SYSTEM",
+        user_identifier=user.get("username"),
         action="EXPORT_AUDIT_LOGS_EXCEL",
         entity_type="AuditLog",
         entity_id=None,
@@ -400,7 +404,8 @@ def export_audit_logs_excel(
 
 @router.get("/data-quality-excel")
 def export_data_quality_excel(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR"))
 ):
     total_sanctions = db.query(SanctionEntry).count()
 
@@ -571,7 +576,7 @@ def export_data_quality_excel(
 
     write_audit_log(
         db=db,
-        user_identifier="SYSTEM",
+        user_identifier=user.get("username"),
         action="EXPORT_DATA_QUALITY_EXCEL",
         entity_type="DataQuality",
         entity_id=None,
@@ -601,7 +606,8 @@ def export_data_quality_excel(
 
 @router.get("/matching-settings-excel")
 def export_matching_settings_excel(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR"))
 ):
     settings = db.query(MatchingSetting).first()
 
@@ -680,7 +686,7 @@ def export_matching_settings_excel(
 
     write_audit_log(
         db=db,
-        user_identifier="SYSTEM",
+        user_identifier=user.get("username"),
         action="EXPORT_MATCHING_SETTINGS_EXCEL",
         entity_type="MatchingSetting",
         entity_id=str(settings.id) if settings else None,

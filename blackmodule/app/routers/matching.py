@@ -10,6 +10,7 @@ from app.services.matching_service import (
     classify_alert
 )
 from app.services.audit_service import write_audit_log
+from app.services.api_auth import require_roles
 
 
 router = APIRouter(
@@ -21,7 +22,8 @@ router = APIRouter(
 @router.post("/check-client", response_model=ClientCheckResponse)
 def check_client(
     client: ClientCheckRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR", "OPERATEUR"))
 ):
     client_full_name = build_full_name(client.prenom, client.nom)
 
@@ -98,7 +100,7 @@ def check_client(
     # Audit du matching client
     write_audit_log(
         db=db,
-        user_identifier="SYSTEM",
+        user_identifier=user.get("username"),
         action="MATCHING_CLIENT",
         entity_type="ClientScreening",
         entity_id=client.client_reference,

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app.services.audit_service import write_audit_log
+from app.services.api_auth import get_session_user, require_roles
 from app.database import get_db
 from app.models import SanctionEntry
 from app.schemas import SanctionEntryCreate, SanctionEntryResponse
@@ -15,7 +16,10 @@ router = APIRouter(
 
 
 @router.get("/", response_model=list[SanctionEntryResponse])
-def list_sanctions(db: Session = Depends(get_db)):
+def list_sanctions(
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_session_user)
+):
     sanctions = db.query(SanctionEntry).order_by(SanctionEntry.created_at.desc()).all()
     return sanctions
 
@@ -23,7 +27,8 @@ def list_sanctions(db: Session = Depends(get_db)):
 @router.post("/", response_model=SanctionEntryResponse)
 def create_sanction(
     sanction: SanctionEntryCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN"))
 ):
     nom_complet = sanction.nom_complet
 
@@ -51,7 +56,7 @@ def create_sanction(
 
     write_audit_log(
         db=db,
-        user_identifier="SYSTEM",
+        user_identifier=user.get("username"),
         action="CREATION_SANCTION",
         entity_type="SanctionEntry",
         entity_id=str(new_sanction.id),
@@ -71,7 +76,8 @@ def create_sanction(
 @router.get("/{sanction_id}", response_model=SanctionEntryResponse)
 def get_sanction(
     sanction_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_session_user)
 ):
     sanction = db.query(SanctionEntry).filter(
         SanctionEntry.id == sanction_id

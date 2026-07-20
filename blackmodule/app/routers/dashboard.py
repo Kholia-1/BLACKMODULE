@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import SanctionEntry, Alert, AuditLog
 from app.schemas import DashboardStatsResponse
+from app.services.api_auth import get_session_user
 
 
 router = APIRouter(
@@ -13,7 +14,10 @@ router = APIRouter(
 
 
 @router.get("/stats", response_model=DashboardStatsResponse)
-def get_dashboard_stats(db: Session = Depends(get_db)):
+def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_session_user)
+):
     total_sanctions = db.query(SanctionEntry).count()
 
     active_sanctions = db.query(SanctionEntry).filter(

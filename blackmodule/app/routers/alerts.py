@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import Alert
 from app.schemas import AlertResponse, AlertTreatmentRequest
 from app.services.audit_service import write_audit_log
+from app.services.api_auth import get_session_user, require_roles
 
 
 router = APIRouter(
@@ -26,7 +27,8 @@ def list_alerts(
         None,
         description="Filtrer par niveau : ALERTE_EXACTE, ALERTE_PROBABLE, ALERTE_POSSIBLE"
     ),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_session_user)
 ):
     """
     Liste toutes les alertes générées par le moteur de matching.
@@ -49,7 +51,8 @@ def list_alerts(
 @router.get("/{alert_id}", response_model=AlertResponse)
 def get_alert(
     alert_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_session_user)
 ):
     """
     Récupère une alerte précise à partir de son ID.
@@ -70,7 +73,8 @@ def get_alert(
 def treat_alert(
     alert_id: UUID,
     treatment: AlertTreatmentRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR"))
 ):
     """
     Traite une alerte de conformité.
@@ -109,15 +113,16 @@ def treat_alert(
         )
 
     # 1. Mise à jour de l'alerte
+    treated_by = user.get("username")
     alert.statut = new_status
-    alert.treated_by = treatment.treated_by
+    alert.treated_by = treated_by
     alert.treatment_comment = treatment.treatment_comment
     alert.treated_at = datetime.utcnow()
 
     # 2. Écriture dans le journal d'audit
     write_audit_log(
         db=db,
-        user_identifier=treatment.treated_by,
+        user_identifier=treated_by,
         action="TRAITEMENT_ALERTE",
         entity_type="Alert",
         entity_id=str(alert.id),

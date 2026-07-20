@@ -26,7 +26,9 @@ from app.services.list_update_service import (
     auto_update_france_gel,
     auto_update_eu_xml,
     auto_update_un_xml,
+    auto_update_uksl_csv,
 )
+from app.services.api_auth import require_roles
 
 
 router = APIRouter(
@@ -160,8 +162,8 @@ async def _execute_import(
 @router.post("/afb-ppe-csv", response_model=ImportBatchResponse)
 async def upload_afb_ppe_csv(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     _validate_extension(
         file.filename,
@@ -172,7 +174,7 @@ async def upload_afb_ppe_csv(
     return await _execute_import(
         db=db,
         file=file,
-        imported_by=imported_by,
+        imported_by=user.get("username"),
         source_liste="AFB_PPE",
         file_type="CSV",
         importer=import_afb_ppe_csv,
@@ -185,8 +187,8 @@ async def upload_afb_ppe_csv(
 @router.post("/ofac-sdn-xml", response_model=ImportBatchResponse)
 async def upload_ofac_sdn_xml(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     _validate_extension(
         file.filename,
@@ -197,7 +199,7 @@ async def upload_ofac_sdn_xml(
     return await _execute_import(
         db=db,
         file=file,
-        imported_by=imported_by,
+        imported_by=user.get("username"),
         source_liste="OFAC_SDN",
         file_type="XML",
         importer=import_ofac_sdn_xml,
@@ -210,8 +212,8 @@ async def upload_ofac_sdn_xml(
 @router.post("/ofac-consolidated-xml", response_model=ImportBatchResponse)
 async def upload_ofac_consolidated_xml(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     _validate_extension(
         file.filename,
@@ -222,7 +224,7 @@ async def upload_ofac_consolidated_xml(
     return await _execute_import(
         db=db,
         file=file,
-        imported_by=imported_by,
+        imported_by=user.get("username"),
         source_liste="OFAC_CONSOLIDATED",
         file_type="XML",
         importer=import_ofac_consolidated_xml,
@@ -235,8 +237,8 @@ async def upload_ofac_consolidated_xml(
 @router.post("/un-xml", response_model=ImportBatchResponse)
 async def upload_un_xml(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     _validate_extension(
         file.filename,
@@ -247,7 +249,7 @@ async def upload_un_xml(
     return await _execute_import(
         db=db,
         file=file,
-        imported_by=imported_by,
+        imported_by=user.get("username"),
         source_liste="ONU",
         file_type="XML",
         importer=import_un_xml,
@@ -260,8 +262,8 @@ async def upload_un_xml(
 @router.post("/eu-csv", response_model=ImportBatchResponse)
 async def upload_eu_csv(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     _validate_extension(
         file.filename,
@@ -272,7 +274,7 @@ async def upload_eu_csv(
     return await _execute_import(
         db=db,
         file=file,
-        imported_by=imported_by,
+        imported_by=user.get("username"),
         source_liste="UE",
         file_type="CSV",
         importer=import_eu_csv,
@@ -285,8 +287,8 @@ async def upload_eu_csv(
 @router.post("/ofsi-csv", response_model=ImportBatchResponse)
 async def upload_ofsi_csv(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     _validate_extension(
         file.filename,
@@ -297,7 +299,7 @@ async def upload_ofsi_csv(
     return await _execute_import(
         db=db,
         file=file,
-        imported_by=imported_by,
+        imported_by=user.get("username"),
         source_liste="OFSI",
         file_type="CSV",
         importer=import_ofsi_csv,
@@ -310,8 +312,8 @@ async def upload_ofsi_csv(
 @router.post("/ofsi-excel", response_model=ImportBatchResponse)
 async def upload_ofsi_excel(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     _validate_extension(
         file.filename,
@@ -322,7 +324,7 @@ async def upload_ofsi_excel(
     return await _execute_import(
         db=db,
         file=file,
-        imported_by=imported_by,
+        imported_by=user.get("username"),
         source_liste="OFSI",
         file_type=_detect_file_type(file.filename, "XLSX"),
         importer=import_ofsi_excel,
@@ -335,8 +337,8 @@ async def upload_ofsi_excel(
 @router.post("/france-gel-json", response_model=ImportBatchResponse)
 async def upload_france_gel_json(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     _validate_extension(
         file.filename,
@@ -347,7 +349,7 @@ async def upload_france_gel_json(
     return await _execute_import(
         db=db,
         file=file,
-        imported_by=imported_by,
+        imported_by=user.get("username"),
         source_liste="FR_GEL",
         file_type="JSON",
         importer=import_france_gel_json,
@@ -360,8 +362,8 @@ async def upload_france_gel_json(
 @router.post("/france-gel-xml", response_model=ImportBatchResponse)
 async def upload_france_gel_xml(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     _validate_extension(
         file.filename,
@@ -372,7 +374,7 @@ async def upload_france_gel_xml(
     return await _execute_import(
         db=db,
         file=file,
-        imported_by=imported_by,
+        imported_by=user.get("username"),
         source_liste="FR_GEL",
         file_type="XML",
         importer=import_france_gel_xml,
@@ -385,9 +387,11 @@ async def upload_france_gel_xml(
 @router.post("/uksl-csv", response_model=ImportBatchResponse)
 async def upload_uksl_csv(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
+    imported_by = user.get("username")
+
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(
             status_code=400,
@@ -442,21 +446,32 @@ async def upload_uksl_csv(
         return import_batch
 
     except Exception as e:
-        import_batch.status = "FAILED"
-        import_batch.error_message = str(e)
+        db.rollback()
+
+        failed_batch = ImportBatch(
+            source_liste="UKSL",
+            filename=file.filename,
+            file_type="CSV",
+            status="FAILED",
+            imported_by=imported_by,
+            error_message=str(e)[:1000]
+        )
+
+        db.add(failed_batch)
+        db.flush()
 
         write_audit_log(
             db=db,
             user_identifier=imported_by,
             action="IMPORT_UKSL_CSV_FAILED",
             entity_type="ImportBatch",
-            entity_id=str(import_batch.id),
-            description=f"Échec import CSV UKSL : {str(e)}",
+            entity_id=str(failed_batch.id),
+            description=f"Échec import CSV UKSL : {str(e)[:500]}",
             ip_address=None
         )
 
         db.commit()
-        db.refresh(import_batch)
+        db.refresh(failed_batch)
 
         raise HTTPException(
             status_code=400,
@@ -466,13 +481,13 @@ async def upload_uksl_csv(
 
 @router.post("/auto-update/ofac-sdn", response_model=ImportBatchResponse)
 def manual_auto_update_ofac_sdn(
-    imported_by: str = "MANUAL_ADMIN",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     try:
         return auto_update_ofac_sdn(
             db=db,
-            imported_by=imported_by,
+            imported_by=user.get("username"),
         )
 
     except Exception as e:
@@ -486,13 +501,13 @@ def manual_auto_update_ofac_sdn(
 
 @router.post("/auto-update/ofac-consolidated", response_model=ImportBatchResponse)
 def manual_auto_update_ofac_consolidated(
-    imported_by: str = "MANUAL_ADMIN",
     db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     try:
         return auto_update_ofac_consolidated(
             db=db,
-            imported_by=imported_by,
+            imported_by=user.get("username"),
         )
 
     except Exception as e:
@@ -506,9 +521,11 @@ def manual_auto_update_ofac_consolidated(
 @router.post("/eu-xml", response_model=ImportBatchResponse)
 async def upload_eu_xml(
     file: UploadFile = File(...),
-    imported_by: str = "SYSTEM",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
+    imported_by = user.get("username")
+
     if not file.filename.lower().endswith(".xml"):
         raise HTTPException(
             status_code=400,
@@ -597,13 +614,13 @@ async def upload_eu_xml(
 
 @router.post("/auto-update/france-gel", response_model=ImportBatchResponse)
 def manual_auto_update_france_gel(
-    imported_by: str = "MANUAL_ADMIN",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     try:
         return auto_update_france_gel(
             db=db,
-            imported_by=imported_by
+            imported_by=user.get("username")
         )
 
     except Exception as e:
@@ -617,13 +634,13 @@ def manual_auto_update_france_gel(
 
 @router.post("/auto-update/eu", response_model=ImportBatchResponse)
 def manual_auto_update_eu(
-    imported_by: str = "MANUAL_ADMIN",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     try:
         return auto_update_eu_xml(
             db=db,
-            imported_by=imported_by
+            imported_by=user.get("username")
         )
 
     except Exception as e:
@@ -637,13 +654,13 @@ def manual_auto_update_eu(
 
 @router.post("/auto-update/un", response_model=ImportBatchResponse)
 def manual_auto_update_un(
-    imported_by: str = "MANUAL_ADMIN",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     try:
         return auto_update_un_xml(
             db=db,
-            imported_by=imported_by
+            imported_by=user.get("username")
         )
 
     except Exception as e:
@@ -657,12 +674,12 @@ def manual_auto_update_un(
 
 @router.post("/auto-update/uksl")
 def api_auto_update_uksl(
-    imported_by: str = "MANUAL_ADMIN",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     result = auto_update_uksl_csv(
         db=db,
-        imported_by=imported_by
+        imported_by=user.get("username")
     )
 
     if not result.get("success"):

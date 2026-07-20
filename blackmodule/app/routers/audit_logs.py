@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import AuditLog
 from app.schemas import AuditLogResponse
+from app.services.api_auth import require_roles
 
 
 router = APIRouter(
@@ -22,7 +23,8 @@ def list_audit_logs(
         None,
         description="Filtrer par utilisateur"
     ),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR"))
 ):
     query = db.query(AuditLog)
 
