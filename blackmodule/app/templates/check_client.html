@@ -102,6 +102,42 @@
         font-weight: 700;
     }
 
+    .form-section {
+        margin-top: 22px;
+        padding-top: 18px;
+        border-top: 1px solid var(--afri-gray-light);
+    }
+
+    .form-section:first-of-type {
+        margin-top: 4px;
+        padding-top: 0;
+        border-top: none;
+    }
+
+    .form-section-title {
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: var(--afri-gray-medium);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 14px;
+    }
+
+    .form-row label {
+        margin-top: 14px;
+    }
+
+    @media (max-width: 640px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
     input,
     select {
         width: 100%;
@@ -355,74 +391,110 @@
 
             <form method="post" action="/web/check-client">
 
-                <label>Référence client</label>
-                <input type="text"
-                       name="client_reference"
-                       placeholder="Ex : CLI001"
-                       value="{{ form.client_reference or '' }}">
+                <div class="form-section">
+                    <div class="form-section-title">Identité</div>
 
-                <label>Nom</label>
-                <input type="text"
-                       name="nom"
-                       placeholder="Ex : KAMGA"
-                       required
-                       value="{{ form.nom or '' }}">
+                    <label>Référence client</label>
+                    <input type="text"
+                           name="client_reference"
+                           placeholder="Ex : CLI001"
+                           value="{{ form.client_reference or '' }}">
 
-                <label>Prénom</label>
-                <input type="text"
-                       name="prenom"
-                       placeholder="Ex : PAUL"
-                       value="{{ form.prenom or '' }}">
+                    <div class="form-row">
+                        <div>
+                            <label>Nom</label>
+                            <input type="text"
+                                   name="nom"
+                                   placeholder="Ex : KAMGA"
+                                   required
+                                   value="{{ form.nom or '' }}">
+                        </div>
 
-                <label>Type de pièce d'identité</label>
-                <select name="type_piece">
-                    <option value="">-- Sélectionner --</option>
-                    <option value="CNI" {% if form.type_piece == "CNI" %}selected{% endif %}>CNI</option>
-                    <option value="PASSEPORT" {% if form.type_piece == "PASSEPORT" %}selected{% endif %}>Passeport</option>
-                    <option value="CARTE_SEJOUR" {% if form.type_piece == "CARTE_SEJOUR" %}selected{% endif %}>Carte de séjour</option>
-                    <option value="AUTRE" {% if form.type_piece == "AUTRE" %}selected{% endif %}>Autre</option>
-                </select>
+                        <div>
+                            <label>Prénom</label>
+                            <input type="text"
+                                   name="prenom"
+                                   placeholder="Ex : PAUL"
+                                   value="{{ form.prenom or '' }}">
+                        </div>
+                    </div>
+                </div>
 
-                <label>Numéro de pièce d'identité</label>
-                <input type="text"
-                       name="num_piece"
-                       placeholder="Ex : 123456789"
-                       value="{{ form.num_piece or '' }}">
+                <div class="form-section">
+                    <div class="form-section-title">Pièce d'identité</div>
 
-                <label>Numéro de passeport</label>
-                <input type="text"
-                       name="num_passeport"
-                       placeholder="Ex : P456789"
-                       value="{{ form.num_passeport or '' }}">
+                    <div class="form-row">
+                        <div>
+                            <label>Type de pièce</label>
+                            <select name="type_piece">
+                                <option value="">-- Sélectionner --</option>
+                                <option value="CNI" {% if form.type_piece == "CNI" %}selected{% endif %}>CNI</option>
+                                <option value="PASSEPORT" {% if form.type_piece == "PASSEPORT" %}selected{% endif %}>Passeport</option>
+                                <option value="CARTE_SEJOUR" {% if form.type_piece == "CARTE_SEJOUR" %}selected{% endif %}>Carte de séjour</option>
+                                <option value="AUTRE" {% if form.type_piece == "AUTRE" %}selected{% endif %}>Autre</option>
+                            </select>
+                        </div>
 
-                <label>Date de naissance</label>
-                <input type="date"
-                       name="date_naissance"
-                       value="{{ form.date_naissance or '' }}">
+                        <div>
+                            <label>Numéro de pièce</label>
+                            <input type="text"
+                                   name="num_piece"
+                                   placeholder="Ex : 123456789"
+                                   value="{{ form.num_piece or '' }}">
+                        </div>
+                    </div>
 
-                <label>Âge</label>
-                <input type="number"
-                       name="age"
-                       placeholder="Ex : 45"
-                       value="{{ form.age or '' }}">
+                    <label>Numéro de passeport</label>
+                    <input type="text"
+                           name="num_passeport"
+                           placeholder="Ex : P456789"
+                           value="{{ form.num_passeport or '' }}">
+                </div>
 
-                <label>Ville de résidence</label>
-                <input type="text"
-                       name="ville_residence"
-                       placeholder="Ex : YAOUNDÉ"
-                       value="{{ form.ville_residence or '' }}">
+                <div class="form-section">
+                    <div class="form-section-title">Informations complémentaires</div>
 
-                <label>Nationalité</label>
-                <input type="text"
-                       name="nationalite"
-                       placeholder="Ex : CAMEROUNAISE"
-                       value="{{ form.nationalite or '' }}">
+                    <div class="form-row">
+                        <div>
+                            <label>Date de naissance</label>
+                            <input type="date"
+                                   name="date_naissance"
+                                   value="{{ form.date_naissance or '' }}">
+                        </div>
 
-                <label>Pays de résidence</label>
-                <input type="text"
-                       name="pays_residence"
-                       placeholder="Ex : CAMEROUN"
-                       value="{{ form.pays_residence or '' }}">
+                        <div>
+                            <label>Âge</label>
+                            <input type="number"
+                                   name="age"
+                                   placeholder="Ex : 45"
+                                   value="{{ form.age or '' }}">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div>
+                            <label>Ville de résidence</label>
+                            <input type="text"
+                                   name="ville_residence"
+                                   placeholder="Ex : YAOUNDÉ"
+                                   value="{{ form.ville_residence or '' }}">
+                        </div>
+
+                        <div>
+                            <label>Nationalité</label>
+                            <input type="text"
+                                   name="nationalite"
+                                   placeholder="Ex : CAMEROUNAISE"
+                                   value="{{ form.nationalite or '' }}">
+                        </div>
+                    </div>
+
+                    <label>Pays de résidence</label>
+                    <input type="text"
+                           name="pays_residence"
+                           placeholder="Ex : CAMEROUN"
+                           value="{{ form.pays_residence or '' }}">
+                </div>
 
                 <button type="submit">Lancer le matching</button>
             </form>
