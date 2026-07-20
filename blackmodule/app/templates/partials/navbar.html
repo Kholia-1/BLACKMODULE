@@ -1,8 +1,9 @@
 <style>
     :root {
-        --afri-red: #D22630;
-        --afri-red-dark: #A61924;
-        --afri-black: #111111;
+        --afri-red: #C13B3F;
+        --afri-red-dark: #96302F;
+        --afri-red-soft: rgba(193, 59, 63, 0.16);
+        --afri-black: #2A2D33;
         --afri-dark: #2B2B2B;
         --afri-gray-900: #1F1F1F;
         --afri-gray-700: #4B5563;
@@ -151,9 +152,11 @@
         align-items: center;
         padding-top: 12px;
         border-top: 1px solid rgba(255, 255, 255, 0.12);
+        position: relative;
     }
 
-    .nav a {
+    .nav > a,
+    .nav-group-toggle {
         color: var(--afri-white) !important;
         text-decoration: none !important;
         font-weight: 800;
@@ -163,30 +166,124 @@
         background: rgba(255, 255, 255, 0.06);
         border: 1px solid rgba(255, 255, 255, 0.10);
         transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+        font-family: inherit;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
     }
 
-    .nav a:hover {
-        background: var(--afri-red) !important;
+    .nav > a:hover,
+    .nav-group-toggle:hover {
+        background: var(--afri-red-soft) !important;
         color: var(--afri-white) !important;
         border-color: var(--afri-red) !important;
         transform: translateY(-1px);
     }
 
-    .nav a.active {
-        background: var(--afri-red) !important;
+    .nav > a.active,
+    .nav-group.active > .nav-group-toggle,
+    .nav-group.open > .nav-group-toggle,
+    .user-menu.open > .nav-group-toggle {
+        background: var(--afri-red-soft) !important;
         color: var(--afri-white) !important;
         border-color: var(--afri-red) !important;
     }
 
+    .nav-group-toggle .chevron {
+        font-size: 10px;
+        transition: transform 0.15s ease;
+    }
+
+    .nav-group.open .chevron,
+    .user-menu.open .chevron {
+        transform: rotate(180deg);
+    }
+
+    /* --- Sous-menus déroulants par rubrique --- */
+
+    .nav-group {
+        position: relative;
+    }
+
+    .nav-dropdown {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        min-width: 220px;
+        background: var(--afri-black);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+        padding: 6px;
+        z-index: 50;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .nav-group.open .nav-dropdown,
+    .user-menu.open .nav-dropdown {
+        display: flex;
+    }
+
+    .nav-dropdown a {
+        color: var(--afri-white) !important;
+        text-decoration: none !important;
+        font-weight: 700;
+        font-size: 13px;
+        padding: 9px 10px;
+        border-radius: 6px;
+        background: transparent !important;
+        border: none !important;
+        white-space: nowrap;
+    }
+
+    .nav-dropdown a:hover {
+        background: rgba(255, 255, 255, 0.10) !important;
+    }
+
+    .nav-dropdown a.active {
+        background: var(--afri-red-soft) !important;
+    }
+
+    /* --- Menu compte utilisateur --- */
+
+    .user-menu {
+        position: relative;
+    }
+
+    .user-menu-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: var(--afri-white) !important;
+        font-weight: 800;
+        font-size: 13px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+    .user-menu-toggle:hover {
+        background: rgba(255, 255, 255, 0.14);
+    }
+
+    .user-menu .nav-dropdown {
+        left: auto;
+        right: 0;
+    }
+
     .nav a.logout-link {
-        background: rgba(210, 38, 48, 0.18);
-        border-color: rgba(210, 38, 48, 0.45);
+        background: var(--afri-red-soft) !important;
         color: var(--afri-white) !important;
     }
 
     .nav a.logout-link:hover {
         background: var(--afri-red-dark) !important;
-        border-color: var(--afri-red-dark) !important;
     }
 
     /* =====================================================
@@ -243,7 +340,7 @@
     textarea:focus {
         outline: none !important;
         border-color: var(--afri-red) !important;
-        box-shadow: 0 0 0 3px rgba(210, 38, 48, 0.14) !important;
+        box-shadow: 0 0 0 3px var(--afri-red-soft) !important;
     }
 
     /* =====================================================
@@ -363,7 +460,7 @@
         border-color: var(--afri-red) !important;
         border-left-color: var(--afri-black) !important;
         text-decoration: none !important;
-        box-shadow: 0 6px 16px rgba(210, 38, 48, 0.25) !important;
+        box-shadow: 0 6px 16px rgba(193, 59, 63, 0.25) !important;
         transform: translateY(-1px) !important;
     }
 
@@ -571,16 +668,40 @@
 {% set full_name = user.get("full_name") if user else "" %}
 {% set path = request.url.path %}
 
+{% set filtrage_paths = ["/web/check-client", "/web/sanctions", "/web/alerts", "/web/critical-alerts"] %}
+{% set listes_paths = ["/web/imports", "/web/list-updates", "/web/scheduler-status", "/web/import-history"] %}
+{% set admin_paths = ["/web/users", "/web/external-api"] %}
+{% set audit_paths = ["/web/audit-logs", "/web/data-quality", "/web/matching-settings"] %}
+
 <div class="top-user-bar">
     <div>
         <span class="user-info-label">Connecté :</span>
         <strong>{{ full_name if full_name else username }}</strong>
     </div>
 
-    <div>
+    <div style="display: flex; align-items: center; gap: 12px;">
         <span class="role-badge role-{{ role|lower }}">
             {{ role if role else "NON CONNECTÉ" }}
         </span>
+
+        <div class="user-menu">
+            <button type="button" class="user-menu-toggle nav-group-toggle">
+                Mon compte
+                <span class="chevron">▾</span>
+            </button>
+
+            <div class="nav-dropdown">
+                <a href="/web/profile" class="{% if path == '/web/profile' %}active{% endif %}">
+                    Profil
+                </a>
+                <a href="/web/change-password" class="{% if path == '/web/change-password' %}active{% endif %}">
+                    Mot de passe
+                </a>
+                <a href="/web/logout" class="logout-link">
+                    Déconnexion
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -590,72 +711,138 @@
     </a>
 
     {% if role in ["ADMIN", "SUPERVISEUR", "OPERATEUR"] %}
-        <a href="/web/check-client" class="{% if path == '/web/check-client' %}active{% endif %}">
-            Vérifier client
+        <div class="nav-group {% if path in filtrage_paths %}active{% endif %}">
+            <button type="button" class="nav-group-toggle">
+                Filtrage &amp; Conformité
+                <span class="chevron">▾</span>
+            </button>
+
+            <div class="nav-dropdown">
+                <a href="/web/check-client" class="{% if path == '/web/check-client' %}active{% endif %}">
+                    Vérifier client
+                </a>
+
+                <a href="/web/sanctions" class="{% if path == '/web/sanctions' %}active{% endif %}">
+                    Sanctions
+                </a>
+
+                <a href="/web/alerts" class="{% if path == '/web/alerts' %}active{% endif %}">
+                    Alertes
+                </a>
+
+                {% if role in ["ADMIN", "SUPERVISEUR"] %}
+                    <a href="/web/critical-alerts" class="{% if path == '/web/critical-alerts' %}active{% endif %}">
+                        Alertes critiques
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <a href="/web/sanctions" class="{% if path == '/web/sanctions' %}active{% endif %}">
+            Sanctions
         </a>
-    {% endif %}
 
-    <a href="/web/sanctions" class="{% if path == '/web/sanctions' %}active{% endif %}">
-        Sanctions
-    </a>
-
-    <a href="/web/alerts" class="{% if path == '/web/alerts' %}active{% endif %}">
-        Alertes
-    </a>
-
-    {% if role == "ADMIN" %}
-        <a href="/web/imports" class="{% if path == '/web/imports' %}active{% endif %}">
-            Imports
-        </a>
-
-        <a href="/web/list-updates" class="{% if path == '/web/list-updates' %}active{% endif %}">
-            MAJ listes
-        </a>
-
-        <a href="/web/scheduler-status" class="{% if path == '/web/scheduler-status' %}active{% endif %}">
-            Scheduler
-        </a>
-
-        <a href="/web/users" class="{% if path == '/web/users' %}active{% endif %}">
-            Utilisateurs
-        </a>
-
-        <a href="/web/external-api" class="{% if path == '/web/external-api' %}active{% endif %}">
-            API externe
+        <a href="/web/alerts" class="{% if path == '/web/alerts' %}active{% endif %}">
+            Alertes
         </a>
     {% endif %}
 
     {% if role in ["ADMIN", "SUPERVISEUR"] %}
-        <a href="/web/import-history" class="{% if path == '/web/import-history' %}active{% endif %}">
-            Historique
-        </a>
+        <div class="nav-group {% if path in listes_paths %}active{% endif %}">
+            <button type="button" class="nav-group-toggle">
+                Listes de sanctions
+                <span class="chevron">▾</span>
+            </button>
 
-        <a href="/web/audit-logs" class="{% if path == '/web/audit-logs' %}active{% endif %}">
-            Audit
-        </a>
-
-        <a href="/web/data-quality" class="{% if path == '/web/data-quality' %}active{% endif %}">
-            Qualité
-        </a>
-
-        <a href="/web/matching-settings" class="{% if path == '/web/matching-settings' %}active{% endif %}">
-            Paramètres Matching
-        </a>
-
-        <a href="/web/critical-alerts" class="{% if path == '/web/critical-alerts' %}active{% endif %}">
-            Alertes critiques
-        </a>
+            <div class="nav-dropdown">
+                {% if role == "ADMIN" %}
+                    <a href="/web/imports" class="{% if path == '/web/imports' %}active{% endif %}">
+                        Imports
+                    </a>
+                    <a href="/web/list-updates" class="{% if path == '/web/list-updates' %}active{% endif %}">
+                        Mise à jour des listes
+                    </a>
+                    <a href="/web/scheduler-status" class="{% if path == '/web/scheduler-status' %}active{% endif %}">
+                        Scheduler
+                    </a>
+                {% endif %}
+                <a href="/web/import-history" class="{% if path == '/web/import-history' %}active{% endif %}">
+                    Historique des imports
+                </a>
+            </div>
+        </div>
     {% endif %}
 
-    <a href="/web/profile" class="{% if path == '/web/profile' %}active{% endif %}">
-        Profil
-    </a>
+    {% if role == "ADMIN" %}
+        <div class="nav-group {% if path in admin_paths %}active{% endif %}">
+            <button type="button" class="nav-group-toggle">
+                Administration
+                <span class="chevron">▾</span>
+            </button>
 
-    <a href="/web/change-password" class="{% if path == '/web/change-password' %}active{% endif %}">
-        Mot de passe
-    </a>
+            <div class="nav-dropdown">
+                <a href="/web/users" class="{% if path == '/web/users' %}active{% endif %}">
+                    Utilisateurs
+                </a>
+                <a href="/web/external-api" class="{% if path == '/web/external-api' %}active{% endif %}">
+                    API externe
+                </a>
+            </div>
+        </div>
+    {% endif %}
 
-    <a href="/web/logout" class="logout-link">
-        Déconnexion
-    </a>
+    {% if role in ["ADMIN", "SUPERVISEUR"] %}
+        <div class="nav-group {% if path in audit_paths %}active{% endif %}">
+            <button type="button" class="nav-group-toggle">
+                Audit &amp; Qualité
+                <span class="chevron">▾</span>
+            </button>
+
+            <div class="nav-dropdown">
+                <a href="/web/audit-logs" class="{% if path == '/web/audit-logs' %}active{% endif %}">
+                    Journal d'audit
+                </a>
+                <a href="/web/data-quality" class="{% if path == '/web/data-quality' %}active{% endif %}">
+                    Qualité des données
+                </a>
+                <a href="/web/matching-settings" class="{% if path == '/web/matching-settings' %}active{% endif %}">
+                    Paramètres de matching
+                </a>
+            </div>
+        </div>
+    {% endif %}
 </div>
+
+<script>
+(function () {
+    function closeAllMenus(except) {
+        document.querySelectorAll('.nav-group.open, .user-menu.open').forEach(function (el) {
+            if (el !== except) {
+                el.classList.remove('open');
+            }
+        });
+    }
+
+    document.querySelectorAll('.nav-group-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var parent = btn.closest('.nav-group, .user-menu');
+            var wasOpen = parent.classList.contains('open');
+            closeAllMenus(null);
+            if (!wasOpen) {
+                parent.classList.add('open');
+            }
+        });
+    });
+
+    document.addEventListener('click', function () {
+        closeAllMenus(null);
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            closeAllMenus(null);
+        }
+    });
+})();
+</script>
