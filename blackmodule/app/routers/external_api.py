@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -26,8 +26,23 @@ router = APIRouter(
 EXTERNAL_API_KEY = BLACKMODULE_API_KEY
 
 
-def verify_api_key(x_api_key: str | None = Header(None)):
+def verify_api_key(
+    request: Request,
+    x_api_key: str | None = Header(None),
+    db: Session = Depends(get_db)
+):
     if not x_api_key:
+        write_audit_log(
+            db=db,
+            user_identifier="EXTERNAL_API",
+            action="API_AUTH_FAILED",
+            entity_type="ExternalAPI",
+            entity_id=request.url.path,
+            description=f"Appel refusé sur {request.url.path} : header X-API-KEY manquant.",
+            ip_address=request.client.host if request.client else None
+        )
+        db.commit()
+
         raise HTTPException(
             status_code=401,
             detail="Clé API manquante. Header requis : X-API-KEY."
@@ -37,6 +52,17 @@ def verify_api_key(x_api_key: str | None = Header(None)):
     expected_key = EXTERNAL_API_KEY.strip()
 
     if received_key != expected_key:
+        write_audit_log(
+            db=db,
+            user_identifier="EXTERNAL_API",
+            action="API_AUTH_FAILED",
+            entity_type="ExternalAPI",
+            entity_id=request.url.path,
+            description=f"Appel refusé sur {request.url.path} : clé X-API-KEY invalide.",
+            ip_address=request.client.host if request.client else None
+        )
+        db.commit()
+
         raise HTTPException(
             status_code=403,
             detail="Clé API invalide."

@@ -2219,7 +2219,8 @@ def web_external_api_page(
             "API_MATCHING_CLIENT",
             "API_GET_ALERTS",
             "API_STATUS_CHECK",
-            "API_DOCUMENTATION_ACCESS"
+            "API_DOCUMENTATION_ACCESS",
+            "API_AUTH_FAILED"
         ])
     ).order_by(
         AuditLog.created_at.desc()
@@ -2272,12 +2273,17 @@ def web_external_api_page(
         ])
     ).count()
 
+    total_api_auth_failures = db.query(AuditLog).filter(
+        AuditLog.action == "API_AUTH_FAILED"
+    ).count()
+
     last_api_call = db.query(AuditLog).filter(
         AuditLog.action.in_([
             "API_MATCHING_CLIENT",
             "API_GET_ALERTS",
             "API_STATUS_CHECK",
-            "API_DOCUMENTATION_ACCESS"
+            "API_DOCUMENTATION_ACCESS",
+            "API_AUTH_FAILED"
         ])
     ).order_by(
         AuditLog.created_at.desc()
@@ -2296,6 +2302,7 @@ def web_external_api_page(
             "total_api_screenings": total_api_screenings,
             "total_api_alerts_views": total_api_alerts_views,
             "total_api_technical_views": total_api_technical_views,
+            "total_api_auth_failures": total_api_auth_failures,
             "last_api_call": last_api_call,
         }
     )

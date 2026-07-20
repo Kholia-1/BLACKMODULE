@@ -91,6 +91,11 @@
             color: white;
         }
 
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         code, pre {
             background: #0f172a;
             color: #e5e7eb;
@@ -205,6 +210,14 @@
             <span class="badge badge-warning">{{ total_api_technical_views }}</span>
         </p>
         <p>Consultations du statut API et de la documentation technique.</p>
+    </div>
+
+    <div class="card">
+        <h2>Tentatives échouées</h2>
+        <p>
+            <span class="badge badge-danger">{{ total_api_auth_failures }}</span>
+        </p>
+        <p>Appels reçus refusés faute de clé X-API-KEY valide (clé manquante ou incorrecte).</p>
     </div>
 
 </div>
@@ -364,7 +377,13 @@
                         <tr>
                             <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else "-" }}</td>
                             <td>{{ log.user_identifier }}</td>
-                            <td><span class="badge badge-info">{{ log.action }}</span></td>
+                            <td>
+                                {% if log.action == "API_AUTH_FAILED" %}
+                                    <span class="badge badge-danger">{{ log.action }}</span>
+                                {% else %}
+                                    <span class="badge badge-info">{{ log.action }}</span>
+                                {% endif %}
+                            </td>
                             <td>{{ log.entity_type }}</td>
                             <td>{{ log.description }}</td>
                         </tr>
