@@ -532,7 +532,7 @@
         </div>
 
         <!-- RESULTATS -->
-        <div class="card">
+        <div class="card" id="result-section">
             <h2>Résultat du screening</h2>
 
             {% if result %}
@@ -736,6 +736,12 @@
     </div>
 
 </div>
+
+{% if result %}
+<script>
+    document.getElementById('result-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+</script>
+{% endif %}
 
 </body>
 </html>

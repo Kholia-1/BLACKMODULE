@@ -5,85 +5,93 @@
     <title>BLACKMODULE - État Scheduler</title>
 <link rel="stylesheet" href="/static/css/styles.css">
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #F8FAFC;
             margin: 0;
             padding: 0;
         }
 
         .header {
-            background: #111827;
+            background: #0F172A;
             color: white;
-            padding: 20px 40px;
+            padding: 22px 32px;
         }
 
         .header h1 {
             margin: 0;
-            font-size: 26px;
+            font-size: 22px;
+            font-weight: 700;
         }
 
         .header p {
-            margin: 5px 0 0;
-            color: #d1d5db;
+            margin: 6px 0 0;
+            color: #94A3B8;
+            font-size: 13.5px;
         }
 
         .container {
-            padding: 30px 40px;
+            padding: 28px 32px;
         }
 
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 24px;
+            gap: 20px;
             align-items: start;
         }
 
         .card {
             background: white;
             border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
-            margin-bottom: 24px;
+            padding: 22px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+            margin-bottom: 22px;
         }
 
         h2 {
             margin-top: 0;
-            color: #111827;
-            font-size: 22px;
+            color: #0F172A;
+            font-size: 17px;
+            font-weight: 600;
         }
 
         .badge {
             display: inline-block;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11.5px;
+            font-weight: 600;
         }
 
         .badge-success {
-            background: #dcfce7;
+            background: #DCFCE7;
             color: #166534;
         }
 
         .badge-info {
-            background: #dbeafe;
-            color: #1e40af;
+            background: #E2E8F0;
+            color: #334155;
         }
 
         .badge-warning {
-            background: #fef3c7;
-            color: #92400e;
+            background: #FEF3C7;
+            color: #92400E;
         }
 
         .btn {
             display: inline-block;
-            padding: 12px 18px;
-            background: #111827;
+            padding: 11px 18px;
+            background: #DC2626;
             color: white;
             border-radius: 8px;
             text-decoration: none;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 14px;
             margin-top: 15px;
         }
 
@@ -91,23 +99,31 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 14px;
+            font-size: 13.5px;
         }
 
         th {
             text-align: left;
-            background: #f3f4f6;
-            color: #374151;
-            padding: 12px;
-            font-size: 14px;
+            background: #F1F5F9;
+            color: #334155;
+            padding: 11px 12px;
+            font-size: 11.5px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
             white-space: nowrap;
         }
 
         td {
             padding: 12px;
-            border-bottom: 1px solid #e5e7eb;
-            font-size: 14px;
-            color: #111827;
+            border-bottom: 1px solid #E2E8F0;
+            font-size: 13.5px;
+            color: #1E293B;
             white-space: nowrap;
+        }
+
+        tr:hover td {
+            background: #F8FAFC;
         }
 
         .table-wrapper {
@@ -117,6 +133,8 @@
         .status-line {
             margin-bottom: 16px;
             line-height: 1.7;
+            font-size: 13.5px;
+            color: #334155;
         }
 
         @media (max-width: 1000px) {

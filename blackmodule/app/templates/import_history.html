@@ -6,27 +6,33 @@
     <link rel="stylesheet" href="/static/css/styles.css">
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #F8FAFC;
             margin: 0;
             padding: 0;
         }
 
         .header {
-            background: #111827;
+            background: #0F172A;
             color: white;
-            padding: 20px 40px;
+            padding: 22px 32px;
         }
 
         .header h1 {
             margin: 0;
-            font-size: 26px;
+            font-size: 22px;
+            font-weight: 700;
         }
 
         .header p {
-            margin: 5px 0 0;
-            color: #d1d5db;
+            margin: 6px 0 0;
+            color: #94A3B8;
+            font-size: 13.5px;
         }
 
         .nav {
@@ -34,28 +40,29 @@
         }
 
         .nav a {
-            color: #93c5fd;
+            color: #94A3B8;
             margin-right: 18px;
             text-decoration: none;
-            font-weight: bold;
+            font-weight: 600;
         }
 
         .container {
-            padding: 30px 40px;
+            padding: 28px 32px;
         }
 
         .card {
             background: white;
             border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
-            margin-bottom: 24px;
+            padding: 22px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+            margin-bottom: 22px;
         }
 
         h2 {
             margin-top: 0;
-            color: #111827;
-            font-size: 20px;
+            color: #0F172A;
+            font-size: 17px;
+            font-weight: 600;
         }
 
         .top-bar {
@@ -68,8 +75,8 @@
         }
 
         .summary {
-            color: #4b5563;
-            font-size: 14px;
+            color: #64748B;
+            font-size: 13.5px;
         }
 
         .filter-form {
@@ -79,34 +86,37 @@
         }
 
         input, select {
-            padding: 10px 12px;
-            border: 1px solid #d1d5db;
+            padding: 9px 12px;
+            border: 1px solid #CBD5E1;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 13.5px;
         }
 
         button {
-            padding: 10px 14px;
-            background: #111827;
+            padding: 9px 14px;
+            background: #DC2626;
             color: white;
-            border: none;
+            border: 1px solid #DC2626;
             border-radius: 8px;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
         }
 
         button:hover {
-            background: #1f2937;
+            background: #B91C1C;
         }
 
-        .btn-link {
-            padding: 10px 14px;
-            background: #e5e7eb;
-            color: #111827;
+        .btn-secondary {
+            padding: 9px 14px;
+            background: white;
+            color: #334155;
+            border: 1px solid #CBD5E1;
             border-radius: 8px;
             text-decoration: none;
-            font-weight: bold;
-            font-size: 14px;
+            font-weight: 600;
+            font-size: 13.5px;
+            display: inline-flex;
+            align-items: center;
         }
 
         .table-wrapper {
@@ -119,23 +129,31 @@
             border-collapse: collapse;
             margin-top: 14px;
             background: white;
+            font-size: 13.5px;
         }
 
         th {
             text-align: left;
-            background: #f3f4f6;
-            color: #374151;
-            padding: 12px;
-            font-size: 14px;
+            background: #F1F5F9;
+            color: #334155;
+            padding: 11px 12px;
+            font-size: 11.5px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
             white-space: nowrap;
         }
 
         td {
             padding: 12px;
-            border-bottom: 1px solid #e5e7eb;
-            font-size: 14px;
-            color: #111827;
+            border-bottom: 1px solid #E2E8F0;
+            font-size: 13.5px;
+            color: #1E293B;
             vertical-align: top;
+        }
+
+        tr:hover td {
+            background: #F8FAFC;
         }
 
         .nowrap {
@@ -143,42 +161,42 @@
         }
 
         .badge {
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11.5px;
+            font-weight: 600;
             display: inline-block;
             white-space: nowrap;
         }
 
         .badge-success {
-            background: #dcfce7;
+            background: #DCFCE7;
             color: #166534;
         }
 
         .badge-failed {
-            background: #fee2e2;
-            color: #991b1b;
+            background: #FEE2E2;
+            color: #B91C1C;
         }
 
         .badge-pending {
-            background: #fef3c7;
-            color: #92400e;
+            background: #FEF3C7;
+            color: #92400E;
         }
 
         .badge-source {
-            background: #dbeafe;
-            color: #1e40af;
+            background: #E2E8F0;
+            color: #334155;
         }
 
         .error {
-            color: #991b1b;
+            color: #B91C1C;
             max-width: 350px;
             line-height: 1.5;
         }
 
         .empty {
-            color: #6b7280;
+            color: #64748B;
             font-size: 14px;
             padding: 20px 0;
         }
@@ -208,7 +226,7 @@
 
 <div class="header">
     <h1>BLACKMODULE</h1>
-    <p>Tableau de bord général</p>
+    <p>Historique des imports</p>
 
     {% include "partials/navbar.html" %}
 </div>
@@ -247,7 +265,7 @@
                 <input type="text" name="imported_by" placeholder="Importé par..." value="{{ imported_by or '' }}">
 
                 <button type="submit">Filtrer</button>
-                <a class="btn-link" href="/web/import-history">Réinitialiser</a>
+                <a class="btn-secondary" href="/web/import-history">Réinitialiser</a>
             </form>
         </div>
 
