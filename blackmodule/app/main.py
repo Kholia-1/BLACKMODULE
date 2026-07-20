@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.config import SECRET_KEY
 from app.database import Base, engine, get_db, SessionLocal
 from app import models
 from app.services.auth_service import create_default_admin
@@ -30,7 +31,7 @@ app = FastAPI(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key="blackmodule_secret_key_change_later"
+    secret_key=SECRET_KEY
 )
 
 

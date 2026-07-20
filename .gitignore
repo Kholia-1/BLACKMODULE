@@ -1,3 +1,6 @@
+# Outils de déploiement locaux (secrets)
+_deploy_tmp/
+
 # Python
 __pycache__/
 *.py[cod]

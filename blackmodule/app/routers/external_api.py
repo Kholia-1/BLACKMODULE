@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import Optional
-import os
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
@@ -15,6 +14,7 @@ from app.services.matching_service import (
     classify_alert
 )
 from app.services.matching_settings_service import get_or_create_matching_settings
+from app.config import BLACKMODULE_API_KEY
 
 
 router = APIRouter(
@@ -23,7 +23,7 @@ router = APIRouter(
 )
 
 
-EXTERNAL_API_KEY = os.getenv("BLACKMODULE_API_KEY", "BLACKMODULE-API-KEY-2026")
+EXTERNAL_API_KEY = BLACKMODULE_API_KEY
 
 
 def verify_api_key(x_api_key: str | None = Header(None)):
