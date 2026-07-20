@@ -432,7 +432,7 @@ def auto_update_eu_xml(
     file_type = "XML"
 
     try:
-        response = requests.get(EU_XML_URL, timeout=90)
+        response = requests.get(EU_XML_URL, timeout=180)
         response.raise_for_status()
 
         file_content = response.content

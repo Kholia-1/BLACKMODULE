@@ -126,19 +126,35 @@ def parse_un_xml(file_content: bytes) -> list[dict]:
         if nationality_node is not None and nationality_node.text:
             nationalite = clean_text(nationality_node.text)
 
-        # Date de naissance
+        # Date de naissance (certaines fiches ONU ne donnent que l'année)
         date_naissance = None
         dob_node = individual.find(".//INDIVIDUAL_DATE_OF_BIRTH/DATE")
 
         if dob_node is not None and dob_node.text:
             date_naissance = parse_date(dob_node.text)
 
-        # Passeport / document
-        num_passeport = None
-        document_node = individual.find(".//INDIVIDUAL_DOCUMENT/NUMBER")
+        if not date_naissance:
+            year_node = individual.find(".//INDIVIDUAL_DATE_OF_BIRTH/YEAR")
 
-        if document_node is not None and document_node.text:
-            num_passeport = clean_text(document_node.text)
+            if year_node is not None and year_node.text:
+                date_naissance = parse_date(year_node.text)
+
+        # Passeport : on ne retient que les documents explicitement de type passeport,
+        # sinon un numéro de carte d'identité nationale se retrouverait étiqueté passeport.
+        num_passeport = None
+
+        for document_node in individual.findall(".//INDIVIDUAL_DOCUMENT"):
+            doc_type = get_text_from_child(document_node, "TYPE_OF_DOCUMENT")
+
+            if doc_type and any(
+                keyword in doc_type.lower()
+                for keyword in ["passport", "passeport", "pasaporte"]
+            ):
+                doc_number = get_text_from_child(document_node, "NUMBER")
+
+                if doc_number:
+                    num_passeport = doc_number
+                    break
 
         # Alias
         aliases = []

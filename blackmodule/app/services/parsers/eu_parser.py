@@ -57,6 +57,26 @@ def first_child_attr(element, child_names, attr_names):
     return None
 
 
+def first_passport_number(element, child_names):
+    """
+    Les blocs identification/document de la liste UE couvrent tout type de pièce
+    (passeport, carte nationale, numéro fiscal...). On ne retient un numéro que
+    si son type est explicitement un passeport, sinon un numéro fiscal ou une
+    carte d'identité se retrouverait étiqueté à tort comme passeport.
+    """
+    child_names = [n.lower() for n in child_names]
+    for child in element.iter():
+        if local_name(child.tag).lower() in child_names:
+            type_code = attr(child, ["identificationTypeCode", "documentType", "type"])
+            type_desc = attr(child, ["identificationTypeDescription", "documentTypeDescription"])
+            combined = f"{type_code or ''} {type_desc or ''}".lower()
+            if "passport" in combined or "passeport" in combined:
+                value = attr(child, ["number", "passportNumber", "documentNumber", "identificationNumber"])
+                if value:
+                    return value
+    return None
+
+
 def all_child_attrs(element, child_names, attr_names):
     child_names = [n.lower() for n in child_names]
     values = []
@@ -191,7 +211,7 @@ def parse_eu_xml(file_content: bytes) -> list[dict]:
 
         nationalite = first_child_attr(record, ["citizenship"], ["countryDescription", "countryIso2Code", "country"]) or first_text(record, ["citizenship", "nationality"])
         pays = first_child_attr(record, ["address"], ["countryDescription", "countryIso2Code", "country"]) or first_text(record, ["country", "countryDescription", "addressCountry"])
-        num_passeport = first_child_attr(record, ["identification", "document", "passport"], ["number", "passportNumber", "documentNumber", "identificationNumber"])
+        num_passeport = first_passport_number(record, ["identification", "document", "passport"])
         motif_sanction = first_child_attr(record, ["regulation", "regulationSummary"], ["programme", "numberTitle", "publicationUrl"]) or first_text(record, ["regulationSummary", "programme", "program", "remark", "reason", "legalBasis"]) or "UNION EUROPEENNE"
         designation_date = attr(record, ["designationDate", "listedOn", "publicationDate"]) or first_child_attr(record, ["regulation"], ["entryIntoForceDate", "publicationDate"])
         date_inscription = parse_date(designation_date) or date.today()

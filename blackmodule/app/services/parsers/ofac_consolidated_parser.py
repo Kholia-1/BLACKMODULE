@@ -258,18 +258,24 @@ def extract_date_naissance(party):
 
 
 def extract_passport_or_document(party):
-    values = get_texts_by_tag_contains(
+    # On préfère un numéro explicitement de type passeport ; sinon on retombe
+    # sur un identifiant générique plutôt que de laisser le champ vide.
+    passport_values = get_texts_by_tag_contains(party, ["passport"])
+
+    if passport_values:
+        return passport_values[0]
+
+    fallback_values = get_texts_by_tag_contains(
         party,
         [
-            "passport",
             "idnumber",
             "documentnumber",
             "registrationnumber"
         ]
     )
 
-    if values:
-        return values[0]
+    if fallback_values:
+        return fallback_values[0]
 
     return None
 

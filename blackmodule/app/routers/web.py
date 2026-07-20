@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query, Upl
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 
 from app.database import get_db
@@ -948,12 +948,16 @@ async def web_import_france_gel_xml(request: Request, imported_by: str = Form(..
     return await process_web_import(request, db, file, current_username(request, imported_by), "FR_GEL", "XML", import_france_gel_xml, "Import XML France Gel des Avoirs effectué avec succès.", "WEB_IMPORT_FRANCE_GEL_XML")
 
 
+SANCTIONS_PAGE_SIZE = 50
+
+
 @router.get("/sanctions")
 def web_sanctions(
     request: Request,
     q: str | None = Query(None),
     source_liste: str | None = Query(None),
     statut: str | None = Query(None),
+    page: int = Query(1, ge=1),
     db: Session = Depends(get_db),
 ):
     if not require_login(request):
@@ -976,12 +980,32 @@ def web_sanctions(
     if statut:
         query = query.filter(SanctionEntry.statut == statut.strip().upper())
 
-    sanctions = query.order_by(SanctionEntry.created_at.desc()).all()
+    total_count = query.count()
+    total_pages = max(1, (total_count + SANCTIONS_PAGE_SIZE - 1) // SANCTIONS_PAGE_SIZE)
+    page = min(page, total_pages)
+
+    sanctions = (
+        query.options(selectinload(SanctionEntry.aliases))
+        .order_by(SanctionEntry.created_at.desc())
+        .offset((page - 1) * SANCTIONS_PAGE_SIZE)
+        .limit(SANCTIONS_PAGE_SIZE)
+        .all()
+    )
 
     return templates.TemplateResponse(
         request=request,
         name="sanctions.html",
-        context={"request": request, "sanctions": sanctions, "q": q, "source_liste": source_liste, "statut": statut},
+        context={
+            "request": request,
+            "sanctions": sanctions,
+            "q": q,
+            "source_liste": source_liste,
+            "statut": statut,
+            "page": page,
+            "total_pages": total_pages,
+            "total_count": total_count,
+            "page_size": SANCTIONS_PAGE_SIZE,
+        },
     )
 
 
