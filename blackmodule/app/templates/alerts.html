@@ -234,7 +234,7 @@
         <h2>Liste des alertes</h2>
 
         <a class="btn-link"
-           href="/api/exports/alerts-excel?statut={{ current_status or '' }}&niveau_alerte={{ niveau_alerte or '' }}&source_liste={{ source_liste or '' }}&client_reference={{ client_reference or '' }}&date_from={{ date_from or '' }}&date_to={{ date_to or '' }}">
+           href="/api/exports/alerts-excel?statut={{ current_status | urlencode if current_status else '' }}&niveau_alerte={{ niveau_alerte | urlencode if niveau_alerte else '' }}&source_liste={{ source_liste | urlencode if source_liste else '' }}&client_reference={{ client_reference | urlencode if client_reference else '' }}&date_from={{ date_from | urlencode if date_from else '' }}&date_to={{ date_to | urlencode if date_to else '' }}">
             Exporter Excel </a>
     </div>
 

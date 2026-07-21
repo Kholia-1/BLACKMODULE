@@ -388,6 +388,31 @@
         </div>
     </div>
 
+            <div class="card">
+        <span class="badge-csv">OFSI UK · Excel</span>
+        <h2>Importer la liste OFSI UK (Excel)</h2>
+
+        <form method="post" action="/web/imports/ofsi-excel" enctype="multipart/form-data">
+            <label>Importé par</label>
+            <input type="text" name="imported_by" value="bello.etienne" required>
+
+            <label>Fichier Excel OFSI UK</label>
+            <input type="file" name="file" accept=".xls,.xlsx" required>
+
+            <button type="submit">Importer le fichier Excel OFSI</button>
+        </form>
+
+        <div class="help">
+            <strong>Format attendu :</strong><br>
+            Même contenu que la version CSV, au format Excel (<code>.xls</code> ou <code>.xlsx</code>) :
+            colonnes nom, type d'entité, date de naissance, nationalité, pays, numéro de passeport,
+            adresse, motif de sanction, date d'inscription, statut, alias.
+            <br><br>
+            Les données seront normalisées dans <code>sanction_entries</code> avec la source
+            <code>OFSI</code>.
+        </div>
+    </div>
+
 <div class="card">
     <span class="badge-csv">OFSI / UKSL · CSV</span>
     <h2>Importer la UK Sanctions List</h2>

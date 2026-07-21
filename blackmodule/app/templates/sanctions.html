@@ -35,17 +35,6 @@
             font-size: 13.5px;
         }
 
-        .nav {
-            margin-top: 15px;
-        }
-
-        .nav a {
-            color: #94A3B8;
-            margin-right: 18px;
-            text-decoration: none;
-            font-weight: 600;
-        }
-
         .container {
             padding: 28px 32px;
         }
@@ -65,19 +54,54 @@
             font-weight: 600;
         }
 
-        .top-bar {
+        .list-header {
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
             gap: 16px;
-            align-items: center;
             flex-wrap: wrap;
-            margin-bottom: 18px;
         }
 
-        .search-form {
+        .list-header h2 {
+            margin: 0;
+        }
+
+        .summary {
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .count-pill {
+            background: #F1F5F9;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 999px;
+        }
+
+        .summary-text {
+            color: #64748B;
+            font-size: 13px;
+        }
+
+        .filters-bar {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            align-items: center;
+            background: #F1F5F9;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 18px;
+        }
+
+        .filters-bar input, .filters-bar select {
+            background: white;
         }
 
         input, select {
@@ -85,6 +109,7 @@
             border: 1px solid #CBD5E1;
             border-radius: 8px;
             font-size: 13.5px;
+            font-family: inherit;
         }
 
         button {
@@ -94,6 +119,7 @@
             border: 1px solid #DC2626;
             border-radius: 8px;
             font-weight: 600;
+            font-size: 13.5px;
             cursor: pointer;
         }
 
@@ -116,13 +142,15 @@
 
         .table-wrapper {
             overflow-x: auto;
+            margin-top: 18px;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
         }
 
         table {
             width: 100%;
             min-width: 1250px;
             border-collapse: collapse;
-            margin-top: 14px;
             background: white;
             font-size: 13.5px;
         }
@@ -148,6 +176,32 @@
         }
 
         tr:hover td {
+            background: #F8FAFC;
+        }
+
+        th:first-child, td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 1;
+            max-width: 260px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            box-shadow: 2px 0 4px rgba(15, 23, 42, 0.05);
+        }
+
+        th:first-child {
+            background: #F1F5F9;
+            z-index: 2;
+        }
+
+        td:first-child {
+            background: white;
+            font-weight: 600;
+            color: #0F172A;
+        }
+
+        tr:hover td:first-child {
             background: #F8FAFC;
         }
 
@@ -185,19 +239,26 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 16px;
+            gap: 14px;
             margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .goto-page {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .goto-page input {
+            width: 76px;
+            text-align: center;
         }
 
         .empty {
             color: #64748B;
             font-size: 14px;
             padding: 20px 0;
-        }
-
-        .summary {
-            color: #64748B;
-            font-size: 14px;
         }
 
         @media (max-width: 800px) {
@@ -209,12 +270,12 @@
                 padding: 20px;
             }
 
-            .search-form {
+            .filters-bar {
                 flex-direction: column;
-                width: 100%;
+                align-items: stretch;
             }
 
-            input, select, button {
+            .filters-bar input, .filters-bar select, .filters-bar button, .filters-bar a {
                 width: 100%;
             }
         }
@@ -232,77 +293,54 @@
 
 <div class="container">
 
-        <div class="top-bar">
+    {% set user = request.session.get("user") %}
+    {% set role = user.get("role") if user else "" %}
+
+    <div class="card">
+
+        <div class="list-header">
             <div>
                 <h2>Entrées de sanctions / PPE</h2>
                 <div class="summary">
                     {% if total_count is defined %}
-                        {{ total_count }} entrée(s) au total — page {{ page }}/{{ total_pages }}
+                        <span class="count-pill">{{ total_count }} entrée{{ "s" if total_count != 1 else "" }}</span>
+                        <span class="summary-text">Page {{ page }} / {{ total_pages }}</span>
                     {% else %}
-                        Total affiché : {{ sanctions|length }} entrée(s)
+                        <span class="count-pill">{{ sanctions|length }} entrée(s)</span>
                     {% endif %}
                 </div>
             </div>
 
-{% set user = request.session.get("user") %}
-{% set role = user.get("role") if user else "" %}
+            {% if role in ["ADMIN", "SUPERVISEUR"] %}
+                <a class="btn-excel" href="/api/exports/sanctions-excel">Exporter Excel</a>
+            {% endif %}
+        </div>
 
-{% if role in ["ADMIN", "SUPERVISEUR"] %}
-    <a class="btn" href="/api/exports/alerts-excel">
-        Exporter Excel
-    </a>
-{% endif %}
-
-    <form class="search-form" method="get" action="/web/sanctions">
-                <input type="text" name="q" placeholder="Nom, prénom, passeport..." value="{{ q or '' }}">
+        <form class="filters-bar" method="get" action="/web/sanctions">
+            <input type="text" name="q" placeholder="Nom, prénom, passeport..." value="{{ q or '' }}">
 
             <select name="source_liste">
-                    <option value="">Toutes les sources</option>
+                <option value="">Toutes les sources</option>
+                <option value="AFB_PPE" {% if source_liste == "AFB_PPE" %}selected{% endif %}>AFB_PPE</option>
+                <option value="OFAC_SDN" {% if source_liste == "OFAC_SDN" %}selected{% endif %}>OFAC_SDN</option>
+                <option value="OFAC_CONSOLIDATED" {% if source_liste == "OFAC_CONSOLIDATED" %}selected{% endif %}>OFAC_CONSOLIDATED</option>
+                <option value="ONU" {% if source_liste == "ONU" %}selected{% endif %}>ONU</option>
+                <option value="UE" {% if source_liste == "UE" %}selected{% endif %}>UE</option>
+                <option value="OFSI" {% if source_liste == "OFSI" %}selected{% endif %}>OFSI</option>
+                <option value="FR_GEL" {% if source_liste == "FR_GEL" %}selected{% endif %}>FR_GEL</option>
+                <option value="UKSL" {% if source_liste == "UKSL" %}selected{% endif %}>OFSI / UKSL</option>
+            </select>
 
-                    <option value="AFB_PPE" {% if source_liste == "AFB_PPE" %}selected{% endif %}>
-                        AFB_PPE
-                    </option>
+            <select name="statut">
+                <option value="">Tous les statuts</option>
+                <option value="ACTIF" {% if statut == "ACTIF" %}selected{% endif %}>ACTIF</option>
+                <option value="SUPPRIME" {% if statut == "SUPPRIME" %}selected{% endif %}>SUPPRIME</option>
+                <option value="EN_REVISION" {% if statut == "EN_REVISION" %}selected{% endif %}>EN_REVISION</option>
+            </select>
 
-                    <option value="OFAC_SDN" {% if source_liste == "OFAC_SDN" %}selected{% endif %}>
-                        OFAC_SDN
-                    </option>
-
-                    <option value="OFAC_CONSOLIDATED" {% if source_liste == "OFAC_CONSOLIDATED" %}selected{% endif %}>
-                        OFAC_CONSOLIDATED
-                    </option>
-
-                    <option value="ONU" {% if source_liste == "ONU" %}selected{% endif %}>
-                        ONU
-                    </option>
-
-                    <option value="UE" {% if source_liste == "UE" %}selected{% endif %}>
-                        UE
-                    </option>
-
-                    <option value="OFSI" {% if source_liste == "OFSI" %}selected{% endif %}>
-                        OFSI
-                    </option>
-
-                    <option value="FR_GEL" {% if source_liste == "FR_GEL" %}selected{% endif %}>
-                        FR_GEL
-                    </option>
-                    <option value="UKSL" {% if source_liste == "UKSL" %}selected{% endif %}>
-                        OFSI / UKSL
-                    </option>
-
-        </select>
-
-                <select name="statut">
-                    <option value="">Tous les statuts</option>
-                    <option value="ACTIF" {% if statut == "ACTIF" %}selected{% endif %}>ACTIF</option>
-                    <option value="SUPPRIME" {% if statut == "SUPPRIME" %}selected{% endif %}>SUPPRIME</option>
-                    <option value="EN_REVISION" {% if statut == "EN_REVISION" %}selected{% endif %}>EN_REVISION</option>
-                </select>
-
-                <button type="submit">Filtrer</button>
-                <a class="btn-secondary" href="/web/sanctions">Réinitialiser</a>
-            </form>
-        </div>
+            <button type="submit">Filtrer</button>
+            <a class="btn-secondary" href="/web/sanctions">Réinitialiser</a>
+        </form>
 
         {% if sanctions and sanctions|length > 0 %}
             <div class="table-wrapper">
@@ -327,7 +365,7 @@
                     <tbody>
                         {% for sanction in sanctions %}
                         <tr>
-                            <td>{{ sanction.nom_complet if sanction.nom_complet else "-" }}</td>
+                            <td title="{{ sanction.nom_complet if sanction.nom_complet else '' }}">{{ sanction.nom_complet if sanction.nom_complet else "-" }}</td>
                             <td>{{ sanction.nom if sanction.nom else "-" }}</td>
                             <td>{{ sanction.prenom if sanction.prenom else "-" }}</td>
 
@@ -381,14 +419,22 @@
             {% set base_params = {'q': q, 'source_liste': source_liste, 'statut': statut} %}
             <div class="pagination">
                 {% if page > 1 %}
-                    <a class="btn-secondary" href="/web/sanctions?{% for k, v in base_params.items() %}{% if v %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page - 1 }}">&laquo; Précédent</a>
+                    <a class="btn-secondary" href="/web/sanctions?{% for k, v in base_params.items() %}{% if v %}{{ k }}={{ v | urlencode }}&{% endif %}{% endfor %}page={{ page - 1 }}">&laquo; Précédent</a>
                 {% endif %}
 
-                <span class="summary">Page {{ page }} / {{ total_pages }}</span>
+                <span class="summary-text">Page {{ page }} / {{ total_pages }}</span>
 
                 {% if page < total_pages %}
-                    <a class="btn-secondary" href="/web/sanctions?{% for k, v in base_params.items() %}{% if v %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page + 1 }}">Suivant &raquo;</a>
+                    <a class="btn-secondary" href="/web/sanctions?{% for k, v in base_params.items() %}{% if v %}{{ k }}={{ v | urlencode }}&{% endif %}{% endfor %}page={{ page + 1 }}">Suivant &raquo;</a>
                 {% endif %}
+
+                <form class="goto-page" method="get" action="/web/sanctions">
+                    {% for k, v in base_params.items() %}
+                        {% if v %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}
+                    {% endfor %}
+                    <input type="number" name="page" min="1" max="{{ total_pages }}" value="{{ page }}">
+                    <button type="submit">Aller</button>
+                </form>
             </div>
         {% endif %}
     </div>

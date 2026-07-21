@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>BLACKMODULE - Alertes critiques</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
 
     <style>
         * {
@@ -84,11 +85,48 @@
             color: #92400E;
         }
 
+        .card-exacte {
+            border-left: 3px solid #DC2626;
+        }
+
+        .card-probable {
+            border-left: 3px solid #D97706;
+        }
+
         h2 {
             margin-top: 0;
             color: #0F172A;
             font-size: 17px;
             font-weight: 600;
+        }
+
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 4px;
+        }
+
+        .list-header h2 {
+            margin: 0;
+        }
+
+        .list-header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .count-pill {
+            background: #F1F5F9;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 999px;
         }
 
         form {
@@ -217,23 +255,19 @@
 </div>
 
 <div class="container">
-<a class="btn-link"
-   href="/api/exports/alerts-excel?critical_only=1&niveau_alerte={{ niveau_alerte or '' }}&statut={{ statut or '' }}">
-    Exporter Excel alertes critiques
-</a>
 
     <div class="grid">
-        <div class="card">
+        <div class="card card-exacte">
             <div class="metric-title">Total alertes critiques</div>
             <div class="metric-value metric-danger">{{ total_critical }}</div>
         </div>
 
-        <div class="card">
+        <div class="card card-exacte">
             <div class="metric-title">Alertes exactes</div>
             <div class="metric-value metric-danger">{{ exact_count }}</div>
         </div>
 
-        <div class="card">
+        <div class="card card-probable">
             <div class="metric-title">Alertes probables</div>
             <div class="metric-value metric-warning">{{ probable_count }}</div>
         </div>
@@ -267,7 +301,17 @@
     </div>
 
     <div class="card">
-        <h2>Liste des alertes critiques</h2>
+        <div class="list-header">
+            <div class="list-header-title">
+                <h2>Liste des alertes critiques</h2>
+                <span class="count-pill">{{ total_critical }} alerte{{ "s" if total_critical != 1 else "" }}</span>
+            </div>
+
+            <a class="btn-link"
+               href="/api/exports/alerts-excel?critical_only=1&niveau_alerte={{ niveau_alerte | urlencode if niveau_alerte else '' }}&statut={{ statut | urlencode if statut else '' }}">
+                Exporter Excel
+            </a>
+        </div>
 
         <div class="table-wrapper">
             <table>
@@ -308,7 +352,7 @@
                         <td>{{ alert.matching_type }}</td>
                         <td>{{ alert.action_recommandee }}</td>
                         <td>
-                            <a href="/web/alerts/{{ alert.id }}/treat">Traiter</a>
+                            <a class="btn" href="/web/alerts/{{ alert.id }}/treat">Traiter</a>
                         </td>
                     </tr>
                     {% else %}

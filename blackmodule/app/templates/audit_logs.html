@@ -228,7 +228,7 @@
 <div class="container">
 
 <a class="btn-link"
-   href="/api/exports/audit-logs-excel?action={{ action or '' }}&user_identifier={{ user_identifier or '' }}&entity_type={{ entity_type or '' }}&date_from={{ date_from or '' }}&date_to={{ date_to or '' }}">
+   href="/api/exports/audit-logs-excel?action={{ action | urlencode if action else '' }}&user_identifier={{ user_identifier | urlencode if user_identifier else '' }}&entity_type={{ entity_type | urlencode if entity_type else '' }}&date_from={{ date_from | urlencode if date_from else '' }}&date_to={{ date_to | urlencode if date_to else '' }}">
     Exporter Excel
 </a>
 

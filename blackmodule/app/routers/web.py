@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
@@ -163,6 +163,30 @@ def logout(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse(url="/web/login", status_code=303)
 
 
+def build_daily_alert_trend(db: Session, days: int = 30):
+    today = datetime.utcnow().date()
+    start_date = today - timedelta(days=days - 1)
+
+    rows = (
+        db.query(
+            func.date(Alert.created_at).label("day"),
+            func.count(Alert.id).label("count"),
+        )
+        .filter(Alert.created_at >= start_date)
+        .group_by(func.date(Alert.created_at))
+        .all()
+    )
+
+    counts_by_day = {row.day: row.count for row in rows}
+
+    trend = []
+    for i in range(days):
+        day = start_date + timedelta(days=i)
+        trend.append({"date": day.isoformat(), "count": counts_by_day.get(day, 0)})
+
+    return trend
+
+
 @router.get("/dashboard")
 def web_dashboard(request: Request, db: Session = Depends(get_db)):
     if not require_login(request):
@@ -181,6 +205,7 @@ def web_dashboard(request: Request, db: Session = Depends(get_db)):
         "alertes_possibles": db.query(Alert).filter(Alert.niveau_alerte == "ALERTE_POSSIBLE").count(),
         "total_audit_logs": db.query(AuditLog).count(),
         "recent_alerts": db.query(Alert).order_by(Alert.created_at.desc()).limit(10).all(),
+        "alert_trend": build_daily_alert_trend(db),
     }
 
     return templates.TemplateResponse(request=request, name="dashboard.html", context=context)
@@ -890,21 +915,32 @@ async def web_import_uksl_csv(
         )
 
     except Exception as e:
-        import_batch.status = "FAILED"
-        import_batch.error_message = str(e)
+        db.rollback()
+
+        failed_batch = ImportBatch(
+            source_liste="UKSL",
+            filename=file.filename,
+            file_type="CSV",
+            status="FAILED",
+            imported_by=imported_by,
+            error_message=str(e)[:1000]
+        )
+
+        db.add(failed_batch)
+        db.flush()
 
         write_audit_log(
             db=db,
             user_identifier=imported_by,
             action="WEB_IMPORT_UKSL_CSV_FAILED",
             entity_type="ImportBatch",
-            entity_id=str(import_batch.id),
-            description=f"Échec import CSV UKSL depuis l'interface web : {str(e)}",
+            entity_id=str(failed_batch.id),
+            description=f"Échec import CSV UKSL depuis l'interface web : {str(e)[:500]}",
             ip_address=request.client.host if request.client else None
         )
 
         db.commit()
-        db.refresh(import_batch)
+        db.refresh(failed_batch)
 
         return templates.TemplateResponse(
             request=request,
@@ -913,7 +949,7 @@ async def web_import_uksl_csv(
                 "request": request,
                 "message": f"Erreur pendant l'import UKSL : {str(e)}",
                 "success": False,
-                "result": import_batch
+                "result": failed_batch
             }
         )
 
@@ -1153,6 +1189,9 @@ def web_create_user(
     role = role.upper()
     if role not in allowed_roles:
         raise HTTPException(status_code=400, detail="Rôle invalide.")
+
+    if len(password) < 6:
+        return RedirectResponse(url="/web/users?message=Le mot de passe doit contenir au moins 6 caractères", status_code=303)
 
     if db.query(User).filter(User.username == username.strip()).first():
         return RedirectResponse(url="/web/users?message=Nom utilisateur déjà utilisé", status_code=303)
