@@ -43,6 +43,11 @@
             grid-template-columns: 1fr 1fr;
             gap: 20px;
             align-items: start;
+            margin-bottom: 22px;
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
         }
 
         .card {
@@ -51,6 +56,7 @@
             padding: 22px;
             box-shadow: 0 1px 2px rgba(15,23,42,0.06);
             margin-bottom: 22px;
+            min-width: 0;
         }
 
         h2 {
@@ -192,75 +198,68 @@
 
 <div class="container">
 
-    <div class="grid">
-        <div class="grid">
+    <div class="grid stats-grid">
 
-    <div class="card">
-        <h2>Total appels API</h2>
-        <p>
-            <span class="badge badge-dark">{{ total_api_calls }}</span>
-        </p>
-        <p>Nombre total d’appels journalisés sur l’API externe.</p>
-    </div>
+        <div class="card">
+            <h2>Total appels API</h2>
+            <p>
+                <span class="badge badge-dark">{{ total_api_calls }}</span>
+            </p>
+            <p>Nombre total d’appels journalisés sur l’API externe.</p>
+        </div>
 
-    <div class="card">
-        <h2>Vérifications client</h2>
-        <p>
-            <span class="badge badge-success">{{ total_api_screenings }}</span>
-        </p>
-        <p>Nombre de filtrages clients lancés via l’API externe.</p>
-    </div>
+        <div class="card">
+            <h2>Vérifications client</h2>
+            <p>
+                <span class="badge badge-success">{{ total_api_screenings }}</span>
+            </p>
+            <p>Nombre de filtrages clients lancés via l’API externe.</p>
+        </div>
 
-</div>
+        <div class="card">
+            <h2>Consultations alertes</h2>
+            <p>
+                <span class="badge badge-info">{{ total_api_alerts_views }}</span>
+            </p>
+            <p>Nombre de consultations d’alertes client via API.</p>
+        </div>
 
-<div class="grid">
+        <div class="card">
+            <h2>Consultations techniques</h2>
+            <p>
+                <span class="badge badge-warning">{{ total_api_technical_views }}</span>
+            </p>
+            <p>Consultations du statut API et de la documentation technique.</p>
+        </div>
 
-    <div class="card">
-        <h2>Consultations alertes</h2>
-        <p>
-            <span class="badge badge-info">{{ total_api_alerts_views }}</span>
-        </p>
-        <p>Nombre de consultations d’alertes client via API.</p>
-    </div>
+        <div class="card">
+            <h2>Tentatives échouées</h2>
+            <p>
+                <span class="badge badge-danger">{{ total_api_auth_failures }}</span>
+            </p>
+            <p>Appels reçus refusés faute de clé X-API-KEY valide (clé manquante ou incorrecte).</p>
+        </div>
 
-    <div class="card">
-        <h2>Consultations techniques</h2>
-        <p>
-            <span class="badge badge-warning">{{ total_api_technical_views }}</span>
-        </p>
-        <p>Consultations du statut API et de la documentation technique.</p>
-    </div>
+        <div class="card">
+            <h2>Dernier appel API</h2>
 
-    <div class="card">
-        <h2>Tentatives échouées</h2>
-        <p>
-            <span class="badge badge-danger">{{ total_api_auth_failures }}</span>
-        </p>
-        <p>Appels reçus refusés faute de clé X-API-KEY valide (clé manquante ou incorrecte).</p>
-    </div>
-
-</div>
-
-<div class="card">
-    <h2>Dernier appel API</h2>
-
-    {% if last_api_call %}
-        <p>
-            <strong>Date :</strong>
-            {{ last_api_call.created_at.strftime('%Y-%m-%d %H:%M:%S') if last_api_call.created_at else "-" }}
-        </p>
-        <p>
-            <strong>Action :</strong>
-            <span class="badge badge-info">{{ last_api_call.action }}</span>
-        </p>
-        <p>
-            <strong>Description :</strong>
-            {{ last_api_call.description }}
-        </p>
-    {% else %}
-        <p>Aucun appel API enregistré pour le moment.</p>
-    {% endif %}
-</div>
+            {% if last_api_call %}
+                <p>
+                    <strong>Date :</strong>
+                    {{ last_api_call.created_at.strftime('%Y-%m-%d %H:%M:%S') if last_api_call.created_at else "-" }}
+                </p>
+                <p>
+                    <strong>Action :</strong>
+                    <span class="badge badge-info">{{ last_api_call.action }}</span>
+                </p>
+                <p>
+                    <strong>Description :</strong>
+                    {{ last_api_call.description }}
+                </p>
+            {% else %}
+                <p>Aucun appel API enregistré pour le moment.</p>
+            {% endif %}
+        </div>
 
         <div class="card">
             <h2>Statut API</h2>
