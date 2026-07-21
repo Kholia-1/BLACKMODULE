@@ -48,12 +48,13 @@
 
         .container {
             padding: 28px 32px;
-            max-width: 1100px;
+            max-width: 1600px;
+            margin: 0 auto;
         }
 
         .grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
             gap: 20px;
             align-items: start;
         }
