@@ -49,11 +49,55 @@
             padding: 28px 32px;
         }
 
-        .grid {
+        .stat-group {
+            margin-bottom: 22px;
+        }
+
+        .stat-group-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748B;
+            margin-bottom: 10px;
+        }
+
+        .cards {
             display: grid;
-            grid-template-columns: 420px 1fr;
-            gap: 20px;
-            align-items: start;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+            border-left: 3px solid transparent;
+        }
+
+        .stat-card-title {
+            color: #64748B;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .stat-card-admin {
+            border-left-color: #DC2626;
+        }
+
+        .stat-card-admin .stat-card-value {
+            color: #DC2626;
+        }
+
+        .stat-card-inactive {
+            border-left-color: #64748B;
         }
 
         .card {
@@ -63,11 +107,85 @@
             box-shadow: 0 1px 2px rgba(15,23,42,0.06);
         }
 
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 100;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            width: 100%;
+            max-width: 440px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: #64748B;
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+        }
+
+        .modal-close:hover {
+            color: #0F172A;
+            background: transparent;
+        }
+
+        .btn-add {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #DC2626;
+            color: white;
+            border: 1px solid #DC2626;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        .btn-add:hover {
+            background: #B91C1C;
+        }
+
         h2 {
             margin-top: 0;
             color: #0F172A;
             font-size: 17px;
             font-weight: 600;
+        }
+
+        .card-sub {
+            margin: -8px 0 18px;
+            color: #64748B;
+            font-size: 13px;
         }
 
         label {
@@ -133,6 +251,47 @@
             font-weight: 600;
         }
 
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
+
+        .list-header h2 {
+            margin: 0;
+        }
+
+        .count-pill {
+            background: #F1F5F9;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 999px;
+        }
+
+        .search-box {
+            position: relative;
+            margin: 16px 0 4px;
+        }
+
+        .search-box input {
+            padding-left: 34px;
+        }
+
+        .search-box::before {
+            content: "\1F50D";
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            opacity: 0.55;
+        }
+
         .table-wrapper {
             overflow-x: auto;
         }
@@ -168,6 +327,31 @@
 
         tr:hover td {
             background: #F8FAFC;
+        }
+
+        .user-cell {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .avatar {
+            flex: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            background: #0F172A;
+            color: white;
+            font-size: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .user-cell-name {
+            font-weight: 600;
+            color: #0F172A;
         }
 
         .badge {
@@ -227,9 +411,15 @@
             margin: 0;
         }
 
+        .empty-row td {
+            text-align: center;
+            color: #64748B;
+            padding: 26px 12px;
+        }
+
         @media (max-width: 1000px) {
-            .grid {
-                grid-template-columns: 1fr;
+            .cards {
+                grid-template-columns: repeat(2, 1fr);
             }
 
             .container {
@@ -238,6 +428,12 @@
 
             .header {
                 padding: 20px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .cards {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -258,45 +454,53 @@
         <div class="message">{{ message }}</div>
     {% endif %}
 
-    <div class="grid">
+    {% set total_users = users|length %}
+    {% set active_users = users|selectattr('statut', 'equalto', 'ACTIF')|list|length %}
+    {% set admin_users = users|selectattr('role', 'equalto', 'ADMIN')|list|length %}
 
-        <div class="card">
-            <h2>Créer un utilisateur</h2>
+    <div class="stat-group">
+        <div class="stat-group-title">Vue d'ensemble</div>
+        <div class="cards">
+            <div class="stat-card">
+                <div class="stat-card-title">Utilisateurs</div>
+                <div class="stat-card-value">{{ total_users }}</div>
+            </div>
 
-            <form method="post" action="/web/users/create">
-                <label>Nom d'utilisateur</label>
-                <input type="text" name="username" required>
+            <div class="stat-card">
+                <div class="stat-card-title">Comptes actifs</div>
+                <div class="stat-card-value">{{ active_users }}</div>
+            </div>
 
-                <label>Nom complet</label>
-                <input type="text" name="full_name">
+            <div class="stat-card stat-card-inactive">
+                <div class="stat-card-title">Comptes inactifs</div>
+                <div class="stat-card-value">{{ total_users - active_users }}</div>
+            </div>
 
-                <label>Email</label>
-                <input type="email" name="email">
+            <div class="stat-card stat-card-admin">
+                <div class="stat-card-title">Administrateurs</div>
+                <div class="stat-card-value">{{ admin_users }}</div>
+            </div>
+        </div>
+    </div>
 
-                <label>Mot de passe</label>
-                <input type="password" name="password" required>
-
-                <label>Rôle</label>
-                <select name="role" required>
-                    <option value="LECTEUR">LECTEUR</option>
-                    <option value="OPERATEUR">OPERATEUR</option>
-                    <option value="SUPERVISEUR">SUPERVISEUR</option>
-                    <option value="ADMIN">ADMIN</option>
-                </select>
-
-                <button type="submit">Créer l'utilisateur</button>
-            </form>
+    <div class="card">
+        <div class="list-header">
+            <h2>Liste des utilisateurs</h2>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="count-pill" id="user-count">{{ total_users }} utilisateur{{ "s" if total_users != 1 else "" }}</span>
+                <button type="button" class="btn-add" id="open-create-user">+ Ajouter un utilisateur</button>
+            </div>
         </div>
 
-        <div class="card">
-            <h2>Liste des utilisateurs</h2>
+            <div class="search-box">
+                <input type="text" id="user-search" placeholder="Rechercher par nom, email ou rôle...">
+            </div>
 
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
                             <th>Utilisateur</th>
-                            <th>Nom complet</th>
                             <th>Email</th>
                             <th>Rôle</th>
                             <th>Statut</th>
@@ -305,11 +509,18 @@
                         </tr>
                     </thead>
 
-                    <tbody>
+                    <tbody id="user-table-body">
                         {% for user in users %}
-                        <tr>
-                            <td>{{ user.username }}</td>
-                            <td>{{ user.full_name if user.full_name else "-" }}</td>
+                        <tr data-search="{{ (user.username ~ ' ' ~ (user.full_name or '') ~ ' ' ~ (user.email or '') ~ ' ' ~ user.role)|lower }}">
+                            <td>
+                                <div class="user-cell">
+                                    <div class="avatar">{{ (user.full_name or user.username)[0]|upper }}</div>
+                                    <div>
+                                        <div class="user-cell-name">{{ user.username }}</div>
+                                        <div>{{ user.full_name if user.full_name else "-" }}</div>
+                                    </div>
+                                </div>
+                            </td>
                             <td>{{ user.email if user.email else "-" }}</td>
 
                             <td>
@@ -350,7 +561,14 @@
                             </div>
                             </td>
                         </tr>
+                        {% else %}
+                        <tr class="empty-row">
+                            <td colspan="6">Aucun utilisateur pour le moment.</td>
+                        </tr>
                         {% endfor %}
+                        <tr class="empty-row" id="no-results-row" style="display: none;">
+                            <td colspan="6">Aucun utilisateur ne correspond à votre recherche.</td>
+                        </tr>
                     </tbody>
 
                 </table>
@@ -359,7 +577,109 @@
 
     </div>
 
+    <div class="modal-overlay" id="create-user-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Créer un utilisateur</h2>
+                <button type="button" class="modal-close" id="close-create-user" aria-label="Fermer">&times;</button>
+            </div>
+            <div class="card-sub">Le mot de passe pourra être modifié par l'utilisateur depuis son profil.</div>
+
+            <form method="post" action="/web/users/create">
+                <label>Nom d'utilisateur</label>
+                <input type="text" name="username" required>
+
+                <label>Nom complet</label>
+                <input type="text" name="full_name">
+
+                <label>Email</label>
+                <input type="email" name="email">
+
+                <label>Mot de passe</label>
+                <input type="password" name="password" required>
+
+                <label>Rôle</label>
+                <select name="role" required>
+                    <option value="LECTEUR">LECTEUR</option>
+                    <option value="OPERATEUR">OPERATEUR</option>
+                    <option value="SUPERVISEUR">SUPERVISEUR</option>
+                    <option value="ADMIN">ADMIN</option>
+                </select>
+
+                <button type="submit">Créer l'utilisateur</button>
+            </form>
+        </div>
+    </div>
+
 </div>
+
+<script>
+(function () {
+    var input = document.getElementById('user-search');
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#user-table-body tr[data-search]'));
+    var countPill = document.getElementById('user-count');
+    var noResultsRow = document.getElementById('no-results-row');
+    var totalCount = rows.length;
+
+    if (!input) {
+        return;
+    }
+
+    input.addEventListener('input', function () {
+        var term = input.value.trim().toLowerCase();
+        var visible = 0;
+
+        rows.forEach(function (row) {
+            var match = row.getAttribute('data-search').indexOf(term) !== -1;
+            row.style.display = match ? '' : 'none';
+            if (match) {
+                visible += 1;
+            }
+        });
+
+        countPill.textContent = term
+            ? visible + ' / ' + totalCount + ' utilisateurs'
+            : totalCount + ' utilisateur' + (totalCount !== 1 ? 's' : '');
+
+        if (noResultsRow) {
+            noResultsRow.style.display = (term && visible === 0) ? '' : 'none';
+        }
+    });
+})();
+
+(function () {
+    var overlay = document.getElementById('create-user-overlay');
+    var openBtn = document.getElementById('open-create-user');
+    var closeBtn = document.getElementById('close-create-user');
+
+    if (!overlay || !openBtn) {
+        return;
+    }
+
+    function openModal() {
+        overlay.classList.add('open');
+    }
+
+    function closeModal() {
+        overlay.classList.remove('open');
+    }
+
+    openBtn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) {
+            closeModal();
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
+})();
+</script>
 
 </body>
 </html>
