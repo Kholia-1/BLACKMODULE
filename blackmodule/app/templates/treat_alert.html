@@ -47,7 +47,15 @@
 
         .container {
             padding: 28px 32px;
-            max-width: 900px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
         }
 
         .card {
@@ -56,6 +64,19 @@
             padding: 22px;
             box-shadow: 0 1px 2px rgba(15,23,42,0.06);
             margin-bottom: 22px;
+            border-left: 4px solid transparent;
+        }
+
+        .card-exacte {
+            border-left-color: #DC2626;
+        }
+
+        .card-probable {
+            border-left-color: #D97706;
+        }
+
+        .card-possible {
+            border-left-color: #64748B;
         }
 
         h2 {
@@ -67,8 +88,8 @@
 
         .info-grid {
             display: grid;
-            grid-template-columns: 220px 1fr;
-            gap: 10px 18px;
+            grid-template-columns: 160px 1fr;
+            gap: 12px 18px;
             font-size: 13.5px;
         }
 
@@ -79,6 +100,45 @@
 
         .value {
             color: #0F172A;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11.5px;
+            font-weight: 600;
+        }
+
+        .badge-exacte {
+            background: #FEE2E2;
+            color: #B91C1C;
+        }
+
+        .badge-probable {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .badge-possible {
+            background: #E2E8F0;
+            color: #334155;
+        }
+
+        .badge-status {
+            background: #F1F5F9;
+            color: #334155;
+        }
+
+        input[readonly] {
+            background: #F1F5F9;
+            color: #475569;
+        }
+
+        .field-hint {
+            margin: 4px 0 0;
+            color: #94A3B8;
+            font-size: 12px;
         }
 
         label {
@@ -128,6 +188,12 @@
             font-weight: 600;
         }
 
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media (max-width: 700px) {
             .info-grid {
                 grid-template-columns: 1fr;
@@ -153,61 +219,79 @@
     {% include "partials/navbar.html" %}
 </div>
 
+{% set user = request.session.get("user") %}
+{% set current_display_name = (user.full_name if user and user.full_name else (user.username if user else "")) %}
+
 <div class="container">
 
-    <div class="card">
-        <h2>Détails de l'alerte</h2>
+    <div class="grid">
 
-        <div class="info-grid">
-            <div class="label">Référence client</div>
-            <div class="value">{{ alert.client_reference }}</div>
+        <div class="card {% if alert.niveau_alerte == 'ALERTE_EXACTE' %}card-exacte{% elif alert.niveau_alerte == 'ALERTE_PROBABLE' %}card-probable{% else %}card-possible{% endif %}">
+            <h2>Détails de l'alerte</h2>
 
-            <div class="label">Client</div>
-            <div class="value">{{ alert.client_prenom }} {{ alert.client_nom }}</div>
+            <div class="info-grid">
+                <div class="label">Référence client</div>
+                <div class="value">{{ alert.client_reference }}</div>
 
-            <div class="label">Score</div>
-            <div class="value">{{ alert.matching_score }}</div>
+                <div class="label">Client</div>
+                <div class="value">{{ alert.client_prenom }} {{ alert.client_nom }}</div>
 
-            <div class="label">Niveau</div>
-            <div class="value">{{ alert.niveau_alerte }}</div>
+                <div class="label">Score</div>
+                <div class="value">{{ alert.matching_score }}</div>
 
-            <div class="label">Statut actuel</div>
-            <div class="value">{{ alert.statut }}</div>
+                <div class="label">Niveau</div>
+                <div class="value">
+                    {% if alert.niveau_alerte == "ALERTE_EXACTE" %}
+                        <span class="badge badge-exacte">{{ alert.niveau_alerte }}</span>
+                    {% elif alert.niveau_alerte == "ALERTE_PROBABLE" %}
+                        <span class="badge badge-probable">{{ alert.niveau_alerte }}</span>
+                    {% else %}
+                        <span class="badge badge-possible">{{ alert.niveau_alerte }}</span>
+                    {% endif %}
+                </div>
 
-            <div class="label">Source</div>
-            <div class="value">{{ alert.source_liste }}</div>
+                <div class="label">Statut actuel</div>
+                <div class="value">
+                    <span class="badge badge-status">{{ alert.statut }}</span>
+                </div>
 
-            <div class="label">Type matching</div>
-            <div class="value">{{ alert.matching_type }}</div>
+                <div class="label">Source</div>
+                <div class="value">{{ alert.source_liste }}</div>
 
-            <div class="label">Action recommandée</div>
-            <div class="value">{{ alert.action_recommandee }}</div>
+                <div class="label">Type matching</div>
+                <div class="value">{{ alert.matching_type }}</div>
+
+                <div class="label">Action recommandée</div>
+                <div class="value">{{ alert.action_recommandee }}</div>
+            </div>
         </div>
-    </div>
 
-    <div class="card">
-        <h2>Traiter l'alerte</h2>
+        <div class="card">
+            <h2>Traiter l'alerte</h2>
 
-        <form method="post" action="/web/alerts/{{ alert.id }}/treat">
+            <form method="post" action="/web/alerts/{{ alert.id }}/treat">
 
-            <label>Nouveau statut</label>
-            <select name="statut" required>
-                <option value="EN_COURS">EN_COURS</option>
-                <option value="FAUX_POSITIF">FAUX_POSITIF</option>
-                <option value="CONFIRMEE">CONFIRMEE</option>
-                <option value="ESCALADEE">ESCALADEE</option>
-                <option value="CLOTUREE">CLOTUREE</option>
-            </select>
+                <label>Nouveau statut</label>
+                <select name="statut" required>
+                    <option value="EN_COURS">EN_COURS</option>
+                    <option value="FAUX_POSITIF">FAUX_POSITIF</option>
+                    <option value="CONFIRMEE">CONFIRMEE</option>
+                    <option value="ESCALADEE">ESCALADEE</option>
+                    <option value="CLOTUREE">CLOTUREE</option>
+                </select>
 
-            <label>Traité par</label>
-            <input type="text" name="treated_by" value="bello.etienne" required>
+                <label>Traité par</label>
+                <input type="text" name="treated_by" value="{{ current_display_name }}" readonly>
+                <p class="field-hint">Enregistré automatiquement avec ton identité de connexion.</p>
 
-            <label>Commentaire de traitement</label>
-            <textarea name="treatment_comment" placeholder="Explique ici la décision prise..." required></textarea>
+                <label>Commentaire de traitement</label>
+                <textarea name="treatment_comment" placeholder="Explique ici la décision prise..." required></textarea>
 
-            <button type="submit">Enregistrer le traitement</button>
-            <a class="back" href="/web/alerts">Retour aux alertes</a>
-        </form>
+                <button type="submit">Enregistrer le traitement</button>
+                <a class="back" href="/web/alerts">Retour aux alertes</a>
+            </form>
+        </div>
+
     </div>
 
 </div>
