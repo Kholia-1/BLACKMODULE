@@ -38,6 +38,7 @@
         .container {
             padding: 28px 32px;
             max-width: 900px;
+            margin: 0 auto;
         }
 
         .card {
@@ -55,10 +56,58 @@
             font-weight: 600;
         }
 
-        .profile-row {
+        .hero {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .avatar-lg {
+            flex: none;
+            width: 64px;
+            height: 64px;
+            border-radius: 999px;
+            background: #0F172A;
+            color: white;
+            font-size: 24px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero-info {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .hero-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .hero-username {
+            color: #64748B;
+            font-size: 13.5px;
+            margin-top: 2px;
+        }
+
+        .hero-badges {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .info-grid {
             display: grid;
-            grid-template-columns: 220px 1fr;
-            gap: 14px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .profile-row {
             padding: 13px 0;
             border-bottom: 1px solid #E2E8F0;
             font-size: 13.5px;
@@ -71,10 +120,15 @@
         .label {
             font-weight: 600;
             color: #64748B;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 4px;
         }
 
         .value {
             color: #0F172A;
+            font-size: 14px;
         }
 
         .badge {
@@ -105,9 +159,39 @@
             color: #64748B;
         }
 
+        .badge-active {
+            background: #DCFCE7;
+            color: #166534;
+        }
+
+        .badge-inactive {
+            background: #F1F5F9;
+            color: #64748B;
+        }
+
+        .security-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .security-card-text {
+            font-size: 13.5px;
+            color: #64748B;
+            max-width: 480px;
+        }
+
+        .security-card-text strong {
+            display: block;
+            color: #0F172A;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+
         .btn {
             display: inline-block;
-            margin-top: 18px;
             padding: 10px 16px;
             border-radius: 8px;
             background: #DC2626;
@@ -115,10 +199,11 @@
             text-decoration: none;
             font-weight: 600;
             font-size: 13.5px;
+            white-space: nowrap;
         }
 
         @media (max-width: 800px) {
-            .profile-row {
+            .info-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -145,42 +230,53 @@
 <div class="container">
 
     <div class="card">
-        <h2>Mon profil</h2>
+        <div class="hero">
+            <div class="avatar-lg">{{ (user.full_name or user.username)[0]|upper }}</div>
 
-        <div class="profile-row">
-            <div class="label">Nom utilisateur</div>
-            <div class="value">{{ user.username }}</div>
-        </div>
+            <div class="hero-info">
+                <div class="hero-name">{{ user.full_name if user.full_name else user.username }}</div>
+                <div class="hero-username">@{{ user.username }}</div>
 
-        <div class="profile-row">
-            <div class="label">Nom complet</div>
-            <div class="value">{{ user.full_name if user.full_name else "-" }}</div>
-        </div>
-
-        <div class="profile-row">
-            <div class="label">Email</div>
-            <div class="value">{{ user.email if user.email else "-" }}</div>
-        </div>
-
-        <div class="profile-row">
-            <div class="label">Rôle</div>
-            <div class="value">
-                <span class="badge badge-{{ user.role|lower }}">
-                    {{ user.role }}
-                </span>
+                <div class="hero-badges">
+                    <span class="badge badge-{{ user.role|lower }}">{{ user.role }}</span>
+                    <span class="badge badge-{{ 'active' if user.statut == 'ACTIF' else 'inactive' }}">{{ user.statut }}</span>
+                </div>
             </div>
         </div>
+    </div>
 
-        <div class="profile-row">
-            <div class="label">Statut</div>
-            <div class="value">{{ user.statut }}</div>
-        </div>
+    <div class="card">
+        <h2>Informations du compte</h2>
 
-        <div class="profile-row">
-            <div class="label">Date création</div>
-            <div class="value">
-                {{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else "-" }}
+        <div class="info-grid">
+            <div class="profile-row">
+                <div class="label">Nom utilisateur</div>
+                <div class="value">{{ user.username }}</div>
             </div>
+
+            <div class="profile-row">
+                <div class="label">Nom complet</div>
+                <div class="value">{{ user.full_name if user.full_name else "-" }}</div>
+            </div>
+
+            <div class="profile-row">
+                <div class="label">Email</div>
+                <div class="value">{{ user.email if user.email else "-" }}</div>
+            </div>
+
+            <div class="profile-row">
+                <div class="label">Date création</div>
+                <div class="value">
+                    {{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else "-" }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card security-card">
+        <div class="security-card-text">
+            <strong>Mot de passe</strong>
+            Pensez à utiliser un mot de passe unique et à le renouveler régulièrement.
         </div>
 
         <a class="btn" href="/web/change-password">Modifier mon mot de passe</a>

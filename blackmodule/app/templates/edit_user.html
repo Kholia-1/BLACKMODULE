@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>BLACKMODULE - Modifier utilisateur</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
 
     <style>
         * {
@@ -34,20 +35,10 @@
             font-size: 13.5px;
         }
 
-        .nav {
-            margin-top: 15px;
-        }
-
-        .nav a {
-            color: #94A3B8;
-            margin-right: 18px;
-            text-decoration: none;
-            font-weight: 600;
-        }
-
         .container {
             padding: 28px 32px;
             max-width: 700px;
+            margin: 0 auto;
         }
 
         .card {
@@ -55,6 +46,7 @@
             border-radius: 12px;
             padding: 24px;
             box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+            margin-bottom: 22px;
         }
 
         h2 {
@@ -62,6 +54,38 @@
             color: #0F172A;
             font-size: 17px;
             font-weight: 600;
+        }
+
+        .identity {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .avatar-lg {
+            flex: none;
+            width: 52px;
+            height: 52px;
+            border-radius: 999px;
+            background: #0F172A;
+            color: white;
+            font-size: 20px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .identity-name {
+            font-size: 17px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .identity-meta {
+            color: #64748B;
+            font-size: 13px;
+            margin-top: 2px;
         }
 
         label {
@@ -80,6 +104,11 @@
             border-radius: 8px;
             font-size: 13.5px;
             font-family: inherit;
+        }
+
+        input:disabled {
+            background: #F1F5F9;
+            color: #64748B;
         }
 
         button {
@@ -104,14 +133,9 @@
             font-size: 14px;
         }
 
-        .info {
-            background: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            padding: 14px;
-            border-radius: 10px;
-            color: #334155;
-            font-size: 13.5px;
-            margin-bottom: 18px;
+        .form-actions {
+            display: flex;
+            align-items: center;
         }
     </style>
 </head>
@@ -128,12 +152,19 @@
 <div class="container">
 
     <div class="card">
-        <h2>Modifier l’utilisateur</h2>
-
-        <div class="info">
-            <strong>Utilisateur :</strong> {{ user.username }}<br>
-            <strong>Date création :</strong> {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else "-" }}
+        <div class="identity">
+            <div class="avatar-lg">{{ (user.full_name or user.username)[0]|upper }}</div>
+            <div>
+                <div class="identity-name">{{ user.full_name if user.full_name else user.username }}</div>
+                <div class="identity-meta">
+                    @{{ user.username }} · Créé le {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else "-" }}
+                </div>
+            </div>
         </div>
+    </div>
+
+    <div class="card">
+        <h2>Modifier l'utilisateur</h2>
 
         <form method="post" action="/web/users/{{ user.id }}/edit">
             <label>Nom d'utilisateur</label>
@@ -159,8 +190,10 @@
                 <option value="INACTIF" {% if user.statut == "INACTIF" %}selected{% endif %}>INACTIF</option>
             </select>
 
-            <button type="submit">Enregistrer les modifications</button>
-            <a class="btn-secondary" href="/web/users">Retour</a>
+            <div class="form-actions">
+                <button type="submit">Enregistrer les modifications</button>
+                <a class="btn-secondary" href="/web/users">Retour</a>
+            </div>
         </form>
     </div>
 

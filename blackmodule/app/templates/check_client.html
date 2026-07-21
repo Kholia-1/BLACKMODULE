@@ -3,377 +3,488 @@
 <head>
     <meta charset="UTF-8">
     <title>BLACKMODULE - Vérification Client</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
 
     <style>
-    :root {
-        --afri-red: #D22630;
-        --afri-red-dark: #A61924;
-        --afri-black: #111111;
-        --afri-dark: #1F2933;
-        --afri-gray-bg: #F4F5F7;
-        --afri-gray-light: #E5E7EB;
-        --afri-gray-medium: #6B7280;
-        --afri-white: #FFFFFF;
-        --afri-shadow: rgba(17, 17, 17, 0.08);
-    }
-
-    body {
-        font-family: Arial, sans-serif;
-        background: var(--afri-gray-bg);
-        margin: 0;
-        padding: 0;
-        color: var(--afri-black);
-    }
-
-    .header {
-        background: var(--afri-black);
-        color: var(--afri-white);
-        padding: 22px 40px;
-        border-bottom: 5px solid var(--afri-red);
-        box-shadow: 0 4px 16px var(--afri-shadow);
-    }
-
-    .header h1 {
-        margin: 0;
-        font-size: 28px;
-        letter-spacing: 0.5px;
-        font-weight: 800;
-    }
-
-    .header h1::before {
-        content: "";
-        display: inline-block;
-        width: 10px;
-        height: 26px;
-        background: var(--afri-red);
-        border-radius: 2px;
-        margin-right: 12px;
-        vertical-align: -4px;
-    }
-
-    .header p {
-        margin: 8px 0 0;
-        color: #D1D5DB;
-        font-size: 14px;
-    }
-
-    .container {
-        padding: 30px 40px;
-    }
-
-    .layout {
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
-    }
-
-    .card {
-        background: var(--afri-white);
-        border-radius: 10px;
-        padding: 24px;
-        box-shadow: 0 6px 18px var(--afri-shadow);
-        margin-bottom: 24px;
-        border: 1px solid var(--afri-gray-light);
-    }
-
-    .card h2 {
-        margin-top: 0;
-        color: var(--afri-black);
-        font-size: 20px;
-        font-weight: 800;
-        padding-bottom: 12px;
-        border-bottom: 2px solid var(--afri-gray-light);
-    }
-
-    h3 {
-        color: var(--afri-black);
-        font-size: 17px;
-        margin-top: 24px;
-        margin-bottom: 10px;
-    }
-
-    label {
-        display: block;
-        margin-top: 14px;
-        margin-bottom: 6px;
-        color: var(--afri-dark);
-        font-size: 14px;
-        font-weight: 700;
-    }
-
-    .form-section {
-        margin-top: 22px;
-        padding-top: 18px;
-        border-top: 1px solid var(--afri-gray-light);
-    }
-
-    .form-section:first-of-type {
-        margin-top: 4px;
-        padding-top: 0;
-        border-top: none;
-    }
-
-    .form-section-title {
-        font-size: 12px;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-        color: var(--afri-gray-medium);
-    }
-
-    .form-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 0 16px;
-    }
-
-    .form-row label {
-        margin-top: 14px;
-    }
-
-    .form-actions {
-        margin-top: 22px;
-        display: flex;
-        justify-content: flex-end;
-    }
-
-    .form-actions button {
-        width: auto;
-        min-width: 220px;
-        margin-top: 0;
-    }
-
-    @media (max-width: 1100px) {
-        .form-row {
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-
-    @media (max-width: 640px) {
-        .form-row {
-            grid-template-columns: 1fr;
+        * {
+            box-sizing: border-box;
         }
 
-        .form-actions {
-            justify-content: stretch;
-        }
-
-        .form-actions button {
-            width: 100%;
-        }
-    }
-
-    input,
-    select {
-        width: 100%;
-        padding: 11px 12px;
-        border: 1px solid #D1D5DB;
-        border-radius: 6px;
-        font-size: 14px;
-        box-sizing: border-box;
-        background: var(--afri-white);
-        color: var(--afri-black);
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    input:focus,
-    select:focus {
-        outline: none;
-        border-color: var(--afri-red);
-        box-shadow: 0 0 0 3px rgba(210, 38, 48, 0.14);
-    }
-
-    button {
-        margin-top: 22px;
-        width: 100%;
-        padding: 13px;
-        background: var(--afri-red);
-        color: var(--afri-white);
-        border: none;
-        border-radius: 6px;
-        font-size: 15px;
-        font-weight: 800;
-        cursor: pointer;
-        transition: background 0.2s ease, transform 0.1s ease;
-    }
-
-    button:hover {
-        background: var(--afri-red-dark);
-    }
-
-    button:active {
-        transform: scale(0.99);
-    }
-
-    .threshold-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
-    }
-
-    .threshold-item {
-        background: #FAFAFA;
-        border: 1px solid var(--afri-gray-light);
-        border-left: 5px solid var(--afri-red);
-        border-radius: 8px;
-        padding: 14px;
-    }
-
-    .threshold-item strong {
-        display: block;
-        color: var(--afri-black);
-        margin-bottom: 6px;
-        font-weight: 800;
-    }
-
-    .result-box {
-        margin-bottom: 22px;
-        padding: 18px;
-        border-radius: 8px;
-        border-left: 6px solid var(--afri-red);
-    }
-
-    .safe {
-        background: #F9FAFB;
-        color: var(--afri-black);
-        border-left-color: var(--afri-black);
-    }
-
-    .exacte {
-        background: #FFF1F2;
-        color: #7F1D1D;
-        border-left-color: var(--afri-red);
-    }
-
-    .probable {
-        background: #F3F4F6;
-        color: var(--afri-black);
-        border-left-color: var(--afri-red);
-    }
-
-    .possible {
-        background: #F9FAFB;
-        color: var(--afri-dark);
-        border-left-color: var(--afri-gray-medium);
-    }
-
-    .result-title {
-        font-size: 18px;
-        font-weight: 900;
-        margin-bottom: 8px;
-        text-transform: uppercase;
-    }
-
-    .result-info {
-        font-size: 14px;
-        line-height: 1.8;
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 14px;
-        margin-bottom: 18px;
-        border: 1px solid var(--afri-gray-light);
-        border-radius: 8px;
-        overflow: hidden;
-    }
-
-    th {
-        text-align: left;
-        background: #F3F4F6;
-        color: var(--afri-black);
-        padding: 12px;
-        font-size: 14px;
-        vertical-align: top;
-        font-weight: 800;
-        border-bottom: 1px solid var(--afri-gray-light);
-    }
-
-    td {
-        padding: 12px;
-        border-bottom: 1px solid var(--afri-gray-light);
-        font-size: 14px;
-        vertical-align: top;
-        color: var(--afri-dark);
-    }
-
-    tr:hover td {
-        background: #FAFAFA;
-    }
-
-    .match-header {
-        background: var(--afri-black);
-        color: var(--afri-white);
-        font-weight: 800;
-        border-left: 5px solid var(--afri-red);
-    }
-
-    .badge {
-        padding: 5px 10px;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: 800;
-        display: inline-block;
-        text-transform: uppercase;
-    }
-
-    .badge-exacte {
-        background: var(--afri-red);
-        color: var(--afri-white);
-    }
-
-    .badge-probable {
-        background: var(--afri-black);
-        color: var(--afri-white);
-    }
-
-    .badge-possible {
-        background: #E5E7EB;
-        color: var(--afri-black);
-    }
-
-    .empty {
-        color: var(--afri-gray-medium);
-        font-size: 14px;
-        padding: 16px;
-        background: #FAFAFA;
-        border: 1px dashed #D1D5DB;
-        border-radius: 8px;
-    }
-
-    .section-title {
-        margin-top: 28px;
-        padding-top: 18px;
-        border-top: 1px solid var(--afri-gray-light);
-    }
-
-    a {
-        color: var(--afri-red);
-    }
-
-    a:hover {
-        color: var(--afri-red-dark);
-    }
-
-    @media (max-width: 1000px) {
-        .layout {
-            grid-template-columns: 1fr;
-        }
-
-        .container {
-            padding: 20px;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #F8FAFC;
+            margin: 0;
+            padding: 0;
         }
 
         .header {
-            padding: 20px;
+            background: #0F172A;
+            color: white;
+            padding: 22px 32px;
         }
 
-        .threshold-grid {
-            grid-template-columns: 1fr;
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
         }
-    }
-</style>
+
+        .header p {
+            margin: 6px 0 0;
+            color: #94A3B8;
+            font-size: 13.5px;
+        }
+
+        .container {
+            padding: 28px 32px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .stat-group {
+            margin-bottom: 22px;
+        }
+
+        .stat-group-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748B;
+            margin-bottom: 10px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 18px 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+            border-left: 3px solid transparent;
+        }
+
+        .stat-card-title {
+            color: #64748B;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+
+        .stat-card-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .stat-card-exacte {
+            border-left-color: #DC2626;
+        }
+
+        .stat-card-probable {
+            border-left-color: #D97706;
+        }
+
+        .stat-card-possible {
+            border-left-color: #64748B;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 22px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+            margin-bottom: 22px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #0F172A;
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 4px;
+        }
+
+        .section-header h2 {
+            margin: 0;
+        }
+
+        .count-pill {
+            background: #F1F5F9;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .form-section {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #E2E8F0;
+        }
+
+        .form-section:first-of-type {
+            margin-top: 4px;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .form-section-title {
+            font-size: 11.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #64748B;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0 16px;
+        }
+
+        .form-actions {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .form-actions button {
+            width: auto;
+            min-width: 220px;
+            margin-top: 0;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            font-size: 13.5px;
+            font-family: inherit;
+        }
+
+        button {
+            margin-top: 18px;
+            padding: 11px 18px;
+            background: #DC2626;
+            color: white;
+            border: 1px solid #DC2626;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #B91C1C;
+        }
+
+        .empty {
+            color: #64748B;
+            font-size: 13.5px;
+            padding: 16px;
+            background: #F8FAFC;
+            border: 1px dashed #CBD5E1;
+            border-radius: 10px;
+        }
+
+        /* ---- Résultat : hero ---- */
+
+        .result-hero {
+            border-radius: 12px;
+            padding: 20px 22px;
+            border-left: 5px solid #64748B;
+            background: #F8FAFC;
+            margin-bottom: 18px;
+        }
+
+        .result-hero.exacte {
+            background: #FEF2F2;
+            border-left-color: #DC2626;
+        }
+
+        .result-hero.probable {
+            background: #FFFBEB;
+            border-left-color: #D97706;
+        }
+
+        .result-hero.possible {
+            background: #F8FAFC;
+            border-left-color: #64748B;
+        }
+
+        .result-hero.safe {
+            background: #F0FDF4;
+            border-left-color: #16A34A;
+        }
+
+        .result-hero-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .result-status {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .result-score {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .result-meta {
+            margin-top: 10px;
+            color: #334155;
+            font-size: 13.5px;
+            line-height: 1.7;
+        }
+
+        .result-chips {
+            display: flex;
+            gap: 12px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        .result-chip {
+            background: white;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 13px;
+            color: #334155;
+        }
+
+        .result-chip strong {
+            color: #0F172A;
+        }
+
+        /* ---- Infos client : grille ---- */
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px 20px;
+        }
+
+        .info-row {
+            padding: 4px 0;
+        }
+
+        .info-label {
+            font-size: 11.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: #64748B;
+            margin-bottom: 3px;
+        }
+
+        .info-value {
+            font-size: 13.5px;
+            color: #0F172A;
+        }
+
+        /* ---- Comparaison : match cards ---- */
+
+        .match-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .match-card {
+            border: 1px solid #E2E8F0;
+            border-left: 4px solid #64748B;
+            border-radius: 10px;
+            padding: 16px 18px;
+            background: white;
+        }
+
+        .match-card.exacte {
+            border-left-color: #DC2626;
+        }
+
+        .match-card.probable {
+            border-left-color: #D97706;
+        }
+
+        .match-card.possible {
+            border-left-color: #64748B;
+        }
+
+        .match-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .match-card-tags {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .match-source {
+            background: #F1F5F9;
+            color: #334155;
+            font-size: 11.5px;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 999px;
+        }
+
+        .match-score {
+            font-size: 17px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .match-name {
+            margin-top: 10px;
+            font-size: 14.5px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .match-type {
+            margin-top: 2px;
+            font-size: 12px;
+            color: #64748B;
+        }
+
+        .match-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px 16px;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid #F1F5F9;
+        }
+
+        .match-grid .info-label {
+            font-size: 11px;
+        }
+
+        .match-grid .info-value {
+            font-size: 13px;
+        }
+
+        .match-motif, .match-action {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #334155;
+        }
+
+        .match-motif strong, .match-action strong {
+            color: #0F172A;
+        }
+
+        .badge {
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11.5px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-exacte {
+            background: #FEE2E2;
+            color: #B91C1C;
+        }
+
+        .badge-probable {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .badge-possible {
+            background: #E2E8F0;
+            color: #334155;
+        }
+
+        @media (max-width: 1100px) {
+            .form-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .info-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .match-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 1000px) {
+            .cards {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .match-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-actions {
+                justify-content: stretch;
+            }
+
+            .form-actions button {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 
 <body>
@@ -387,352 +498,303 @@
 
 <div class="container">
 
-    <div class="card">
-        <h2>Seuils actifs de matching</h2>
-
-        <div class="threshold-grid">
-            <div class="threshold-item">
-                <strong>Alerte exacte</strong>
-                Score ≥ {{ settings.exact_threshold if settings else 90 }}
+    <div class="stat-group">
+        <div class="stat-group-title">Seuils actifs de matching</div>
+        <div class="cards">
+            <div class="stat-card stat-card-exacte">
+                <div class="stat-card-title">Alerte exacte</div>
+                <div class="stat-card-value">Score ≥ {{ settings.exact_threshold if settings else 90 }}</div>
             </div>
 
-            <div class="threshold-item">
-                <strong>Alerte probable</strong>
-                Score ≥ {{ settings.probable_threshold if settings else 75 }}
+            <div class="stat-card stat-card-probable">
+                <div class="stat-card-title">Alerte probable</div>
+                <div class="stat-card-value">Score ≥ {{ settings.probable_threshold if settings else 75 }}</div>
             </div>
 
-            <div class="threshold-item">
-                <strong>Alerte possible</strong>
-                Score ≥ {{ settings.possible_threshold if settings else 60 }}
+            <div class="stat-card stat-card-possible">
+                <div class="stat-card-title">Alerte possible</div>
+                <div class="stat-card-value">Score ≥ {{ settings.possible_threshold if settings else 60 }}</div>
             </div>
         </div>
     </div>
 
-    <div class="layout">
+    <div class="card">
+        <h2>Rechercher un client</h2>
 
-        <!-- FORMULAIRE -->
-        <div class="card">
-            <h2>Rechercher un client</h2>
+        <form method="post" action="/web/check-client">
 
-            <form method="post" action="/web/check-client">
+            <div class="form-section">
+                <div class="form-section-title">Identité</div>
 
-                <div class="form-section">
-                    <div class="form-section-title">Identité</div>
+                <div class="form-row">
+                    <div>
+                        <label>Référence client</label>
+                        <input type="text"
+                               name="client_reference"
+                               placeholder="Ex : CLI001"
+                               value="{{ form.client_reference or '' }}">
+                    </div>
 
-                    <div class="form-row">
-                        <div>
-                            <label>Référence client</label>
-                            <input type="text"
-                                   name="client_reference"
-                                   placeholder="Ex : CLI001"
-                                   value="{{ form.client_reference or '' }}">
-                        </div>
+                    <div>
+                        <label>Nom</label>
+                        <input type="text"
+                               name="nom"
+                               placeholder="Ex : KAMGA"
+                               required
+                               value="{{ form.nom or '' }}">
+                    </div>
 
-                        <div>
-                            <label>Nom</label>
-                            <input type="text"
-                                   name="nom"
-                                   placeholder="Ex : KAMGA"
-                                   required
-                                   value="{{ form.nom or '' }}">
-                        </div>
+                    <div>
+                        <label>Prénom</label>
+                        <input type="text"
+                               name="prenom"
+                               placeholder="Ex : PAUL"
+                               value="{{ form.prenom or '' }}">
+                    </div>
 
-                        <div>
-                            <label>Prénom</label>
-                            <input type="text"
-                                   name="prenom"
-                                   placeholder="Ex : PAUL"
-                                   value="{{ form.prenom or '' }}">
-                        </div>
-
-                        <div>
-                            <label>Type de pièce</label>
-                            <select name="type_piece">
-                                <option value="">-- Sélectionner --</option>
-                                <option value="CNI" {% if form.type_piece == "CNI" %}selected{% endif %}>CNI</option>
-                                <option value="PASSEPORT" {% if form.type_piece == "PASSEPORT" %}selected{% endif %}>Passeport</option>
-                                <option value="CARTE_SEJOUR" {% if form.type_piece == "CARTE_SEJOUR" %}selected{% endif %}>Carte de séjour</option>
-                                <option value="AUTRE" {% if form.type_piece == "AUTRE" %}selected{% endif %}>Autre</option>
-                            </select>
-                        </div>
+                    <div>
+                        <label>Type de pièce</label>
+                        <select name="type_piece">
+                            <option value="">-- Sélectionner --</option>
+                            <option value="CNI" {% if form.type_piece == "CNI" %}selected{% endif %}>CNI</option>
+                            <option value="PASSEPORT" {% if form.type_piece == "PASSEPORT" %}selected{% endif %}>Passeport</option>
+                            <option value="CARTE_SEJOUR" {% if form.type_piece == "CARTE_SEJOUR" %}selected{% endif %}>Carte de séjour</option>
+                            <option value="AUTRE" {% if form.type_piece == "AUTRE" %}selected{% endif %}>Autre</option>
+                        </select>
                     </div>
                 </div>
+            </div>
 
-                <div class="form-section">
-                    <div class="form-section-title">Pièce d'identité &amp; date</div>
+            <div class="form-section">
+                <div class="form-section-title">Pièce d'identité &amp; date</div>
 
-                    <div class="form-row">
-                        <div>
-                            <label>Numéro de pièce</label>
-                            <input type="text"
-                                   name="num_piece"
-                                   placeholder="Ex : 123456789"
-                                   value="{{ form.num_piece or '' }}">
-                        </div>
+                <div class="form-row">
+                    <div>
+                        <label>Numéro de pièce</label>
+                        <input type="text"
+                               name="num_piece"
+                               placeholder="Ex : 123456789"
+                               value="{{ form.num_piece or '' }}">
+                    </div>
 
-                        <div>
-                            <label>Numéro de passeport</label>
-                            <input type="text"
-                                   name="num_passeport"
-                                   placeholder="Ex : P456789"
-                                   value="{{ form.num_passeport or '' }}">
-                        </div>
+                    <div>
+                        <label>Numéro de passeport</label>
+                        <input type="text"
+                               name="num_passeport"
+                               placeholder="Ex : P456789"
+                               value="{{ form.num_passeport or '' }}">
+                    </div>
 
-                        <div>
-                            <label>Date de naissance</label>
-                            <input type="date"
-                                   name="date_naissance"
-                                   value="{{ form.date_naissance or '' }}">
-                        </div>
+                    <div>
+                        <label>Date de naissance</label>
+                        <input type="date"
+                               name="date_naissance"
+                               value="{{ form.date_naissance or '' }}">
+                    </div>
 
-                        <div>
-                            <label>Âge</label>
-                            <input type="number"
-                                   name="age"
-                                   placeholder="Ex : 45"
-                                   value="{{ form.age or '' }}">
-                        </div>
+                    <div>
+                        <label>Âge</label>
+                        <input type="number"
+                               name="age"
+                               placeholder="Ex : 45"
+                               value="{{ form.age or '' }}">
                     </div>
                 </div>
+            </div>
 
-                <div class="form-section">
-                    <div class="form-section-title">Résidence &amp; nationalité</div>
+            <div class="form-section">
+                <div class="form-section-title">Résidence &amp; nationalité</div>
 
-                    <div class="form-row">
-                        <div>
-                            <label>Ville de résidence</label>
-                            <input type="text"
-                                   name="ville_residence"
-                                   placeholder="Ex : YAOUNDÉ"
-                                   value="{{ form.ville_residence or '' }}">
-                        </div>
+                <div class="form-row">
+                    <div>
+                        <label>Ville de résidence</label>
+                        <input type="text"
+                               name="ville_residence"
+                               placeholder="Ex : YAOUNDÉ"
+                               value="{{ form.ville_residence or '' }}">
+                    </div>
 
-                        <div>
-                            <label>Nationalité</label>
-                            <input type="text"
-                                   name="nationalite"
-                                   placeholder="Ex : CAMEROUNAISE"
-                                   value="{{ form.nationalite or '' }}">
-                        </div>
+                    <div>
+                        <label>Nationalité</label>
+                        <input type="text"
+                               name="nationalite"
+                               placeholder="Ex : CAMEROUNAISE"
+                               value="{{ form.nationalite or '' }}">
+                    </div>
 
-                        <div>
-                            <label>Pays de résidence</label>
-                            <input type="text"
-                                   name="pays_residence"
-                                   placeholder="Ex : CAMEROUN"
-                                   value="{{ form.pays_residence or '' }}">
-                        </div>
+                    <div>
+                        <label>Pays de résidence</label>
+                        <input type="text"
+                               name="pays_residence"
+                               placeholder="Ex : CAMEROUN"
+                               value="{{ form.pays_residence or '' }}">
                     </div>
                 </div>
+            </div>
 
-                <div class="form-actions">
-                    <button type="submit">Lancer le matching</button>
-                </div>
-            </form>
-        </div>
+            <div class="form-actions">
+                <button type="submit">Lancer le matching</button>
+            </div>
+        </form>
+    </div>
 
-        <!-- RESULTATS -->
-        <div class="card" id="result-section">
-            <h2>Résultat du screening</h2>
+    <div class="card" id="result-section">
+        <h2>Résultat du screening</h2>
 
-            {% if result %}
+        {% if result %}
 
-                {% if result.status == "ALERTE_EXACTE" %}
-                    <div class="result-box exacte">
-                {% elif result.status == "ALERTE_PROBABLE" %}
-                    <div class="result-box probable">
-                {% elif result.status == "ALERTE_POSSIBLE" %}
-                    <div class="result-box possible">
-                {% else %}
-                    <div class="result-box safe">
-                {% endif %}
-
-                    <div class="result-title">{{ result.status }}</div>
-
-                    <div class="result-info">
-                        <strong>Client :</strong> {{ result.client_name }}<br>
-                        <strong>Référence :</strong> {{ result.client_reference }}<br>
-                        <strong>Score maximum :</strong> {{ "%.2f"|format(result.highest_score) }} %<br>
-                        <strong>Action recommandée :</strong> {{ result.action }}<br>
-                        <strong>Alertes générées :</strong>
-                        {{ result.generated_alerts_count if result.generated_alerts_count is defined else 0 }}<br>
-                        <strong>Alertes déjà existantes :</strong>
-                        {{ result.existing_alerts_count if result.existing_alerts_count is defined else 0 }}
-                    </div>
-                </div>
-
-                {% if result.client_details is defined and result.client_details %}
-                    <h2 class="section-title">Informations du client vérifié</h2>
-
-                    <table>
-                        <tr>
-                            <th>Référence client</th>
-                            <td>{{ result.client_details.client_reference or "-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Nom</th>
-                            <td>{{ result.client_details.nom or "-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Prénom</th>
-                            <td>{{ result.client_details.prenom or "-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Type de pièce</th>
-                            <td>{{ result.client_details.type_piece or "-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Numéro de pièce</th>
-                            <td>{{ result.client_details.num_piece or "-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Numéro de passeport</th>
-                            <td>{{ result.client_details.num_passeport or "-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Date de naissance</th>
-                            <td>{{ result.client_details.date_naissance or "-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Âge</th>
-                            <td>{{ result.client_details.age or "-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Ville de résidence</th>
-                            <td>{{ result.client_details.ville_residence or "-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Nationalité</th>
-                            <td>{{ result.client_details.nationalite or "-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Pays de résidence</th>
-                            <td>{{ result.client_details.pays_residence or "-" }}</td>
-                        </tr>
-                    </table>
-                {% endif %}
-
-                <h2 class="section-title">Comparaison client / liste de sanctions</h2>
-
-                {% if result.matches and result.matches|length > 0 %}
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Information</th>
-                                <th>Client vérifié</th>
-                                <th>Correspondance liste</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {% for match in result.matches %}
-                                <tr>
-                                    <th colspan="3" class="match-header">
-                                        Source : {{ match.source_liste }} |
-                                        Score : {{ "%.2f"|format(match.score) }}% |
-                                        Niveau : {{ match.niveau_alerte }} |
-                                        Type : {{ match.matching_type }}
-                                    </th>
-                                </tr>
-
-                                <tr>
-                                    <td>Nom complet</td>
-                                    <td>
-                                        {% if result.client_details is defined and result.client_details %}
-                                            {{ result.client_details.prenom or "" }} {{ result.client_details.nom or "" }}
-                                        {% else %}
-                                            {{ result.client_name }}
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ match.sanction_nom_complet or match.listed_name or "-" }}</td>
-                                </tr>
-
-                                <tr>
-                                    <td>Date de naissance</td>
-                                    <td>
-                                        {% if result.client_details is defined and result.client_details %}
-                                            {{ result.client_details.date_naissance or "-" }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ match.sanction_date_naissance or "-" }}</td>
-                                </tr>
-
-                                <tr>
-                                    <td>Nationalité</td>
-                                    <td>
-                                        {% if result.client_details is defined and result.client_details %}
-                                            {{ result.client_details.nationalite or "-" }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ match.sanction_nationalite or "-" }}</td>
-                                </tr>
-
-                                <tr>
-                                    <td>Pays</td>
-                                    <td>
-                                        {% if result.client_details is defined and result.client_details %}
-                                            {{ result.client_details.pays_residence or "-" }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ match.sanction_pays or "-" }}</td>
-                                </tr>
-
-                                <tr>
-                                    <td>Document / pièce</td>
-                                    <td>
-                                        {% if result.client_details is defined and result.client_details %}
-                                            {{ result.client_details.type_piece or "-" }}
-                                            {{ result.client_details.num_piece or result.client_details.num_passeport or "" }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ match.sanction_num_passeport or "-" }}</td>
-                                </tr>
-
-                                <tr>
-                                    <td>Motif sanction</td>
-                                    <td>-</td>
-                                    <td>{{ match.sanction_motif or "-" }}</td>
-                                </tr>
-
-                                <tr>
-                                    <td>Niveau d’alerte</td>
-                                    <td colspan="2">
-                                        {% if match.niveau_alerte == "ALERTE_EXACTE" %}
-                                            <span class="badge badge-exacte">{{ match.niveau_alerte }}</span>
-                                        {% elif match.niveau_alerte == "ALERTE_PROBABLE" %}
-                                            <span class="badge badge-probable">{{ match.niveau_alerte }}</span>
-                                        {% else %}
-                                            <span class="badge badge-possible">{{ match.niveau_alerte }}</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <td>Action recommandée</td>
-                                    <td colspan="2">{{ match.action_recommandee }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <div class="empty">Aucune correspondance significative trouvée.</div>
-                {% endif %}
-
+            {% if result.status == "ALERTE_EXACTE" %}
+                {% set hero_class = "exacte" %}
+            {% elif result.status == "ALERTE_PROBABLE" %}
+                {% set hero_class = "probable" %}
+            {% elif result.status == "ALERTE_POSSIBLE" %}
+                {% set hero_class = "possible" %}
             {% else %}
-                <div class="empty">
-                    Saisis les informations du client ci-dessus, puis clique sur <strong>Lancer le matching</strong>.
+                {% set hero_class = "safe" %}
+            {% endif %}
+
+            <div class="result-hero {{ hero_class }}">
+                <div class="result-hero-top">
+                    <div>
+                        <div class="result-status">{{ result.status }}</div>
+                        <div class="result-meta">
+                            <strong>{{ result.client_name }}</strong> · Référence {{ result.client_reference }}<br>
+                            Action recommandée : {{ result.action }}
+                        </div>
+                    </div>
+                    <div class="result-score">{{ "%.2f"|format(result.highest_score) }}%</div>
+                </div>
+
+                <div class="result-chips">
+                    <div class="result-chip"><strong>{{ result.generated_alerts_count if result.generated_alerts_count is defined else 0 }}</strong> alerte(s) générée(s)</div>
+                    <div class="result-chip"><strong>{{ result.existing_alerts_count if result.existing_alerts_count is defined else 0 }}</strong> alerte(s) déjà existante(s)</div>
+                    <div class="result-chip"><strong>{{ result.matches|length if result.matches else 0 }}</strong> correspondance(s)</div>
+                </div>
+            </div>
+
+            {% if result.client_details is defined and result.client_details %}
+                <h2 class="section-title">Informations du client vérifié</h2>
+
+                <div class="info-grid" style="margin-bottom: 22px;">
+                    <div class="info-row">
+                        <div class="info-label">Référence client</div>
+                        <div class="info-value">{{ result.client_details.client_reference or "-" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Nom</div>
+                        <div class="info-value">{{ result.client_details.nom or "-" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Prénom</div>
+                        <div class="info-value">{{ result.client_details.prenom or "-" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Type de pièce</div>
+                        <div class="info-value">{{ result.client_details.type_piece or "-" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Numéro de pièce</div>
+                        <div class="info-value">{{ result.client_details.num_piece or "-" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Numéro de passeport</div>
+                        <div class="info-value">{{ result.client_details.num_passeport or "-" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Date de naissance</div>
+                        <div class="info-value">{{ result.client_details.date_naissance or "-" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Âge</div>
+                        <div class="info-value">{{ result.client_details.age or "-" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Ville de résidence</div>
+                        <div class="info-value">{{ result.client_details.ville_residence or "-" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Nationalité</div>
+                        <div class="info-value">{{ result.client_details.nationalite or "-" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Pays de résidence</div>
+                        <div class="info-value">{{ result.client_details.pays_residence or "-" }}</div>
+                    </div>
                 </div>
             {% endif %}
-        </div>
 
+            <div class="section-header">
+                <h2>Comparaison client / liste de sanctions</h2>
+                {% if result.matches %}
+                    <span class="count-pill">{{ result.matches|length }} correspondance{{ "s" if result.matches|length != 1 else "" }}</span>
+                {% endif %}
+            </div>
+
+            {% if result.matches and result.matches|length > 0 %}
+                <div class="match-list" style="margin-top: 14px;">
+                    {% for match in result.matches %}
+                        {% if match.niveau_alerte == "ALERTE_EXACTE" %}
+                            {% set match_class = "exacte" %}
+                        {% elif match.niveau_alerte == "ALERTE_PROBABLE" %}
+                            {% set match_class = "probable" %}
+                        {% else %}
+                            {% set match_class = "possible" %}
+                        {% endif %}
+
+                        <div class="match-card {{ match_class }}">
+                            <div class="match-card-header">
+                                <div class="match-card-tags">
+                                    {% if match_class == "exacte" %}
+                                        <span class="badge badge-exacte">{{ match.niveau_alerte }}</span>
+                                    {% elif match_class == "probable" %}
+                                        <span class="badge badge-probable">{{ match.niveau_alerte }}</span>
+                                    {% else %}
+                                        <span class="badge badge-possible">{{ match.niveau_alerte }}</span>
+                                    {% endif %}
+                                    <span class="match-source">{{ match.source_liste }}</span>
+                                </div>
+                                <div class="match-score">{{ "%.2f"|format(match.score) }}%</div>
+                            </div>
+
+                            <div class="match-name">{{ match.sanction_nom_complet or match.listed_name or "-" }}</div>
+                            <div class="match-type">Type de correspondance : {{ match.matching_type }}</div>
+
+                            <div class="match-grid">
+                                <div>
+                                    <div class="info-label">Date de naissance</div>
+                                    <div class="info-value">{{ match.sanction_date_naissance or "-" }}</div>
+                                </div>
+                                <div>
+                                    <div class="info-label">Nationalité</div>
+                                    <div class="info-value">{{ match.sanction_nationalite or "-" }}</div>
+                                </div>
+                                <div>
+                                    <div class="info-label">Pays</div>
+                                    <div class="info-value">{{ match.sanction_pays or "-" }}</div>
+                                </div>
+                                <div>
+                                    <div class="info-label">Document</div>
+                                    <div class="info-value">{{ match.sanction_num_passeport or "-" }}</div>
+                                </div>
+                            </div>
+
+                            {% if match.sanction_motif %}
+                                <div class="match-motif"><strong>Motif :</strong> {{ match.sanction_motif }}</div>
+                            {% endif %}
+
+                            <div class="match-action"><strong>Action recommandée :</strong> {{ match.action_recommandee }}</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty" style="margin-top: 14px;">Aucune correspondance significative trouvée.</div>
+            {% endif %}
+
+        {% else %}
+            <div class="empty">
+                Saisis les informations du client ci-dessus, puis clique sur <strong>Lancer le matching</strong>.
+            </div>
+        {% endif %}
     </div>
 
 </div>

@@ -40,7 +40,7 @@
         }
 
         .stat-group {
-            margin-bottom: 22px;
+            margin-bottom: 16px;
         }
 
         .stat-group-title {
@@ -49,18 +49,34 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: #64748B;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
+        }
+
+        .stat-group-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .stat-group-row .stat-group {
+            flex: 1 1 300px;
+            margin-bottom: 0;
         }
 
         .cards {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
+            gap: 12px;
+        }
+
+        .cards-3 {
+            grid-template-columns: repeat(3, 1fr);
         }
 
         .card {
             background: white;
-            padding: 20px;
+            padding: 14px 16px;
             border-radius: 12px;
             box-shadow: 0 1px 2px rgba(15,23,42,0.06);
             border-left: 3px solid transparent;
@@ -68,12 +84,12 @@
 
         .card-title {
             color: #64748B;
-            font-size: 13px;
-            margin-bottom: 8px;
+            font-size: 12.5px;
+            margin-bottom: 6px;
         }
 
         .card-value {
-            font-size: 26px;
+            font-size: 21px;
             font-weight: 700;
             color: #0F172A;
         }
@@ -209,15 +225,125 @@
             font-weight: 600;
         }
 
+        .trend-wrap {
+            position: relative;
+            margin-top: 6px;
+        }
+
+        .trend-svg {
+            width: 100%;
+            height: auto;
+            display: block;
+            overflow: visible;
+        }
+
+        .trend-gridline {
+            stroke: #E2E8F0;
+            stroke-width: 1;
+        }
+
+        .trend-tick-label {
+            fill: #94A3B8;
+            font-size: 11px;
+            font-family: inherit;
+        }
+
+        .trend-x-label {
+            fill: #64748B;
+            font-size: 11px;
+            font-family: inherit;
+        }
+
+        .trend-area {
+            fill: rgba(220, 38, 38, 0.08);
+        }
+
+        .trend-line {
+            fill: none;
+            stroke: #DC2626;
+            stroke-width: 2;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+        }
+
+        .trend-end-dot {
+            fill: #DC2626;
+            stroke: #FFFFFF;
+            stroke-width: 2;
+        }
+
+        .trend-end-label {
+            fill: #0F172A;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: inherit;
+        }
+
+        .trend-crosshair {
+            stroke: #94A3B8;
+            stroke-width: 1;
+            visibility: hidden;
+        }
+
+        .trend-hover-dot {
+            fill: #DC2626;
+            stroke: #FFFFFF;
+            stroke-width: 2;
+            visibility: hidden;
+        }
+
+        .trend-hit-rect {
+            fill: transparent;
+            cursor: crosshair;
+        }
+
+        .trend-tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: #0F172A;
+            color: white;
+            padding: 8px 11px;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.6;
+            box-shadow: 0 10px 24px rgba(15,23,42,0.25);
+            transform: translate(-50%, -100%);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.1s ease;
+            z-index: 5;
+        }
+
+        .trend-tooltip.visible {
+            opacity: 1;
+        }
+
+        .trend-tooltip-date {
+            color: #94A3B8;
+        }
+
+        .trend-tooltip-value {
+            font-weight: 700;
+            font-size: 13.5px;
+        }
+
         @media (max-width: 1000px) {
             .cards {
                 grid-template-columns: repeat(2, 1fr);
+            }
+
+            .trend-svg {
+                height: 240px;
             }
         }
 
         @media (max-width: 600px) {
             .cards {
                 grid-template-columns: 1fr;
+            }
+
+            .trend-svg {
+                height: 280px;
             }
 
             .container {
@@ -267,42 +393,59 @@
         </div>
     </div>
 
-    <div class="stat-group">
-        <div class="stat-group-title">Alertes par statut de traitement</div>
-        <div class="cards">
-            <div class="card">
-                <div class="card-title">En attente (générées)</div>
-                <div class="card-value">{{ alerts_generee }}</div>
-            </div>
+    <div class="section">
+        <div class="section-header">
+            <h2>Tendance des alertes générées (30 derniers jours)</h2>
+        </div>
 
-            <div class="card">
-                <div class="card-title">Confirmées</div>
-                <div class="card-value">{{ alerts_confirmee }}</div>
-            </div>
-
-            <div class="card">
-                <div class="card-title">Faux positifs</div>
-                <div class="card-value">{{ alerts_faux_positif }}</div>
+        <div class="trend-wrap">
+            <svg class="trend-svg" id="trend-svg" viewBox="0 0 960 260" preserveAspectRatio="none"
+                 role="img" aria-label="Nombre d'alertes générées par jour sur les 30 derniers jours" tabindex="0"></svg>
+            <div class="trend-tooltip" id="trend-tooltip">
+                <div class="trend-tooltip-date" id="trend-tooltip-date"></div>
+                <div class="trend-tooltip-value" id="trend-tooltip-value"></div>
             </div>
         </div>
     </div>
 
-    <div class="stat-group">
-        <div class="stat-group-title">Alertes par niveau de gravité</div>
-        <div class="cards">
-            <div class="card card-exacte">
-                <div class="card-title">Alertes exactes</div>
-                <div class="card-value">{{ alertes_exactes }}</div>
-            </div>
+    <div class="stat-group-row">
+        <div class="stat-group">
+            <div class="stat-group-title">Alertes par statut de traitement</div>
+            <div class="cards cards-3">
+                <div class="card">
+                    <div class="card-title">En attente (générées)</div>
+                    <div class="card-value">{{ alerts_generee }}</div>
+                </div>
 
-            <div class="card card-probable">
-                <div class="card-title">Alertes probables</div>
-                <div class="card-value">{{ alertes_probables }}</div>
-            </div>
+                <div class="card">
+                    <div class="card-title">Confirmées</div>
+                    <div class="card-value">{{ alerts_confirmee }}</div>
+                </div>
 
-            <div class="card card-possible">
-                <div class="card-title">Alertes possibles</div>
-                <div class="card-value">{{ alertes_possibles }}</div>
+                <div class="card">
+                    <div class="card-title">Faux positifs</div>
+                    <div class="card-value">{{ alerts_faux_positif }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-group">
+            <div class="stat-group-title">Alertes par niveau de gravité</div>
+            <div class="cards cards-3">
+                <div class="card card-exacte">
+                    <div class="card-title">Alertes exactes</div>
+                    <div class="card-value">{{ alertes_exactes }}</div>
+                </div>
+
+                <div class="card card-probable">
+                    <div class="card-title">Alertes probables</div>
+                    <div class="card-value">{{ alertes_probables }}</div>
+                </div>
+
+                <div class="card card-possible">
+                    <div class="card-title">Alertes possibles</div>
+                    <div class="card-value">{{ alertes_possibles }}</div>
+                </div>
             </div>
         </div>
     </div>
@@ -374,6 +517,225 @@
     </div>
 
 </div>
+
+<script>
+(function () {
+    var data = {{ alert_trend | tojson }};
+
+    var svg = document.getElementById('trend-svg');
+    var tooltip = document.getElementById('trend-tooltip');
+    var tooltipDate = document.getElementById('trend-tooltip-date');
+    var tooltipValue = document.getElementById('trend-tooltip-value');
+
+    if (!svg || !data || data.length === 0) {
+        return;
+    }
+
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    var VIEW_W = 960;
+    var VIEW_H = 260;
+    var PAD_LEFT = 34;
+    var PAD_RIGHT = 12;
+    var PAD_TOP = 14;
+    var PAD_BOTTOM = 26;
+    var PLOT_W = VIEW_W - PAD_LEFT - PAD_RIGHT;
+    var PLOT_H = VIEW_H - PAD_TOP - PAD_BOTTOM;
+
+    var MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+    function el(tag, attrs) {
+        var node = document.createElementNS(SVG_NS, tag);
+        for (var key in attrs) {
+            node.setAttribute(key, attrs[key]);
+        }
+        return node;
+    }
+
+    function niceMax(value) {
+        if (value <= 4) {
+            return 4;
+        }
+        var magnitude = Math.pow(10, Math.floor(Math.log(value) / Math.LN10));
+        var residual = value / magnitude;
+        var niceResidual = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
+        return niceResidual * magnitude;
+    }
+
+    function parseDay(iso) {
+        var parts = iso.split('-');
+        return { y: parts[0], m: parseInt(parts[1], 10), d: parseInt(parts[2], 10) };
+    }
+
+    function shortLabel(iso) {
+        var p = parseDay(iso);
+        return p.d + '/' + (p.m < 10 ? '0' + p.m : p.m);
+    }
+
+    function longLabel(iso) {
+        var p = parseDay(iso);
+        return p.d + ' ' + MONTHS_FR[p.m - 1] + ' ' + p.y;
+    }
+
+    var counts = data.map(function (d) { return d.count; });
+    var maxCount = niceMax(Math.max.apply(null, counts));
+    var n = data.length;
+    var step = n > 1 ? PLOT_W / (n - 1) : 0;
+
+    function xAt(i) {
+        return PAD_LEFT + i * step;
+    }
+
+    function yAt(value) {
+        return PAD_TOP + (1 - (value / maxCount)) * PLOT_H;
+    }
+
+    while (svg.firstChild) {
+        svg.removeChild(svg.firstChild);
+    }
+
+    var gridGroup = el('g', {});
+    var ticks = [0, 0.25, 0.5, 0.75, 1];
+    ticks.forEach(function (frac) {
+        var value = Math.round(maxCount * frac);
+        var y = yAt(value);
+        gridGroup.appendChild(el('line', {
+            class: 'trend-gridline',
+            x1: PAD_LEFT, x2: VIEW_W - PAD_RIGHT, y1: y, y2: y
+        }));
+        var label = el('text', { class: 'trend-tick-label trend-text', x: PAD_LEFT - 8, y: y + 3, 'text-anchor': 'end' });
+        label.textContent = value;
+        gridGroup.appendChild(label);
+    });
+    svg.appendChild(gridGroup);
+
+    var areaPoints = data.map(function (d, i) { return xAt(i) + ',' + yAt(d.count); });
+    var areaPath = 'M' + xAt(0) + ',' + yAt(0) + ' L' + areaPoints.join(' L') +
+        ' L' + xAt(n - 1) + ',' + yAt(0) + ' Z';
+    svg.appendChild(el('path', { class: 'trend-area', d: areaPath }));
+
+    var linePath = 'M' + areaPoints.join(' L');
+    svg.appendChild(el('path', { class: 'trend-line', d: linePath }));
+
+    var xLabelGroup = el('g', {});
+    var labelEvery = Math.ceil(n / 6);
+    data.forEach(function (d, i) {
+        if (i % labelEvery === 0 || i === n - 1) {
+            var label = el('text', {
+                class: 'trend-x-label trend-text', x: xAt(i), y: VIEW_H - 6, 'text-anchor': 'middle'
+            });
+            label.textContent = shortLabel(d.date);
+            xLabelGroup.appendChild(label);
+        }
+    });
+    svg.appendChild(xLabelGroup);
+
+    var lastX = xAt(n - 1);
+    var lastY = yAt(data[n - 1].count);
+    svg.appendChild(el('circle', { class: 'trend-end-dot', cx: lastX, cy: lastY, r: 4 }));
+
+    var endLabel = el('text', {
+        class: 'trend-end-label trend-text', x: Math.min(lastX, VIEW_W - PAD_RIGHT - 18), y: Math.max(lastY - 12, PAD_TOP + 10),
+        'text-anchor': 'end'
+    });
+    endLabel.textContent = data[n - 1].count;
+    svg.appendChild(endLabel);
+
+    var crosshair = el('line', { class: 'trend-crosshair', x1: 0, x2: 0, y1: PAD_TOP, y2: VIEW_H - PAD_BOTTOM });
+    svg.appendChild(crosshair);
+
+    var hoverDot = el('circle', { class: 'trend-hover-dot', r: 4, cx: 0, cy: 0 });
+    svg.appendChild(hoverDot);
+
+    var hitRect = el('rect', {
+        class: 'trend-hit-rect', x: PAD_LEFT, y: PAD_TOP, width: PLOT_W, height: PLOT_H
+    });
+    svg.appendChild(hitRect);
+
+    function fixTextAspect() {
+        var rect = svg.getBoundingClientRect();
+        if (!rect.width || !rect.height) {
+            return;
+        }
+        var scaleX = rect.width / VIEW_W;
+        var scaleY = rect.height / VIEW_H;
+        var correction = scaleY / scaleX;
+        var texts = svg.querySelectorAll('.trend-text');
+        for (var i = 0; i < texts.length; i++) {
+            var t = texts[i];
+            var tx = t.getAttribute('x');
+            var ty = t.getAttribute('y');
+            t.setAttribute('transform', 'translate(' + tx + ',' + ty + ') scale(' + correction + ',1) translate(' + (-tx) + ',' + (-ty) + ')');
+        }
+    }
+
+    fixTextAspect();
+
+    var resizeTimer = null;
+    window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(fixTextAspect, 120);
+    });
+
+    function showIndex(i) {
+        i = Math.max(0, Math.min(n - 1, i));
+        var point = data[i];
+        var x = xAt(i);
+        var y = yAt(point.count);
+
+        crosshair.setAttribute('x1', x);
+        crosshair.setAttribute('x2', x);
+        crosshair.style.visibility = 'visible';
+
+        hoverDot.setAttribute('cx', x);
+        hoverDot.setAttribute('cy', y);
+        hoverDot.style.visibility = 'visible';
+
+        tooltipDate.textContent = longLabel(point.date);
+        tooltipValue.textContent = point.count + ' alerte' + (point.count !== 1 ? 's' : '') + ' générée' + (point.count !== 1 ? 's' : '');
+
+        var svgRect = svg.getBoundingClientRect();
+        var scaleX = svgRect.width / VIEW_W;
+        var scaleY = svgRect.height / VIEW_H;
+        tooltip.style.left = (x * scaleX) + 'px';
+        tooltip.style.top = (Math.max(y * scaleY - 10, 0)) + 'px';
+        tooltip.classList.add('visible');
+    }
+
+    function hideTooltip() {
+        crosshair.style.visibility = 'hidden';
+        hoverDot.style.visibility = 'hidden';
+        tooltip.classList.remove('visible');
+    }
+
+    function indexFromClientX(clientX) {
+        var svgRect = svg.getBoundingClientRect();
+        var scaleX = svgRect.width / VIEW_W;
+        var localX = (clientX - svgRect.left) / scaleX;
+        var i = Math.round((localX - PAD_LEFT) / step);
+        return Math.max(0, Math.min(n - 1, i));
+    }
+
+    hitRect.addEventListener('pointermove', function (e) {
+        showIndex(indexFromClientX(e.clientX));
+    });
+    hitRect.addEventListener('pointerleave', hideTooltip);
+
+    var focusIndex = n - 1;
+    svg.addEventListener('focus', function () { showIndex(focusIndex); });
+    svg.addEventListener('blur', hideTooltip);
+    svg.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowRight') {
+            focusIndex = Math.min(n - 1, focusIndex + 1);
+            showIndex(focusIndex);
+            e.preventDefault();
+        } else if (e.key === 'ArrowLeft') {
+            focusIndex = Math.max(0, focusIndex - 1);
+            showIndex(focusIndex);
+            e.preventDefault();
+        }
+    });
+})();
+</script>
 
 </body>
 </html>

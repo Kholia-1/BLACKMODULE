@@ -1,6 +1,9 @@
 # Outils de déploiement locaux (secrets)
 _deploy_tmp/
 
+# PostgreSQL portable pour le développement local
+.pgportable/
+
 # Python
 __pycache__/
 *.py[cod]
