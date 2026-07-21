@@ -58,6 +58,57 @@
             align-items: start;
         }
 
+        .stat-group {
+            margin-bottom: 24px;
+        }
+
+        .stat-group-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748B;
+            margin-bottom: 10px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 18px 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+            border-left: 3px solid transparent;
+        }
+
+        .stat-card-title {
+            color: #64748B;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+
+        .stat-card-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .stat-card-exacte {
+            border-left-color: #DC2626;
+        }
+
+        .stat-card-probable {
+            border-left-color: #D97706;
+        }
+
+        .stat-card-possible {
+            border-left-color: #64748B;
+        }
+
         .card {
             background: white;
             border-radius: 12px;
@@ -157,12 +208,40 @@
         .info {
             background: #F8FAFC;
             border: 1px solid #E2E8F0;
-            padding: 15px 16px;
+            padding: 20px 22px;
             border-radius: 10px;
             color: #334155;
             font-size: 13.5px;
-            line-height: 1.8;
+            line-height: 1.6;
+            margin-top: 22px;
+        }
+
+        .info-title {
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .rule-formula {
+            display: inline-block;
+            margin-top: 8px;
+        }
+
+        .rule-list {
             margin-top: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .rule-item {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .rule-item .badge {
+            flex: none;
         }
 
         .grid {
@@ -219,6 +298,10 @@
                 grid-template-columns: 1fr;
             }
 
+            .cards {
+                grid-template-columns: 1fr;
+            }
+
             .layout {
                 grid-template-columns: 1fr;
             }
@@ -247,6 +330,26 @@
     <a class="btn-link" href="/api/exports/matching-settings-excel">
     Exporter Excel paramètres de matching
 </a>
+
+    <div class="stat-group">
+        <div class="stat-group-title">Seuils actifs</div>
+        <div class="cards">
+            <div class="stat-card stat-card-exacte">
+                <div class="stat-card-title">Alerte exacte</div>
+                <div class="stat-card-value">Score ≥ {{ settings.exact_threshold }}</div>
+            </div>
+
+            <div class="stat-card stat-card-probable">
+                <div class="stat-card-title">Alerte probable</div>
+                <div class="stat-card-value">Score ≥ {{ settings.probable_threshold }}</div>
+            </div>
+
+            <div class="stat-card stat-card-possible">
+                <div class="stat-card-title">Alerte possible</div>
+                <div class="stat-card-value">Score ≥ {{ settings.possible_threshold }}</div>
+            </div>
+        </div>
+    </div>
 
     {% if message %}
         {% if success %}
@@ -293,20 +396,25 @@
 </form>
 
         <div class="info">
-            <strong>Règle obligatoire :</strong><br>
-            <code>0 ≤ Alerte Possible ≤ Alerte Probable ≤ Alerte Exacte ≤ 100</code>
-            <br><br>
+            <div class="info-title">Règle obligatoire</div>
+            <code class="rule-formula">0 ≤ Alerte Possible ≤ Alerte Probable ≤ Alerte Exacte ≤ 100</code>
 
-            <span class="badge badge-exacte">Alerte exacte</span>
-            score supérieur ou égal au seuil exact : opération bloquée.
-            <br>
+            <div class="rule-list">
+                <div class="rule-item">
+                    <span class="badge badge-exacte">Alerte exacte</span>
+                    <span>score supérieur ou égal au seuil exact : opération bloquée.</span>
+                </div>
 
-            <span class="badge badge-probable">Alerte probable</span>
-            score supérieur ou égal au seuil probable : revue conformité.
-            <br>
+                <div class="rule-item">
+                    <span class="badge badge-probable">Alerte probable</span>
+                    <span>score supérieur ou égal au seuil probable : revue conformité.</span>
+                </div>
 
-            <span class="badge badge-possible">Alerte possible</span>
-            score supérieur ou égal au seuil possible : surveillance renforcée.
+                <div class="rule-item">
+                    <span class="badge badge-possible">Alerte possible</span>
+                    <span>score supérieur ou égal au seuil possible : surveillance renforcée.</span>
+                </div>
+            </div>
         </div>
     </div>
 
