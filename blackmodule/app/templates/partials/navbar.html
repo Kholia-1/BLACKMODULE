@@ -329,6 +329,284 @@
     }
 
     /* =====================================================
+       CLOCHE DE NOTIFICATIONS (ALERTES CRITIQUES)
+       ===================================================== */
+
+    .notif-bell {
+        position: relative;
+    }
+
+    .bell-btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        margin: 0;
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 999px !important;
+        cursor: pointer;
+        color: #CBD5E1;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .bell-btn:hover {
+        background: rgba(255, 255, 255, 0.10) !important;
+        color: var(--afri-white);
+    }
+
+    .bell-btn svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .bell-btn.has-alerts {
+        color: #FCA5A5;
+        border-color: rgba(220, 38, 38, 0.45) !important;
+        background: var(--afri-red-soft) !important;
+    }
+
+    .bell-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        min-width: 17px;
+        height: 17px;
+        padding: 0 4px;
+        border-radius: 999px;
+        background: var(--afri-red);
+        color: var(--afri-white);
+        font-size: 10.5px;
+        font-weight: 700;
+        line-height: 17px;
+        text-align: center;
+        border: 2px solid var(--afri-black);
+        display: none;
+    }
+
+    @keyframes bell-ring {
+        0%, 100% { transform: rotate(0deg); }
+        15% { transform: rotate(14deg); }
+        30% { transform: rotate(-12deg); }
+        45% { transform: rotate(8deg); }
+        60% { transform: rotate(-6deg); }
+        75% { transform: rotate(3deg); }
+    }
+
+    .bell-btn.ring svg {
+        transform-origin: top center;
+        animation: bell-ring 0.7s ease-in-out;
+    }
+
+    @keyframes badge-pop {
+        0% { transform: scale(0.6); }
+        60% { transform: scale(1.15); }
+        100% { transform: scale(1); }
+    }
+
+    .bell-badge.pop {
+        animation: badge-pop 0.35s ease-out;
+    }
+
+    .notif-dropdown {
+        display: none;
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        width: 340px;
+        max-width: 90vw;
+        background: var(--afri-black);
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        border-radius: var(--radius-md);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+        z-index: 60;
+        overflow: hidden;
+    }
+
+    .notif-bell.open .notif-dropdown {
+        display: block;
+    }
+
+    .notif-dropdown-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--afri-white);
+        font-size: 13.5px;
+        font-weight: 700;
+    }
+
+    .notif-dropdown-header span {
+        color: #94A3B8;
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    .notif-list {
+        max-height: 320px;
+        overflow-y: auto;
+    }
+
+    .notif-item {
+        display: block;
+        padding: 11px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        text-decoration: none !important;
+    }
+
+    .notif-item:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+    }
+
+    .notif-item-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+
+    .notif-item-name {
+        color: var(--afri-white) !important;
+        font-weight: 600;
+        font-size: 13px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .notif-item-level {
+        flex-shrink: 0;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 999px;
+        letter-spacing: 0.3px;
+    }
+
+    .notif-item-level.exacte {
+        background: rgba(220, 38, 38, 0.18);
+        color: #FCA5A5;
+    }
+
+    .notif-item-level.probable {
+        background: rgba(217, 119, 6, 0.18);
+        color: #FCD34D;
+    }
+
+    .notif-item-meta {
+        color: #94A3B8 !important;
+        font-size: 11.5px;
+    }
+
+    .notif-empty {
+        padding: 22px 14px;
+        text-align: center;
+        color: #94A3B8;
+        font-size: 13px;
+    }
+
+    .notif-dropdown-footer {
+        display: block;
+        padding: 10px 14px;
+        text-align: center;
+        color: var(--afri-white) !important;
+        background: rgba(255, 255, 255, 0.03);
+        font-size: 12.5px;
+        font-weight: 600;
+        text-decoration: none !important;
+    }
+
+    .notif-dropdown-footer:hover {
+        background: rgba(255, 255, 255, 0.07) !important;
+    }
+
+    /* --- Toast de notification (déclenché à la connexion) --- */
+
+    .notif-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        max-width: 340px;
+        background: var(--afri-black);
+        color: var(--afri-white);
+        border: 1px solid rgba(220, 38, 38, 0.4);
+        border-left: 4px solid var(--afri-red);
+        border-radius: var(--radius-md);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+        padding: 14px 16px;
+        z-index: 999;
+        cursor: pointer;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        opacity: 0;
+        transform: translateY(-10px);
+        transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    .notif-toast.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .notif-toast-icon {
+        flex-shrink: 0;
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        background: var(--afri-red-soft);
+        color: #FCA5A5;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .notif-toast-icon svg {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+    }
+
+    .notif-toast-title {
+        font-weight: 700;
+        font-size: 13.5px;
+        margin-bottom: 2px;
+    }
+
+    .notif-toast-body {
+        color: #CBD5E1;
+        font-size: 12.5px;
+        line-height: 1.4;
+    }
+
+    /* --- Ligne de tableau ciblée depuis une notification --- */
+
+    .bm-row-highlight td {
+        background: #FEE2E2 !important;
+        box-shadow: inset 3px 0 0 var(--afri-red);
+        transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .bm-row-highlight-fade td {
+        background: var(--afri-white) !important;
+        box-shadow: inset 3px 0 0 transparent;
+        transition: background 1.8s ease, box-shadow 1.8s ease;
+    }
+
+    /* =====================================================
        CONTENEURS ET CARTES
        ===================================================== */
 
@@ -762,6 +1040,7 @@
 {% set listes_paths = ["/web/imports", "/web/list-updates", "/web/scheduler-status", "/web/import-history"] %}
 {% set admin_paths = ["/web/users", "/web/external-api"] %}
 {% set audit_paths = ["/web/audit-logs", "/web/data-quality", "/web/matching-settings"] %}
+{% set notif_bell_roles = ["ADMIN", "SUPERVISEUR", "OPERATEUR"] %}
 
 <div class="top-user-bar">
     <div>
@@ -773,6 +1052,33 @@
         <span class="role-badge role-{{ role|lower }}">
             {{ role if role else "NON CONNECTÉ" }}
         </span>
+
+        {% if user and role in notif_bell_roles %}
+            {% set critical_link = "/web/critical-alerts" if role in ["ADMIN", "SUPERVISEUR"] else "/web/alerts?niveau_alerte=ALERTE_EXACTE" %}
+            {% set item_link_base = "/web/critical-alerts" if role in ["ADMIN", "SUPERVISEUR"] else "/web/alerts" %}
+            <div class="notif-bell" id="notifBell" data-critical-link="{{ critical_link }}" data-item-link-base="{{ item_link_base }}">
+                <button type="button" class="bell-btn" id="bellBtn" aria-label="Notifications d'alertes critiques">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span class="bell-badge" id="bellBadge">0</span>
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-dropdown-header">
+                        Alertes critiques
+                        <span id="notifCountLabel">—</span>
+                    </div>
+                    <div class="notif-list" id="notifList">
+                        <div class="notif-empty">Chargement…</div>
+                    </div>
+                    <a class="notif-dropdown-footer" href="{{ critical_link }}">
+                        Voir toutes les alertes critiques
+                    </a>
+                </div>
+            </div>
+        {% endif %}
 
         <div class="user-menu">
             <button type="button" class="user-menu-toggle nav-group-toggle">
@@ -906,7 +1212,7 @@
 <script>
 (function () {
     function closeAllMenus(except) {
-        document.querySelectorAll('.nav-group.open, .user-menu.open').forEach(function (el) {
+        document.querySelectorAll('.nav-group.open, .user-menu.open, .notif-bell.open').forEach(function (el) {
             if (el !== except) {
                 el.classList.remove('open');
             }
@@ -936,3 +1242,298 @@
     });
 })();
 </script>
+
+{% if user and role in notif_bell_roles %}
+<script>
+(function () {
+    var POLL_INTERVAL_MS = 30000;
+    var VISIBILITY_REFRESH_THRESHOLD_MS = 10000;
+    var SEEN_STORAGE_KEY = 'bm_seen_critical_alert_ids';
+    var SEEN_STORAGE_MAX = 300;
+
+    var bell = document.getElementById('notifBell');
+    var bellBtn = document.getElementById('bellBtn');
+    var bellBadge = document.getElementById('bellBadge');
+    var notifList = document.getElementById('notifList');
+    var notifCountLabel = document.getElementById('notifCountLabel');
+    var criticalLink = bell.getAttribute('data-critical-link');
+    var itemLinkBase = bell.getAttribute('data-item-link-base');
+    var lastCount = null;
+    var pollTimer = null;
+    var lastFetchAt = 0;
+    var stopped = false;
+
+    bellBtn.setAttribute('aria-haspopup', 'true');
+    bellBtn.setAttribute('aria-expanded', 'false');
+
+    bellBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var wasOpen = bell.classList.contains('open');
+        document.querySelectorAll('.nav-group.open, .user-menu.open, .notif-bell.open').forEach(function (el) {
+            el.classList.remove('open');
+        });
+        if (!wasOpen) {
+            bell.classList.add('open');
+        }
+        bellBtn.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
+    });
+
+    document.addEventListener('click', function () {
+        bellBtn.setAttribute('aria-expanded', bell.classList.contains('open') ? 'true' : 'false');
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            bellBtn.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    function highlightTargetAlertRow() {
+        if (!location.hash || location.hash.indexOf('#alert-') !== 0) return;
+
+        var target = document.getElementById(location.hash.slice(1));
+        if (!target) return;
+
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('bm-row-highlight');
+
+        setTimeout(function () {
+            target.classList.add('bm-row-highlight-fade');
+        }, 1300);
+
+        setTimeout(function () {
+            target.classList.remove('bm-row-highlight', 'bm-row-highlight-fade');
+        }, 3300);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', highlightTargetAlertRow);
+    } else {
+        highlightTargetAlertRow();
+    }
+    window.addEventListener('hashchange', highlightTargetAlertRow);
+
+    function timeAgo(iso) {
+        if (!iso) return '';
+        var diffMs = Date.now() - new Date(iso).getTime();
+        var mins = Math.floor(diffMs / 60000);
+        if (mins < 1) return "à l'instant";
+        if (mins < 60) return mins + ' min';
+        var hours = Math.floor(mins / 60);
+        if (hours < 24) return hours + ' h';
+        return Math.floor(hours / 24) + ' j';
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    function renderList(items) {
+        if (!items || items.length === 0) {
+            notifList.innerHTML = '<div class="notif-empty">Aucune alerte critique active.</div>';
+            return;
+        }
+
+        notifList.innerHTML = items.map(function (item) {
+            var levelClass = item.niveau_alerte === 'ALERTE_EXACTE' ? 'exacte' : 'probable';
+            var name = (item.client_prenom || '') + ' ' + (item.client_nom || '');
+            name = name.trim() || (item.client_reference || 'Client');
+            var itemHref = itemLinkBase + '#alert-' + encodeURIComponent(item.id);
+
+            return '<a class="notif-item" href="' + itemHref + '">' +
+                '<div class="notif-item-top">' +
+                    '<span class="notif-item-name">' + escapeHtml(name) + '</span>' +
+                    '<span class="notif-item-level ' + levelClass + '">' + escapeHtml(item.niveau_alerte || '') + '</span>' +
+                '</div>' +
+                '<div class="notif-item-meta">' + escapeHtml(item.client_reference || '') + ' · ' + timeAgo(item.created_at) + '</div>' +
+            '</a>';
+        }).join('');
+    }
+
+    function getSeenIds() {
+        try {
+            return JSON.parse(localStorage.getItem(SEEN_STORAGE_KEY) || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveSeenIds(ids) {
+        try {
+            localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(ids.slice(-SEEN_STORAGE_MAX)));
+        } catch (e) {
+            /* stockage indisponible (navigation privée, quota) : pas bloquant */
+        }
+    }
+
+    function itemDisplayName(item) {
+        var name = (item.client_prenom || '') + ' ' + (item.client_nom || '');
+        return name.trim() || (item.client_reference || 'Client');
+    }
+
+    function buildToastMessage(total, newItems) {
+        if (newItems.length > 0) {
+            var names = newItems.slice(0, 2).map(itemDisplayName).join(', ');
+            var extraCount = newItems.length - 2;
+            var extra = extraCount > 0 ? ' et ' + extraCount + ' autre' + (extraCount > 1 ? 's' : '') : '';
+
+            return {
+                title: newItems.length + ' nouvelle' + (newItems.length > 1 ? 's' : '') +
+                    ' alerte' + (newItems.length > 1 ? 's' : '') + ' critique' + (newItems.length > 1 ? 's' : ''),
+                body: names + extra + ' · ' + total + ' alerte' + (total > 1 ? 's' : '') + ' au total en attente.'
+            };
+        }
+
+        return {
+            title: 'Alertes critiques en attente',
+            body: total + ' alerte' + (total > 1 ? 's' : '') + ' critique' + (total > 1 ? 's' : '') +
+                ' toujours en attente de traitement.'
+        };
+    }
+
+    function showToast(total, newItems) {
+        var msg = buildToastMessage(total, newItems);
+
+        var toast = document.createElement('div');
+        toast.className = 'notif-toast';
+        toast.innerHTML =
+            '<div class="notif-toast-icon">' +
+                '<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>' +
+            '</div>' +
+            '<div>' +
+                '<div class="notif-toast-title">' + escapeHtml(msg.title) + '</div>' +
+                '<div class="notif-toast-body">' + escapeHtml(msg.body) + '</div>' +
+            '</div>';
+
+        toast.addEventListener('click', function () {
+            window.location.href = criticalLink;
+        });
+
+        document.body.appendChild(toast);
+        requestAnimationFrame(function () {
+            toast.classList.add('show');
+        });
+
+        setTimeout(function () {
+            toast.classList.remove('show');
+            setTimeout(function () {
+                toast.remove();
+            }, 300);
+        }, 7000);
+
+        if (window.Notification) {
+            if (Notification.permission === 'granted') {
+                new Notification('BLACKMODULE — ' + msg.title, { body: msg.body });
+            } else if (Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+    }
+
+    function notifyOnConnection(total, items) {
+        if (sessionStorage.getItem('bm_critical_notified')) {
+            return;
+        }
+        sessionStorage.setItem('bm_critical_notified', '1');
+
+        if (total === 0) {
+            return;
+        }
+
+        var seenSet = {};
+        var seenIds = getSeenIds();
+        seenIds.forEach(function (id) { seenSet[id] = true; });
+
+        var newItems = items.filter(function (item) { return !seenSet[item.id]; });
+
+        showToast(total, newItems);
+        saveSeenIds(seenIds.concat(items.map(function (item) { return item.id; })));
+    }
+
+    function stopPolling() {
+        stopped = true;
+        if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    function refresh() {
+        if (stopped) return;
+        lastFetchAt = Date.now();
+
+        fetch('/api/alerts/critical-notifications', { credentials: 'same-origin' })
+            .then(function (res) {
+                if (res.status === 401) {
+                    stopPolling();
+                    throw new Error('Session expirée');
+                }
+                if (!res.ok) throw new Error('Requête échouée');
+                return res.json();
+            })
+            .then(function (data) {
+                var count = data.total || 0;
+                var items = data.items || [];
+
+                notifCountLabel.textContent = count + ' actif' + (count !== 1 ? 's' : '');
+
+                if (!bell.classList.contains('open')) {
+                    renderList(items);
+                }
+
+                if (count > 0) {
+                    bellBadge.textContent = count > 99 ? '99+' : String(count);
+                    bellBadge.style.display = 'inline-block';
+                    bellBtn.classList.add('has-alerts');
+                } else {
+                    bellBadge.style.display = 'none';
+                    bellBtn.classList.remove('has-alerts');
+                }
+
+                if (lastCount !== null && count > lastCount) {
+                    bellBtn.classList.remove('ring');
+                    void bellBtn.offsetWidth;
+                    bellBtn.classList.add('ring');
+                    bellBadge.classList.remove('pop');
+                    void bellBadge.offsetWidth;
+                    bellBadge.classList.add('pop');
+                }
+
+                notifyOnConnection(count, items);
+
+                lastCount = count;
+            })
+            .catch(function () {
+                /* silencieux : ne bloque jamais la navigation en cas d'échec réseau ou de session expirée */
+            });
+    }
+
+    function startPolling() {
+        if (stopped || pollTimer) return;
+        pollTimer = setInterval(refresh, POLL_INTERVAL_MS);
+    }
+
+    document.addEventListener('visibilitychange', function () {
+        if (stopped) return;
+
+        if (document.hidden) {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+            return;
+        }
+
+        if (Date.now() - lastFetchAt > VISIBILITY_REFRESH_THRESHOLD_MS) {
+            refresh();
+        }
+        startPolling();
+    });
+
+    refresh();
+    startPolling();
+})();
+</script>
+{% endif %}

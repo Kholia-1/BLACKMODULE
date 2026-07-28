@@ -48,6 +48,42 @@ def list_alerts(
     return alerts
 
 
+@router.get("/critical-notifications")
+def get_critical_notifications(
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_session_user)
+):
+    """
+    Fournit le contenu de la cloche de notifications : nombre et liste
+    des alertes critiques actives, pour affichage en temps réel dans le menu.
+    """
+
+    query = db.query(Alert).filter(
+        Alert.niveau_alerte.in_(["ALERTE_EXACTE", "ALERTE_PROBABLE"]),
+        Alert.statut.in_(["GENEREE", "EN_COURS", "ESCALADEE", "CONFIRMEE"])
+    )
+
+    total = query.count()
+
+    recent = query.order_by(Alert.created_at.desc()).limit(8).all()
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": str(alert.id),
+                "client_reference": alert.client_reference,
+                "client_nom": alert.client_nom,
+                "client_prenom": alert.client_prenom,
+                "niveau_alerte": alert.niveau_alerte,
+                "statut": alert.statut,
+                "created_at": alert.created_at.isoformat() if alert.created_at else None
+            }
+            for alert in recent
+        ]
+    }
+
+
 @router.get("/{alert_id}", response_model=AlertResponse)
 def get_alert(
     alert_id: UUID,
