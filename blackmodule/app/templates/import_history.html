@@ -81,8 +81,23 @@
 
         .filter-form {
             display: flex;
-            gap: 10px;
+            align-items: flex-end;
+            gap: 14px;
             flex-wrap: wrap;
+        }
+
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-field label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         input, select {
@@ -243,29 +258,43 @@
             </div>
 
             <form class="filter-form" method="get" action="/web/import-history">
-                <select name="source_liste">
-                    <option value="">Toutes les sources</option>
+                <div class="filter-field">
+                    <label>Source</label>
+                    <select name="source_liste" onchange="this.form.submit()">
+                        <option value="">Toutes les sources</option>
 
-                    <option value="AFB_PPE" {% if source_liste == "AFB_PPE" %}selected{% endif %}>AFB_PPE</option>
-                    <option value="OFAC_SDN" {% if source_liste == "OFAC_SDN" %}selected{% endif %}>OFAC_SDN</option>
-                    <option value="OFAC_CONSOLIDATED" {% if source_liste == "OFAC_CONSOLIDATED" %}selected{% endif %}>OFAC_CONSOLIDATED</option>
-                    <option value="ONU" {% if source_liste == "ONU" %}selected{% endif %}>ONU</option>
-                    <option value="UE" {% if source_liste == "UE" %}selected{% endif %}>UE</option>
-                    <option value="OFSI" {% if source_liste == "OFSI" %}selected{% endif %}>OFSI</option>
-                    <option value="FR_GEL" {% if source_liste == "FR_GEL" %}selected{% endif %}>FR_GEL</option>
-                </select>
+                        <option value="AFB_PPE" {% if source_liste == "AFB_PPE" %}selected{% endif %}>AFB_PPE</option>
+                        <option value="OFAC_SDN" {% if source_liste == "OFAC_SDN" %}selected{% endif %}>OFAC_SDN</option>
+                        <option value="OFAC_CONSOLIDATED" {% if source_liste == "OFAC_CONSOLIDATED" %}selected{% endif %}>OFAC_CONSOLIDATED</option>
+                        <option value="ONU" {% if source_liste == "ONU" %}selected{% endif %}>ONU</option>
+                        <option value="UE" {% if source_liste == "UE" %}selected{% endif %}>UE</option>
+                        <option value="OFSI" {% if source_liste == "OFSI" %}selected{% endif %}>OFSI</option>
+                        <option value="FR_GEL" {% if source_liste == "FR_GEL" %}selected{% endif %}>FR_GEL</option>
+                    </select>
+                </div>
 
-                <select name="status">
-                    <option value="">Tous les statuts</option>
-                    <option value="SUCCESS" {% if status == "SUCCESS" %}selected{% endif %}>SUCCESS</option>
-                    <option value="FAILED" {% if status == "FAILED" %}selected{% endif %}>FAILED</option>
-                    <option value="PENDING" {% if status == "PENDING" %}selected{% endif %}>PENDING</option>
-                </select>
+                <div class="filter-field">
+                    <label>Statut</label>
+                    <select name="status" onchange="this.form.submit()">
+                        <option value="">Tous les statuts</option>
+                        <option value="SUCCESS" {% if status == "SUCCESS" %}selected{% endif %}>SUCCESS</option>
+                        <option value="FAILED" {% if status == "FAILED" %}selected{% endif %}>FAILED</option>
+                        <option value="PENDING" {% if status == "PENDING" %}selected{% endif %}>PENDING</option>
+                    </select>
+                </div>
 
-                <input type="text" name="imported_by" placeholder="Importé par..." value="{{ imported_by or '' }}">
+                <div class="filter-field">
+                    <label>Importé par</label>
+                    <input type="text" name="imported_by" placeholder="Importé par..." value="{{ imported_by or '' }}">
+                </div>
 
-                <button type="submit">Filtrer</button>
-                <a class="btn-secondary" href="/web/import-history">Réinitialiser</a>
+                <div class="filter-field">
+                    <label>&nbsp;</label>
+                    <div style="display:flex; gap:8px;">
+                        <button type="submit">Filtrer</button>
+                        <a class="btn-secondary" href="/web/import-history">Réinitialiser</a>
+                    </div>
+                </div>
             </form>
         </div>
 

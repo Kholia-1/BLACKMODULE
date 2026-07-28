@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query, UploadFile, File
@@ -503,6 +504,8 @@ def web_alerts(
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     message: str | None = Query(None),
+    sort_by: str | None = Query(None),
+    sort_dir: str | None = Query(None),
     db: Session = Depends(get_db)
 ):
     if not require_login(request):
@@ -550,7 +553,47 @@ def web_alerts(
         except ValueError:
             pass
 
-    alerts = query.order_by(Alert.created_at.desc()).all()
+    sort_columns = {
+        "reference": Alert.client_reference,
+        "score": Alert.matching_score,
+        "niveau": Alert.niveau_alerte,
+        "statut": Alert.statut,
+        "source": Alert.source_liste,
+        "date": Alert.created_at,
+    }
+    current_sort_by = sort_by if sort_by in sort_columns else "date"
+    current_sort_dir = "asc" if sort_dir == "asc" else "desc"
+    sort_column = sort_columns[current_sort_by]
+    query = query.order_by(sort_column.asc() if current_sort_dir == "asc" else sort_column.desc())
+
+    alerts = query.all()
+
+    counts_by_niveau = {"ALERTE_EXACTE": 0, "ALERTE_PROBABLE": 0, "ALERTE_POSSIBLE": 0}
+    for alert in alerts:
+        if alert.niveau_alerte in counts_by_niveau:
+            counts_by_niveau[alert.niveau_alerte] += 1
+
+    active_filters = {
+        "statut": current_status,
+        "niveau_alerte": current_niveau,
+        "source_liste": current_source,
+        "client_reference": current_client_reference,
+        "date_from": current_date_from,
+        "date_to": current_date_to,
+    }
+
+    def sort_url(field: str) -> str:
+        next_dir = "desc" if (current_sort_by == field and current_sort_dir == "asc") else "asc"
+        query_params = {k: v for k, v in active_filters.items() if v}
+        query_params["sort_by"] = field
+        query_params["sort_dir"] = next_dir
+        return "/web/alerts?" + urlencode(query_params)
+
+    sort_links = {field: sort_url(field) for field in sort_columns}
+    sort_arrows = {
+        field: ("▲" if current_sort_dir == "asc" else "▼") if current_sort_by == field else ""
+        for field in sort_columns
+    }
 
     return templates.TemplateResponse(
         request=request,
@@ -564,7 +607,11 @@ def web_alerts(
             "client_reference": current_client_reference,
             "date_from": current_date_from,
             "date_to": current_date_to,
-            "message": message
+            "message": message,
+            "total_count": len(alerts),
+            "counts_by_niveau": counts_by_niveau,
+            "sort_links": sort_links,
+            "sort_arrows": sort_arrows,
         }
     )
 
@@ -601,6 +648,7 @@ def web_treat_alert_submit(
     statut: str = Form(...),
     treated_by: str = Form(...),
     treatment_comment: str = Form(...),
+    return_to: str = Form(None),
     db: Session = Depends(get_db),
 ):
     if not require_login(request):
@@ -645,8 +693,10 @@ def web_treat_alert_submit(
     )
     db.commit()
 
+    redirect_base = return_to if return_to and return_to.startswith("/web/") else "/web/alerts"
+
     return RedirectResponse(
-        url=f"/web/alerts?message=Alerte traitée avec succès : {new_status}",
+        url=f"{redirect_base}?message=Alerte traitée avec succès : {new_status}",
         status_code=303,
     )
 
@@ -1974,6 +2024,7 @@ def web_critical_alerts(
     request: Request,
     niveau_alerte: str | None = Query(None),
     statut: str | None = Query(None),
+    message: str | None = Query(None),
     db: Session = Depends(get_db)
 ):
     if not require_login(request):
@@ -2030,7 +2081,8 @@ def web_critical_alerts(
             "exact_count": exact_count,
             "probable_count": probable_count,
             "niveau_alerte": current_niveau,
-            "statut": current_status
+            "statut": current_status,
+            "message": message
         }
     )
 

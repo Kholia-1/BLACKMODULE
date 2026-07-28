@@ -90,9 +90,9 @@
 
         .filters-bar {
             display: flex;
-            gap: 10px;
+            gap: 14px;
             flex-wrap: wrap;
-            align-items: center;
+            align-items: flex-end;
             background: #F1F5F9;
             border: 1px solid #E2E8F0;
             border-radius: 10px;
@@ -102,6 +102,20 @@
 
         .filters-bar input, .filters-bar select {
             background: white;
+        }
+
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-field label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         input, select {
@@ -317,29 +331,43 @@
         </div>
 
         <form class="filters-bar" method="get" action="/web/sanctions">
-            <input type="text" name="q" placeholder="Nom, prénom, passeport..." value="{{ q or '' }}">
+            <div class="filter-field">
+                <label>Recherche</label>
+                <input type="text" name="q" placeholder="Nom, prénom, passeport..." value="{{ q or '' }}">
+            </div>
 
-            <select name="source_liste">
-                <option value="">Toutes les sources</option>
-                <option value="AFB_PPE" {% if source_liste == "AFB_PPE" %}selected{% endif %}>AFB_PPE</option>
-                <option value="OFAC_SDN" {% if source_liste == "OFAC_SDN" %}selected{% endif %}>OFAC_SDN</option>
-                <option value="OFAC_CONSOLIDATED" {% if source_liste == "OFAC_CONSOLIDATED" %}selected{% endif %}>OFAC_CONSOLIDATED</option>
-                <option value="ONU" {% if source_liste == "ONU" %}selected{% endif %}>ONU</option>
-                <option value="UE" {% if source_liste == "UE" %}selected{% endif %}>UE</option>
-                <option value="OFSI" {% if source_liste == "OFSI" %}selected{% endif %}>OFSI</option>
-                <option value="FR_GEL" {% if source_liste == "FR_GEL" %}selected{% endif %}>FR_GEL</option>
-                <option value="UKSL" {% if source_liste == "UKSL" %}selected{% endif %}>OFSI / UKSL</option>
-            </select>
+            <div class="filter-field">
+                <label>Source</label>
+                <select name="source_liste" onchange="this.form.submit()">
+                    <option value="">Toutes les sources</option>
+                    <option value="AFB_PPE" {% if source_liste == "AFB_PPE" %}selected{% endif %}>AFB_PPE</option>
+                    <option value="OFAC_SDN" {% if source_liste == "OFAC_SDN" %}selected{% endif %}>OFAC_SDN</option>
+                    <option value="OFAC_CONSOLIDATED" {% if source_liste == "OFAC_CONSOLIDATED" %}selected{% endif %}>OFAC_CONSOLIDATED</option>
+                    <option value="ONU" {% if source_liste == "ONU" %}selected{% endif %}>ONU</option>
+                    <option value="UE" {% if source_liste == "UE" %}selected{% endif %}>UE</option>
+                    <option value="OFSI" {% if source_liste == "OFSI" %}selected{% endif %}>OFSI</option>
+                    <option value="FR_GEL" {% if source_liste == "FR_GEL" %}selected{% endif %}>FR_GEL</option>
+                    <option value="UKSL" {% if source_liste == "UKSL" %}selected{% endif %}>OFSI / UKSL</option>
+                </select>
+            </div>
 
-            <select name="statut">
-                <option value="">Tous les statuts</option>
-                <option value="ACTIF" {% if statut == "ACTIF" %}selected{% endif %}>ACTIF</option>
-                <option value="SUPPRIME" {% if statut == "SUPPRIME" %}selected{% endif %}>SUPPRIME</option>
-                <option value="EN_REVISION" {% if statut == "EN_REVISION" %}selected{% endif %}>EN_REVISION</option>
-            </select>
+            <div class="filter-field">
+                <label>Statut</label>
+                <select name="statut" onchange="this.form.submit()">
+                    <option value="">Tous les statuts</option>
+                    <option value="ACTIF" {% if statut == "ACTIF" %}selected{% endif %}>ACTIF</option>
+                    <option value="SUPPRIME" {% if statut == "SUPPRIME" %}selected{% endif %}>SUPPRIME</option>
+                    <option value="EN_REVISION" {% if statut == "EN_REVISION" %}selected{% endif %}>EN_REVISION</option>
+                </select>
+            </div>
 
-            <button type="submit">Filtrer</button>
-            <a class="btn-secondary" href="/web/sanctions">Réinitialiser</a>
+            <div class="filter-field">
+                <label>&nbsp;</label>
+                <div style="display:flex; gap:8px;">
+                    <button type="submit">Filtrer</button>
+                    <a class="btn-secondary" href="/web/sanctions">Réinitialiser</a>
+                </div>
+            </div>
         </form>
 
         {% if sanctions and sanctions|length > 0 %}

@@ -53,16 +53,16 @@
         .grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 22px;
+            gap: 14px;
+            margin-bottom: 16px;
         }
 
         .card {
             background: white;
             border-radius: 12px;
-            padding: 20px;
+            padding: 18px;
             box-shadow: 0 1px 2px rgba(15,23,42,0.06);
-            margin-bottom: 22px;
+            margin-bottom: 16px;
         }
 
         .metric-title {
@@ -131,10 +131,24 @@
 
         form {
             display: flex;
-            gap: 10px;
-            align-items: center;
+            align-items: flex-end;
+            gap: 14px;
             flex-wrap: wrap;
-            margin-bottom: 20px;
+            margin: 14px 0 4px;
+        }
+
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-field label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         select, button, .btn-link, .btn-secondary {
@@ -220,6 +234,87 @@
             overflow-x: auto;
         }
 
+        .quick-action-form {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .quick-action-form select {
+            padding: 5px 6px;
+            border: 1px solid #CBD5E1;
+            border-radius: 6px;
+            font-size: 12px;
+            max-width: 110px;
+        }
+
+        .quick-action-form input[type="text"] {
+            padding: 5px 8px;
+            border: 1px solid #CBD5E1;
+            border-radius: 6px;
+            font-size: 12px;
+            width: 100px;
+        }
+
+        .quick-action-form button {
+            padding: 5px 10px;
+            border-radius: 6px;
+            background: #16A34A;
+            color: white;
+            border: 1px solid #16A34A;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .quick-action-form button:hover {
+            background: #15803D;
+        }
+
+        .message {
+            padding: 13px 16px;
+            border-radius: 10px;
+            background: #DCFCE7;
+            color: #166534;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 7px 12px;
+            border-radius: 8px;
+            background: #DC2626;
+            color: white;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .btn:hover {
+            background: #B91C1C;
+        }
+
+        .btn-outline {
+            display: inline-block;
+            padding: 6px 11px;
+            border-radius: 8px;
+            background: white;
+            color: #334155;
+            border: 1px solid #CBD5E1;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-outline:hover {
+            background: #F1F5F9;
+        }
+
+        .inline-fp-form {
+            display: inline;
+        }
+
         @media (max-width: 900px) {
             .grid {
                 grid-template-columns: 1fr;
@@ -256,6 +351,10 @@
 
 <div class="container">
 
+    {% if message %}
+        <div class="message">{{ message }}</div>
+    {% endif %}
+
     <div class="grid">
         <div class="card card-exacte">
             <div class="metric-title">Total alertes critiques</div>
@@ -274,33 +373,6 @@
     </div>
 
     <div class="card">
-        <h2>Filtres</h2>
-
-        <form method="get" action="/web/critical-alerts">
-            <select name="niveau_alerte">
-                <option value="">Tous les niveaux</option>
-                <option value="ALERTE_EXACTE" {% if niveau_alerte == "ALERTE_EXACTE" %}selected{% endif %}>
-                    ALERTE_EXACTE
-                </option>
-                <option value="ALERTE_PROBABLE" {% if niveau_alerte == "ALERTE_PROBABLE" %}selected{% endif %}>
-                    ALERTE_PROBABLE
-                </option>
-            </select>
-
-            <select name="statut">
-                <option value="">Tous les statuts actifs</option>
-                <option value="GENEREE" {% if statut == "GENEREE" %}selected{% endif %}>GENEREE</option>
-                <option value="EN_COURS" {% if statut == "EN_COURS" %}selected{% endif %}>EN_COURS</option>
-                <option value="ESCALADEE" {% if statut == "ESCALADEE" %}selected{% endif %}>ESCALADEE</option>
-                <option value="CONFIRMEE" {% if statut == "CONFIRMEE" %}selected{% endif %}>CONFIRMEE</option>
-            </select>
-
-            <button type="submit">Filtrer</button>
-            <a class="btn-secondary" href="/web/critical-alerts">Réinitialiser</a>
-        </form>
-    </div>
-
-    <div class="card">
         <div class="list-header">
             <div class="list-header-title">
                 <h2>Liste des alertes critiques</h2>
@@ -312,6 +384,34 @@
                 Exporter Excel
             </a>
         </div>
+
+        <form method="get" action="/web/critical-alerts">
+            <div class="filter-field">
+                <label>Niveau</label>
+                <select name="niveau_alerte" onchange="this.form.submit()">
+                    <option value="">Tous les niveaux</option>
+                    <option value="ALERTE_EXACTE" {% if niveau_alerte == "ALERTE_EXACTE" %}selected{% endif %}>
+                        ALERTE_EXACTE
+                    </option>
+                    <option value="ALERTE_PROBABLE" {% if niveau_alerte == "ALERTE_PROBABLE" %}selected{% endif %}>
+                        ALERTE_PROBABLE
+                    </option>
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label>Statut</label>
+                <select name="statut" onchange="this.form.submit()">
+                    <option value="">Tous les statuts actifs</option>
+                    <option value="GENEREE" {% if statut == "GENEREE" %}selected{% endif %}>GENEREE</option>
+                    <option value="EN_COURS" {% if statut == "EN_COURS" %}selected{% endif %}>EN_COURS</option>
+                    <option value="ESCALADEE" {% if statut == "ESCALADEE" %}selected{% endif %}>ESCALADEE</option>
+                    <option value="CONFIRMEE" {% if statut == "CONFIRMEE" %}selected{% endif %}>CONFIRMEE</option>
+                </select>
+            </div>
+
+            <a class="btn-secondary" href="/web/critical-alerts">Réinitialiser</a>
+        </form>
 
         <div class="table-wrapper">
             <table>
@@ -327,12 +427,15 @@
                         <th>Type matching</th>
                         <th>Action</th>
                         <th>Traitement</th>
+                        <th>Action rapide</th>
                     </tr>
                 </thead>
 
                 <tbody>
+                    {% set user = request.session.get("user") %}
+                    {% set current_display_name = (user.full_name if user and user.full_name else (user.username if user else "")) %}
                     {% for alert in alerts %}
-                    <tr>
+                    <tr id="alert-{{ alert.id }}">
                         <td>{{ alert.created_at.strftime('%Y-%m-%d %H:%M:%S') if alert.created_at else "-" }}</td>
                         <td>{{ alert.client_reference }}</td>
                         <td>
@@ -354,10 +457,29 @@
                         <td>
                             <a class="btn" href="/web/alerts/{{ alert.id }}/treat">Traiter</a>
                         </td>
+                        <td>
+                            {% if alert.statut in ["FAUX_POSITIF", "CLOTUREE"] %}
+                                <span class="badge badge-status">-</span>
+                            {% else %}
+                                <form method="post" action="/web/alerts/{{ alert.id }}/treat" class="quick-action-form" onsubmit="return confirm('Confirmer ce traitement rapide ?');">
+                                    <select name="statut" required>
+                                        <option value="EN_COURS" {% if alert.statut == "EN_COURS" %}selected{% endif %}>EN_COURS</option>
+                                        <option value="CONFIRMEE">CONFIRMEE</option>
+                                        <option value="FAUX_POSITIF">FAUX_POSITIF</option>
+                                        <option value="ESCALADEE">ESCALADEE</option>
+                                        <option value="CLOTUREE">CLOTUREE</option>
+                                    </select>
+                                    <input type="text" name="treatment_comment" placeholder="Motif..." required>
+                                    <input type="hidden" name="treated_by" value="{{ current_display_name }}">
+                                    <input type="hidden" name="return_to" value="/web/critical-alerts">
+                                    <button type="submit" title="Enregistrer">✓</button>
+                                </form>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="10">Aucune alerte critique active.</td>
+                        <td colspan="11">Aucune alerte critique active.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
