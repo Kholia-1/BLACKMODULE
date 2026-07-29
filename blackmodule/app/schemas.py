@@ -72,6 +72,12 @@ class AlertResponse(BaseModel):
     client_nom: Optional[str] = None
     client_prenom: Optional[str] = None
     client_date_naissance: Optional[date] = None
+    client_nationalite: Optional[str] = None
+    client_pays_residence: Optional[str] = None
+    client_ville_residence: Optional[str] = None
+    client_type_piece: Optional[str] = None
+    client_num_piece: Optional[str] = None
+    client_num_passeport: Optional[str] = None
 
     sanction_entry_id: Optional[UUID] = None
     source_liste: Optional[str] = None

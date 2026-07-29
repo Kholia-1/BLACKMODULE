@@ -108,6 +108,12 @@ class Alert(Base):
     client_nom = Column(String(255), nullable=True)
     client_prenom = Column(String(255), nullable=True)
     client_date_naissance = Column(Date, nullable=True)
+    client_nationalite = Column(String(100), nullable=True)
+    client_pays_residence = Column(String(100), nullable=True)
+    client_ville_residence = Column(String(150), nullable=True)
+    client_type_piece = Column(String(50), nullable=True)
+    client_num_piece = Column(String(100), nullable=True)
+    client_num_passeport = Column(String(100), nullable=True)
 
     sanction_entry_id = Column(
         UUID(as_uuid=True),

@@ -292,6 +292,8 @@ def external_check_client(
                     client_nom=payload.nom.upper(),
                     client_prenom=payload.prenom.upper() if payload.prenom else None,
                     client_date_naissance=parsed_date,
+                    client_nationalite=payload.nationalite.upper() if payload.nationalite else None,
+                    client_num_passeport=payload.num_passeport.upper() if payload.num_passeport else None,
                     sanction_entry_id=sanction.id,
                     source_liste=sanction.source_liste,
                     matching_score=final_score,

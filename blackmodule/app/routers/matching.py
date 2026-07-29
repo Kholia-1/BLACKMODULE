@@ -79,6 +79,8 @@ def check_client(
                 client_nom=client.nom.upper(),
                 client_prenom=client.prenom.upper() if client.prenom else None,
                 client_date_naissance=client.date_naissance,
+                client_nationalite=client.nationalite.upper() if client.nationalite else None,
+                client_num_passeport=client.num_passeport.upper() if client.num_passeport else None,
                 sanction_entry_id=sanction.id,
                 source_liste=sanction.source_liste,
                 matching_score=final_score,

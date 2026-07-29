@@ -42,6 +42,27 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 def startup():
     Base.metadata.create_all(bind=engine)
 
+    with engine.begin() as conn:
+        for column_def in [
+            "client_nationalite VARCHAR(100)",
+            "client_pays_residence VARCHAR(100)",
+            "client_ville_residence VARCHAR(150)",
+            "client_type_piece VARCHAR(50)",
+            "client_num_piece VARCHAR(100)",
+            "client_num_passeport VARCHAR(100)",
+        ]:
+            conn.execute(text(f"ALTER TABLE alerts ADD COLUMN IF NOT EXISTS {column_def}"))
+
+        for column_def in [
+            "lieu_naissance VARCHAR(255)",
+            "autres_documents TEXT",
+        ]:
+            conn.execute(text(f"ALTER TABLE sanction_entries ADD COLUMN IF NOT EXISTS {column_def}"))
+
+        conn.execute(text(
+            "ALTER TABLE sanction_entries ALTER COLUMN nationalite TYPE VARCHAR(255)"
+        ))
+
     db = SessionLocal()
     try:
         create_default_admin(db)

@@ -403,6 +403,12 @@ def check_client_submit(
                     client_nom=client.nom.upper(),
                     client_prenom=client.prenom.upper() if client.prenom else None,
                     client_date_naissance=client.date_naissance,
+                    client_nationalite=nationalite.upper() if nationalite else None,
+                    client_pays_residence=pays_residence.upper() if pays_residence else None,
+                    client_ville_residence=ville_residence.upper() if ville_residence else None,
+                    client_type_piece=type_piece.upper() if type_piece else None,
+                    client_num_piece=num_piece.upper() if num_piece else None,
+                    client_num_passeport=num_passeport.upper() if num_passeport else None,
                     sanction_entry_id=sanction.id,
                     source_liste=sanction.source_liste,
                     matching_score=final_score,
@@ -634,10 +640,28 @@ def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends
     if not alert:
         raise HTTPException(status_code=404, detail="Alerte introuvable")
 
+    sanction_entry = None
+    if alert.sanction_entry_id:
+        sanction_entry = db.query(SanctionEntry).options(
+            selectinload(SanctionEntry.aliases)
+        ).filter(SanctionEntry.id == alert.sanction_entry_id).first()
+
+    previous_alerts_count = db.query(Alert).filter(
+        Alert.client_reference == alert.client_reference,
+        Alert.id != alert.id
+    ).count() if alert.client_reference else 0
+
     return templates.TemplateResponse(
         request=request,
         name="treat_alert.html",
-        context={"request": request, "alert": alert},
+        context={
+            "request": request,
+            "alert": alert,
+            "sanction_entry": sanction_entry,
+            "client_age": calculate_age(alert.client_date_naissance),
+            "sanction_age": calculate_age(sanction_entry.date_naissance) if sanction_entry else None,
+            "previous_alerts_count": previous_alerts_count,
+        },
     )
 
 
