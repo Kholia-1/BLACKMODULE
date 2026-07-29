@@ -119,12 +119,23 @@ def parse_un_xml(file_content: bytes) -> list[dict]:
         if not nom:
             nom = full_name
 
-        # Nationalité
-        nationalite = None
-        nationality_node = individual.find(".//NATIONALITY/VALUE")
+        # Nationalité(s) : plusieurs valeurs sont parfois listées
+        nationalites_list = []
 
-        if nationality_node is not None and nationality_node.text:
-            nationalite = clean_text(nationality_node.text)
+        for nationality_value_node in individual.findall(".//NATIONALITY/VALUE"):
+            if nationality_value_node.text:
+                value = clean_text(nationality_value_node.text)
+                if value and value not in nationalites_list:
+                    nationalites_list.append(value)
+
+        nationalite = "; ".join(nationalites_list) if nationalites_list else None
+
+        # Pays de résidence : distinct de la nationalité, tiré de l'adresse si présente
+        pays_residence = None
+        address_country_node = individual.find(".//INDIVIDUAL_ADDRESS/COUNTRY")
+
+        if address_country_node is not None and address_country_node.text:
+            pays_residence = clean_text(address_country_node.text)
 
         # Date de naissance (certaines fiches ONU ne donnent que l'année)
         date_naissance = None
@@ -139,22 +150,41 @@ def parse_un_xml(file_content: bytes) -> list[dict]:
             if year_node is not None and year_node.text:
                 date_naissance = parse_date(year_node.text)
 
-        # Passeport : on ne retient que les documents explicitement de type passeport,
-        # sinon un numéro de carte d'identité nationale se retrouverait étiqueté passeport.
+        # Lieu de naissance (ville / état / pays selon ce qui est renseigné)
+        lieu_naissance_parts = []
+
+        for place_node in individual.findall(".//INDIVIDUAL_PLACE_OF_BIRTH"):
+            for field_name in ["CITY", "STATE_PROVINCE", "COUNTRY"]:
+                value = get_text_from_child(place_node, field_name)
+
+                if value and value not in lieu_naissance_parts:
+                    lieu_naissance_parts.append(value)
+
+        lieu_naissance = ", ".join(lieu_naissance_parts) if lieu_naissance_parts else None
+
+        # Passeport et autres pièces d'identité : on ne retient comme "passeport"
+        # que les documents explicitement de ce type, sinon une carte nationale
+        # d'identité se retrouverait étiquetée passeport.
         num_passeport = None
+        autres_documents_list = []
 
         for document_node in individual.findall(".//INDIVIDUAL_DOCUMENT"):
             doc_type = get_text_from_child(document_node, "TYPE_OF_DOCUMENT")
+            doc_number = get_text_from_child(document_node, "NUMBER")
+
+            if not doc_number:
+                continue
 
             if doc_type and any(
                 keyword in doc_type.lower()
                 for keyword in ["passport", "passeport", "pasaporte"]
             ):
-                doc_number = get_text_from_child(document_node, "NUMBER")
-
-                if doc_number:
+                if not num_passeport:
                     num_passeport = doc_number
-                    break
+            else:
+                autres_documents_list.append(f"{doc_type or 'DOCUMENT'} : {doc_number}")
+
+        autres_documents = "; ".join(autres_documents_list) if autres_documents_list else None
 
         # Alias
         aliases = []
@@ -193,9 +223,11 @@ def parse_un_xml(file_content: bytes) -> list[dict]:
             "prenom": prenom.upper() if prenom else None,
             "nom_complet": full_name.upper(),
             "date_naissance": date_naissance,
+            "lieu_naissance": lieu_naissance.upper() if lieu_naissance else None,
             "nationalite": nationalite.upper() if nationalite else None,
-            "pays": nationalite.upper() if nationalite else None,
+            "pays": pays_residence.upper() if pays_residence else (nationalite.upper() if nationalite else None),
             "num_passeport": num_passeport.upper() if num_passeport else None,
+            "autres_documents": autres_documents.upper() if autres_documents else None,
             "motif_sanction": motif_sanction,
             "date_inscription": date_inscription or date.today(),
             "date_suppression": None,

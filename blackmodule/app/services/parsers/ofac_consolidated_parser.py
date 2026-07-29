@@ -258,43 +258,64 @@ def extract_date_naissance(party):
 
 
 def extract_passport_or_document(party):
-    # On préfère un numéro explicitement de type passeport ; sinon on retombe
-    # sur un identifiant générique plutôt que de laisser le champ vide.
+    """
+    Renvoie (numero_passeport, autres_documents) : on ne garde comme "passeport"
+    que les identifiants explicitement typés passeport ; tout autre identifiant
+    (carte nationale, numéro fiscal, immatriculation...) est gardé à part pour
+    ne pas être étiqueté à tort comme un passeport.
+    """
     passport_values = get_texts_by_tag_contains(party, ["passport"])
-
-    if passport_values:
-        return passport_values[0]
+    num_passeport = passport_values[0] if passport_values else None
 
     fallback_values = get_texts_by_tag_contains(
         party,
         [
             "idnumber",
             "documentnumber",
-            "registrationnumber"
+            "registrationnumber",
+            "nationalidnumber",
+            "taxidnumber"
         ]
     )
 
-    if fallback_values:
-        return fallback_values[0]
+    autres = unique_values([v for v in fallback_values if v not in passport_values])
 
-    return None
+    return num_passeport, ("; ".join(autres) if autres else None)
 
 
-def extract_country(party):
+def extract_nationalites(party):
+    values = get_texts_by_tag_exact(
+        party,
+        [
+            "Nationality",
+            "Citizenship"
+        ]
+    )
+
+    return "; ".join(values) if values else None
+
+
+def extract_pays_residence(party):
     values = get_texts_by_tag_exact(
         party,
         [
             "Country",
-            "Nationality",
-            "Citizenship",
             "CountryDescription"
         ]
     )
 
-    if values:
-        return values[0]
+    return values[0] if values else None
 
-    return None
+
+def extract_lieu_naissance(party):
+    values = get_texts_by_tag_contains(
+        party,
+        [
+            "placeofbirth"
+        ]
+    )
+
+    return values[0] if values else None
 
 
 def extract_programs(party):
@@ -343,8 +364,10 @@ def parse_ofac_consolidated_xml(file_content: bytes) -> list[dict]:
 
         type_entite = extract_type_entite(party)
         date_naissance = extract_date_naissance(party)
-        num_passeport = extract_passport_or_document(party)
-        country = extract_country(party)
+        lieu_naissance = extract_lieu_naissance(party)
+        num_passeport, autres_documents = extract_passport_or_document(party)
+        nationalite = extract_nationalites(party)
+        pays_residence = extract_pays_residence(party)
         motif_sanction = extract_programs(party)
 
         # Pour le MVP, nom = nom_complet pour le format Advanced XML
@@ -375,9 +398,11 @@ def parse_ofac_consolidated_xml(file_content: bytes) -> list[dict]:
             "prenom": prenom.upper() if prenom else None,
             "nom_complet": nom_complet.upper(),
             "date_naissance": date_naissance,
-            "nationalite": country.upper() if country else None,
-            "pays": country.upper() if country else None,
+            "lieu_naissance": lieu_naissance.upper() if lieu_naissance else None,
+            "nationalite": nationalite.upper() if nationalite else None,
+            "pays": pays_residence.upper() if pays_residence else (nationalite.upper() if nationalite else None),
             "num_passeport": num_passeport.upper() if num_passeport else None,
+            "autres_documents": autres_documents.upper() if autres_documents else None,
             "motif_sanction": motif_sanction,
             "date_inscription": date.today(),
             "date_suppression": None,

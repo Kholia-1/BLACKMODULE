@@ -57,24 +57,43 @@ def first_child_attr(element, child_names, attr_names):
     return None
 
 
-def first_passport_number(element, child_names):
+def extract_identification_documents(element, child_names):
     """
     Les blocs identification/document de la liste UE couvrent tout type de pièce
-    (passeport, carte nationale, numéro fiscal...). On ne retient un numéro que
-    si son type est explicitement un passeport, sinon un numéro fiscal ou une
-    carte d'identité se retrouverait étiqueté à tort comme passeport.
+    (passeport, carte nationale, numéro fiscal...). Renvoie (numero_passeport,
+    autres_documents) : on ne retient comme passeport que les documents
+    explicitement typés comme tel, le reste est gardé à part pour ne pas être
+    étiqueté à tort comme un passeport.
     """
     child_names = [n.lower() for n in child_names]
+    num_passeport = None
+    autres = []
+
     for child in element.iter():
         if local_name(child.tag).lower() in child_names:
             type_code = attr(child, ["identificationTypeCode", "documentType", "type"])
             type_desc = attr(child, ["identificationTypeDescription", "documentTypeDescription"])
             combined = f"{type_code or ''} {type_desc or ''}".lower()
+            value = attr(child, ["number", "passportNumber", "documentNumber", "identificationNumber"])
+
+            if not value:
+                continue
+
             if "passport" in combined or "passeport" in combined:
-                value = attr(child, ["number", "passportNumber", "documentNumber", "identificationNumber"])
-                if value:
-                    return value
-    return None
+                if not num_passeport:
+                    num_passeport = value
+            else:
+                label = type_desc or type_code or "DOCUMENT"
+                autres.append(f"{label} : {value}")
+
+    unique_autres, seen = [], set()
+    for entry in autres:
+        key = entry.upper()
+        if key not in seen:
+            seen.add(key)
+            unique_autres.append(entry)
+
+    return num_passeport, ("; ".join(unique_autres) if unique_autres else None)
 
 
 def all_child_attrs(element, child_names, attr_names):
@@ -135,6 +154,9 @@ def parse_eu_csv(file_content: bytes) -> list[dict]:
         date_naissance = parse_date(row.get("date_naissance"))
         num_passeport = clean_text(row.get("num_passeport"))
         hash_signature = generate_hash_signature("UE", nom, prenom, date_naissance, num_passeport)
+        lieu_naissance = clean_text(row.get("lieu_naissance"))
+        autres_documents = clean_text(row.get("autres_documents"))
+
         entries.append({
             "source_liste": "UE",
             "type_entite": (clean_text(row.get("type_entite")) or "PERSONNE_PHYSIQUE").upper(),
@@ -142,9 +164,11 @@ def parse_eu_csv(file_content: bytes) -> list[dict]:
             "prenom": prenom.upper() if prenom else None,
             "nom_complet": nom_complet.upper() if nom_complet else nom.upper(),
             "date_naissance": date_naissance,
+            "lieu_naissance": lieu_naissance.upper() if lieu_naissance else None,
             "nationalite": clean_text(row.get("nationalite")).upper() if clean_text(row.get("nationalite")) else None,
             "pays": clean_text(row.get("pays")).upper() if clean_text(row.get("pays")) else None,
             "num_passeport": num_passeport.upper() if num_passeport else None,
+            "autres_documents": autres_documents.upper() if autres_documents else None,
             "motif_sanction": clean_text(row.get("motif_sanction")) or "UNION EUROPEENNE SANCTIONS",
             "date_inscription": parse_date(row.get("date_inscription")) or date.today(),
             "date_suppression": None,
@@ -209,9 +233,11 @@ def parse_eu_xml(file_content: bytes) -> list[dict]:
         if not date_naissance:
             date_naissance = parse_date(first_text(record, ["birthdate", "dateOfBirth", "birthDate", "dob"]))
 
-        nationalite = first_child_attr(record, ["citizenship"], ["countryDescription", "countryIso2Code", "country"]) or first_text(record, ["citizenship", "nationality"])
+        nationalite_values = all_child_attrs(record, ["citizenship"], ["countryDescription", "countryIso2Code", "country"])
+        nationalite = "; ".join(nationalite_values) if nationalite_values else first_text(record, ["citizenship", "nationality"])
         pays = first_child_attr(record, ["address"], ["countryDescription", "countryIso2Code", "country"]) or first_text(record, ["country", "countryDescription", "addressCountry"])
-        num_passeport = first_passport_number(record, ["identification", "document", "passport"])
+        lieu_naissance = first_child_attr(record, ["birthdate"], ["city", "place", "placeName"]) or first_text(record, ["placeOfBirth", "cityOfBirth", "birthPlace"])
+        num_passeport, autres_documents = extract_identification_documents(record, ["identification", "document", "passport"])
         motif_sanction = first_child_attr(record, ["regulation", "regulationSummary"], ["programme", "numberTitle", "publicationUrl"]) or first_text(record, ["regulationSummary", "programme", "program", "remark", "reason", "legalBasis"]) or "UNION EUROPEENNE"
         designation_date = attr(record, ["designationDate", "listedOn", "publicationDate"]) or first_child_attr(record, ["regulation"], ["entryIntoForceDate", "publicationDate"])
         date_inscription = parse_date(designation_date) or date.today()
@@ -228,9 +254,11 @@ def parse_eu_xml(file_content: bytes) -> list[dict]:
             "prenom": prenom.upper()[:150] if prenom else None,
             "nom_complet": nom_complet.upper()[:255],
             "date_naissance": date_naissance,
-            "nationalite": nationalite.upper()[:100] if nationalite else None,
+            "lieu_naissance": lieu_naissance.upper()[:255] if lieu_naissance else None,
+            "nationalite": nationalite.upper()[:255] if nationalite else None,
             "pays": pays.upper()[:100] if pays else None,
             "num_passeport": num_passeport.upper()[:100] if num_passeport else None,
+            "autres_documents": autres_documents.upper()[:1000] if autres_documents else None,
             "motif_sanction": motif_sanction[:500] if motif_sanction else "UNION EUROPEENNE",
             "date_inscription": date_inscription,
             "date_suppression": None,

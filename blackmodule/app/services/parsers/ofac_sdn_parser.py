@@ -183,7 +183,7 @@ def parse_ofac_sdn_xml(file_content: bytes) -> list[dict]:
             elif aka_first:
                 aliases.append(aka_first)
 
-        # Nationalité
+        # Nationalité(s) : une personne peut avoir plusieurs nationalités listées
         nationalite = None
         nationality_nodes = find_all(
             entry,
@@ -191,15 +191,37 @@ def parse_ofac_sdn_xml(file_content: bytes) -> list[dict]:
             namespace
         )
 
-        if nationality_nodes:
-            nationalite = find_text(
-                nationality_nodes[0],
+        nationalites_list = []
+        for nationality_node in nationality_nodes:
+            country_value = find_text(
+                nationality_node,
+                "ns:country" if namespace else "country",
+                namespace
+            )
+            if country_value and country_value not in nationalites_list:
+                nationalites_list.append(country_value)
+
+        if nationalites_list:
+            nationalite = "; ".join(nationalites_list)
+
+        # Pays de résidence : distinct de la nationalité, tiré du bloc adresse si présent
+        pays_residence = None
+        address_nodes = find_all(
+            entry,
+            ".//ns:address" if namespace else ".//address",
+            namespace
+        )
+
+        if address_nodes:
+            pays_residence = find_text(
+                address_nodes[0],
                 "ns:country" if namespace else "country",
                 namespace
             )
 
-        # Date de naissance
+        # Date et lieu de naissance
         date_naissance = None
+        lieu_naissance = None
         dob_nodes = find_all(
             entry,
             ".//ns:dateOfBirthItem" if namespace else ".//dateOfBirthItem",
@@ -214,8 +236,22 @@ def parse_ofac_sdn_xml(file_content: bytes) -> list[dict]:
             )
             date_naissance = parse_date(dob_value)
 
-        # Passeport
+        place_nodes = find_all(
+            entry,
+            ".//ns:placeOfBirthItem" if namespace else ".//placeOfBirthItem",
+            namespace
+        )
+
+        if place_nodes:
+            lieu_naissance = find_text(
+                place_nodes[0],
+                "ns:placeOfBirth" if namespace else "placeOfBirth",
+                namespace
+            )
+
+        # Passeport et autres pièces d'identité
         num_passeport = None
+        autres_documents_list = []
         id_nodes = find_all(
             entry,
             ".//ns:id" if namespace else ".//id",
@@ -226,9 +262,16 @@ def parse_ofac_sdn_xml(file_content: bytes) -> list[dict]:
             id_type = find_text(id_node, "ns:idType" if namespace else "idType", namespace)
             id_number = find_text(id_node, "ns:idNumber" if namespace else "idNumber", namespace)
 
-            if id_type and "passport" in id_type.lower() and id_number:
-                num_passeport = id_number
-                break
+            if not id_number:
+                continue
+
+            if id_type and "passport" in id_type.lower():
+                if not num_passeport:
+                    num_passeport = id_number
+            else:
+                autres_documents_list.append(f"{id_type or 'DOCUMENT'} : {id_number}")
+
+        autres_documents = "; ".join(autres_documents_list) if autres_documents_list else None
 
         hash_signature = generate_hash_signature(
             source_liste="OFAC_SDN",
@@ -245,9 +288,11 @@ def parse_ofac_sdn_xml(file_content: bytes) -> list[dict]:
             "prenom": prenom.upper() if prenom else None,
             "nom_complet": nom_complet.upper(),
             "date_naissance": date_naissance,
+            "lieu_naissance": lieu_naissance.upper() if lieu_naissance else None,
             "nationalite": nationalite.upper() if nationalite else None,
-            "pays": nationalite.upper() if nationalite else None,
+            "pays": pays_residence.upper() if pays_residence else (nationalite.upper() if nationalite else None),
             "num_passeport": num_passeport.upper() if num_passeport else None,
+            "autres_documents": autres_documents.upper() if autres_documents else None,
             "motif_sanction": motif_sanction,
             "date_inscription": None,
             "date_suppression": None,

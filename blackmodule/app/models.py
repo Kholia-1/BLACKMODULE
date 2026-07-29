@@ -31,10 +31,12 @@ class SanctionEntry(Base):
     nom_complet = Column(String(500), nullable=True)
 
     date_naissance = Column(Date, nullable=True)
-    nationalite = Column(String(100), nullable=True)
+    lieu_naissance = Column(String(255), nullable=True)
+    nationalite = Column(String(255), nullable=True)
     pays = Column(String(100), nullable=True)
 
     num_passeport = Column(String(100), nullable=True)
+    autres_documents = Column(Text, nullable=True)
     motif_sanction = Column(Text, nullable=True)
 
     date_inscription = Column(Date, nullable=True)

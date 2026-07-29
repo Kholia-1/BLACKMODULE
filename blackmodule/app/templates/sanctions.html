@@ -163,7 +163,7 @@
 
         table {
             width: 100%;
-            min-width: 1250px;
+            min-width: 1550px;
             border-collapse: collapse;
             background: white;
             font-size: 13.5px;
@@ -382,9 +382,11 @@
                             <th>Source</th>
                             <th>Type entité</th>
                             <th>Date naissance</th>
+                            <th>Lieu de naissance</th>
                             <th>Nationalité</th>
                             <th>Pays</th>
                             <th>Passeport</th>
+                            <th>Autres pièces d'identité</th>
                             <th>Statut</th>
                             <th>Date inscription</th>
                         </tr>
@@ -419,9 +421,11 @@
                                 {{ sanction.date_naissance.strftime('%Y-%m-%d') if sanction.date_naissance else "-" }}
                             </td>
 
+                            <td>{{ sanction.lieu_naissance if sanction.lieu_naissance else "-" }}</td>
                             <td>{{ sanction.nationalite if sanction.nationalite else "-" }}</td>
                             <td>{{ sanction.pays if sanction.pays else "-" }}</td>
                             <td>{{ sanction.num_passeport if sanction.num_passeport else "-" }}</td>
+                            <td>{{ sanction.autres_documents if sanction.autres_documents else "-" }}</td>
 
                             <td>
                                 {% if sanction.statut == "ACTIF" %}

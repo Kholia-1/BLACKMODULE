@@ -183,9 +183,11 @@ def parse_json_record(row):
 
     type_entite = detect_type_entite(row)
     date_naissance = parse_date(first_clean_value(row, ["date_naissance", "dateNaissance", "birthDate", "dateOfBirth"]))
+    lieu_naissance = first_clean_value(row, ["lieu_naissance", "lieuNaissance", "placeOfBirth", "villeNaissance"])
     nationalite = first_clean_value(row, ["nationalite", "nationality", "paysNationalite"])
     pays = first_clean_value(row, ["pays", "country", "paysResidence", "adressePays"])
     num_passeport = first_clean_value(row, ["num_passeport", "numPasseport", "passeport", "passport", "documentNumber", "numeroDocument", "identifiant"])
+    autres_documents = first_clean_value(row, ["autres_documents", "autresDocuments", "autrePiece", "carteIdentite", "numeroFiscal"])
     motif_sanction = first_clean_value(row, ["decision", "motif_sanction", "motifSanction", "motif", "fondement", "reference", "programme"]) or "FRANCE GEL DES AVOIRS"
     date_inscription = parse_date(first_clean_value(row, ["date_inscription", "dateInscription", "datePublication", "publicationDate", "listedOn"])) or date.today()
     date_suppression = parse_date(first_clean_value(row, ["date_suppression", "dateSuppression", "dateRadiation", "removedDate"]))
@@ -210,9 +212,11 @@ def parse_json_record(row):
         "prenom": prenom.upper()[:150] if prenom else None,
         "nom_complet": nom_complet.upper()[:255] if nom_complet else nom.upper()[:255],
         "date_naissance": date_naissance,
-        "nationalite": nationalite.upper()[:100] if nationalite else None,
+        "lieu_naissance": lieu_naissance.upper()[:255] if lieu_naissance else None,
+        "nationalite": nationalite.upper()[:255] if nationalite else None,
         "pays": pays.upper()[:100] if pays else None,
         "num_passeport": num_passeport.upper()[:100] if num_passeport else None,
+        "autres_documents": autres_documents.upper()[:1000] if autres_documents else None,
         "motif_sanction": motif_sanction[:500] if motif_sanction else "FRANCE GEL DES AVOIRS",
         "date_inscription": date_inscription,
         "date_suppression": date_suppression,
@@ -275,9 +279,11 @@ def parse_france_gel_xml(file_content: bytes) -> list[dict]:
             type_entite = "NAVIRE"
 
         date_naissance = parse_date(get_child_text(record, ["dateNaissance", "date_naissance", "birthDate", "dateOfBirth"]))
+        lieu_naissance = get_child_text(record, ["lieuNaissance", "lieu_naissance", "placeOfBirth", "villeNaissance"])
         nationalite = get_child_text(record, ["nationalite", "nationality"])
         pays = get_child_text(record, ["pays", "country"])
         num_passeport = get_child_text(record, ["numPasseport", "passeport", "passport", "documentNumber", "numeroDocument"])
+        autres_documents = get_child_text(record, ["autresDocuments", "autres_documents", "carteIdentite", "numeroFiscal"])
         motif_sanction = get_child_text(record, ["decision", "motif", "motifSanction", "fondement", "reference"]) or "FRANCE GEL DES AVOIRS"
         date_inscription = parse_date(get_child_text(record, ["dateInscription", "datePublication", "publicationDate", "listedOn"])) or date.today()
         date_suppression = parse_date(get_child_text(record, ["dateSuppression", "dateRadiation", "removedDate"]))
@@ -294,9 +300,11 @@ def parse_france_gel_xml(file_content: bytes) -> list[dict]:
             "prenom": prenom.upper()[:150] if prenom else None,
             "nom_complet": nom_complet.upper()[:255] if nom_complet else nom.upper()[:255],
             "date_naissance": date_naissance,
-            "nationalite": nationalite.upper()[:100] if nationalite else None,
+            "lieu_naissance": lieu_naissance.upper()[:255] if lieu_naissance else None,
+            "nationalite": nationalite.upper()[:255] if nationalite else None,
             "pays": pays.upper()[:100] if pays else None,
             "num_passeport": num_passeport.upper()[:100] if num_passeport else None,
+            "autres_documents": autres_documents.upper()[:1000] if autres_documents else None,
             "motif_sanction": motif_sanction[:500] if motif_sanction else "FRANCE GEL DES AVOIRS",
             "date_inscription": date_inscription,
             "date_suppression": date_suppression,

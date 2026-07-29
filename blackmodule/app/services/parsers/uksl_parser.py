@@ -179,14 +179,14 @@ def build_motif(row: dict):
 
 
 def build_passport(row: dict):
+    """
+    Ne garde que le passeport ; les autres pièces (carte d'identité nationale...)
+    sont gérées séparément par build_other_documents pour ne pas être
+    étiquetées à tort comme un passeport.
+    """
     values = []
 
-    for key in [
-        "Passport Number",
-        "Passport Details",
-        "National Identifier Number",
-        "National Identifier Details",
-    ]:
+    for key in ["Passport Number", "Passport Details"]:
         value = clean_value(row.get(key))
 
         if value:
@@ -201,6 +201,33 @@ def build_passport(row: dict):
         result = result[:100]
 
     return result
+
+
+def build_other_documents(row: dict):
+    parts = []
+
+    for key in [
+        "National Identifier Number",
+        "National Identifier Details",
+    ]:
+        value = clean_value(row.get(key))
+
+        if value:
+            parts.append(f"{key}: {value}")
+
+    return " / ".join(parts) if parts else None
+
+
+def build_lieu_naissance(row: dict):
+    parts = []
+
+    for key in ["Town of Birth", "Country of Birth"]:
+        value = clean_value(row.get(key))
+
+        if value and value not in parts:
+            parts.append(value)
+
+    return ", ".join(parts) if parts else None
 
 
 def generate_hash_signature(
@@ -354,7 +381,9 @@ def parse_uksl_csv(file_content: bytes):
             ]
         )
 
+        lieu_naissance = build_lieu_naissance(row)
         num_passeport = build_passport(row)
+        autres_documents = build_other_documents(row)
         motif_sanction = build_motif(row)
 
         statut = get_value(
@@ -373,9 +402,11 @@ def parse_uksl_csv(file_content: bytes):
             "prenom": prenom[:150] if prenom else None,
             "nom_complet": nom_complet[:255] if nom_complet else None,
             "date_naissance": date_naissance,
-            "nationalite": nationalite[:100].upper() if nationalite else None,
+            "lieu_naissance": lieu_naissance[:255].upper() if lieu_naissance else None,
+            "nationalite": nationalite[:255].upper() if nationalite else None,
             "pays": pays[:100].upper() if pays else None,
             "num_passeport": num_passeport,
+            "autres_documents": autres_documents[:1000].upper() if autres_documents else None,
             "motif_sanction": motif_sanction,
             "date_inscription": date_inscription,
             "date_suppression": None,

@@ -115,9 +115,11 @@ def parse_ofsi_csv(file_content: bytes) -> list[dict]:
         type_entite = clean_text(row.get("type_entite")) or "PERSONNE_PHYSIQUE"
 
         date_naissance = parse_date(row.get("date_naissance"))
+        lieu_naissance = clean_text(row.get("lieu_naissance"))
         nationalite = clean_text(row.get("nationalite"))
         pays = clean_text(row.get("pays"))
         num_passeport = clean_text(row.get("num_passeport"))
+        autres_documents = clean_text(row.get("autres_documents"))
         adresse = clean_text(row.get("adresse"))
 
         motif_sanction = clean_text(row.get("motif_sanction")) or "OFSI UK SANCTIONS"
@@ -164,9 +166,11 @@ def parse_ofsi_csv(file_content: bytes) -> list[dict]:
             "prenom": prenom.upper() if prenom else None,
             "nom_complet": nom_complet.upper(),
             "date_naissance": date_naissance,
+            "lieu_naissance": lieu_naissance.upper() if lieu_naissance else None,
             "nationalite": nationalite.upper() if nationalite else None,
             "pays": pays.upper() if pays else None,
             "num_passeport": num_passeport.upper() if num_passeport else None,
+            "autres_documents": autres_documents.upper() if autres_documents else None,
             "motif_sanction": motif_sanction,
             "date_inscription": date_inscription,
             "date_suppression": None,
@@ -223,9 +227,11 @@ def parse_ofsi_excel(file_content: bytes) -> list[dict]:
         type_entite = clean_text(row.get("type_entite")) or "PERSONNE_PHYSIQUE"
 
         date_naissance = parse_date(row.get("date_naissance"))
+        lieu_naissance = clean_text(row.get("lieu_naissance"))
         nationalite = clean_text(row.get("nationalite"))
         pays = clean_text(row.get("pays"))
         num_passeport = clean_text(row.get("num_passeport"))
+        autres_documents = clean_text(row.get("autres_documents"))
         adresse = clean_text(row.get("adresse"))
 
         motif_sanction = clean_text(row.get("motif_sanction")) or "OFSI UK SANCTIONS"
@@ -272,9 +278,11 @@ def parse_ofsi_excel(file_content: bytes) -> list[dict]:
             "prenom": prenom.upper() if prenom else None,
             "nom_complet": nom_complet.upper(),
             "date_naissance": date_naissance,
+            "lieu_naissance": lieu_naissance.upper() if lieu_naissance else None,
             "nationalite": nationalite.upper() if nationalite else None,
             "pays": pays.upper() if pays else None,
             "num_passeport": num_passeport.upper() if num_passeport else None,
+            "autres_documents": autres_documents.upper() if autres_documents else None,
             "motif_sanction": motif_sanction,
             "date_inscription": date_inscription,
             "date_suppression": None,
