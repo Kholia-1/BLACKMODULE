@@ -9,6 +9,7 @@ from app.services.matching_service import (
     calculate_name_scores_batch,
     classify_alert
 )
+from app.services.matching_settings_service import get_or_create_matching_settings
 from app.services.audit_service import write_audit_log
 from app.services.api_auth import require_roles
 
@@ -26,6 +27,7 @@ def check_client(
     user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR", "OPERATEUR"))
 ):
     client_full_name = build_full_name(client.prenom, client.nom)
+    settings = get_or_create_matching_settings(db)
 
     sanctions = db.query(SanctionEntry).filter(
         SanctionEntry.statut == "ACTIF"
@@ -59,9 +61,14 @@ def check_client(
                 final_score = max(final_score, 95.0)
                 matching_type = "NAME_AND_BIRTHDATE"
 
-        niveau_alerte, action_recommandee = classify_alert(final_score)
+        niveau_alerte, action_recommandee = classify_alert(
+            final_score,
+            exact_threshold=settings.exact_threshold,
+            probable_threshold=settings.probable_threshold,
+            possible_threshold=settings.possible_threshold
+        )
 
-        if final_score >= 60:
+        if final_score >= settings.possible_threshold:
             match_result = MatchResult(
                 sanction_id=sanction.id,
                 source_liste=sanction.source_liste,
