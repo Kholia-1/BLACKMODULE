@@ -17,3 +17,11 @@ BLACKMODULE_API_KEY = os.getenv("BLACKMODULE_API_KEY")
 
 if BLACKMODULE_API_KEY is None:
     raise ValueError("BLACKMODULE_API_KEY n'est pas défini dans le fichier .env")
+
+# Utilisé uniquement lors de l'initialisation d'une base vide. Il ne doit
+# jamais avoir de valeur par défaut dans le code ou dans les fichiers d'exemple.
+INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD")
+
+# En développement local HTTP peut être pratique ; en production cette valeur
+# doit impérativement être définie à true.
+SESSION_HTTPS_ONLY = os.getenv("SESSION_HTTPS_ONLY", "false").lower() == "true"

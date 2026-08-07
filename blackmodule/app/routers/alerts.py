@@ -60,7 +60,7 @@ def get_critical_notifications(
 
     query = db.query(Alert).filter(
         Alert.niveau_alerte.in_(["ALERTE_EXACTE", "ALERTE_PROBABLE"]),
-        Alert.statut.in_(["GENEREE", "EN_COURS", "ESCALADEE", "CONFIRMEE"])
+        Alert.statut.in_(["GENEREE", "EN_COURS", "ESCALADEE"])
     )
 
     total = query.count()

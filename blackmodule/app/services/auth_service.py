@@ -43,7 +43,7 @@ def authenticate_user(
     return user
 
 
-def create_default_admin(db: Session):
+def create_default_admin(db: Session, initial_password: str | None = None):
     existing_admin = db.query(User).filter(
         User.username == "admin"
     ).first()
@@ -51,11 +51,16 @@ def create_default_admin(db: Session):
     if existing_admin:
         return existing_admin
 
+    if not initial_password:
+        raise RuntimeError(
+            "INITIAL_ADMIN_PASSWORD doit être défini pour initialiser une base vide."
+        )
+
     admin = User(
         username="admin",
         full_name="Administrateur BLACKMODULE",
         email="admin@blackmodule.local",
-        password_hash=hash_password("admin"),
+        password_hash=hash_password(initial_password),
         role="ADMIN",
         statut="ACTIF"
     )

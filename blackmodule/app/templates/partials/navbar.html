@@ -1537,3 +1537,15 @@
 })();
 </script>
 {% endif %}
+<script>
+document.addEventListener('submit', function (event) {
+    const form = event.target;
+    if (form.method.toLowerCase() !== 'post' || form.querySelector('input[name="csrf_token"]')) return;
+
+    const token = document.createElement('input');
+    token.type = 'hidden';
+    token.name = 'csrf_token';
+    token.value = {{ csrf_token(request) | tojson }};
+    form.appendChild(token);
+});
+</script>

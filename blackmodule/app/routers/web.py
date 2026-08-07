@@ -38,6 +38,7 @@ from app.services.list_update_service import (
     auto_update_uksl_csv
 )
 from app.scheduler import get_scheduler_status
+from app.security import get_csrf_token
 from app.services.matching_settings_service import (
     get_or_create_matching_settings,
     update_matching_settings
@@ -45,6 +46,7 @@ from app.services.matching_settings_service import (
 
 router = APIRouter(prefix="/web", tags=["Web Interface"])
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["csrf_token"] = get_csrf_token
 
 
 def require_login(request: Request) -> bool:
@@ -2063,7 +2065,7 @@ def web_critical_alerts(
         )
         return forbidden_page(request)
 
-    query = db.query(Alert).filter(
+    base_query = db.query(Alert).filter(
         Alert.niveau_alerte.in_(["ALERTE_EXACTE", "ALERTE_PROBABLE"]),
         Alert.statut.in_(["GENEREE", "EN_COURS", "ESCALADEE", "CONFIRMEE"])
     )
@@ -2073,17 +2075,28 @@ def web_critical_alerts(
 
     if niveau_alerte:
         current_niveau = niveau_alerte.strip().upper()
-        query = query.filter(Alert.niveau_alerte == current_niveau)
+        base_query = base_query.filter(Alert.niveau_alerte == current_niveau)
 
     if statut:
         current_status = statut.strip().upper()
-        query = query.filter(Alert.statut == current_status)
+        critical_alerts = base_query.filter(
+            Alert.statut == current_status
+        ).order_by(Alert.created_at.desc()).all()
+        actionable_alerts = critical_alerts if current_status != "CONFIRMEE" else []
+        confirmed_alerts = critical_alerts if current_status == "CONFIRMEE" else []
+    else:
+        actionable_alerts = base_query.filter(
+            Alert.statut.in_(["GENEREE", "EN_COURS", "ESCALADEE"])
+        ).order_by(Alert.created_at.desc()).all()
+        confirmed_alerts = base_query.filter(
+            Alert.statut == "CONFIRMEE"
+        ).order_by(Alert.created_at.desc()).all()
 
-    critical_alerts = query.order_by(
-        Alert.created_at.desc()
-    ).all()
+    critical_alerts = actionable_alerts + confirmed_alerts
 
     total_critical = len(critical_alerts)
+    actionable_total = len(actionable_alerts)
+    confirmed_total = len(confirmed_alerts)
 
     exact_count = sum(
         1 for alert in critical_alerts
@@ -2102,6 +2115,8 @@ def web_critical_alerts(
             "request": request,
             "alerts": critical_alerts,
             "total_critical": total_critical,
+            "actionable_total": actionable_total,
+            "confirmed_total": confirmed_total,
             "exact_count": exact_count,
             "probable_count": probable_count,
             "niveau_alerte": current_niveau,

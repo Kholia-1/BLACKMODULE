@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.config import SECRET_KEY
+from app.config import INITIAL_ADMIN_PASSWORD, SECRET_KEY, SESSION_HTTPS_ONLY
 from app.database import Base, engine, get_db, SessionLocal
 from app import models
 from app.services.auth_service import create_default_admin
+from app.security import CSRFMiddleware
 
 from app.routers import sanctions
 from app.routers import matching
@@ -30,9 +31,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.add_middleware(CSRFMiddleware)
 app.add_middleware(
     SessionMiddleware,
-    secret_key=SECRET_KEY
+    secret_key=SECRET_KEY,
+    same_site="lax",
+    https_only=SESSION_HTTPS_ONLY,
 )
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -65,7 +69,7 @@ def startup():
 
     db = SessionLocal()
     try:
-        create_default_admin(db)
+        create_default_admin(db, INITIAL_ADMIN_PASSWORD)
     finally:
         db.close()
 

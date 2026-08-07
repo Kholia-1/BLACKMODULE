@@ -164,6 +164,7 @@
         {% endif %}
 
         <form method="post" action="/web/login">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
             <label>Nom d'utilisateur</label>
             <input type="text" name="username" required>
 
