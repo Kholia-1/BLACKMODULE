@@ -2,16 +2,17 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import SanctionEntry, Alert
+from app.models import Alert
 from app.schemas import ClientCheckRequest, ClientCheckResponse, MatchResult
 from app.services.matching_service import (
     build_full_name,
-    calculate_name_scores_batch,
-    classify_alert
+    classify_alert,
+    select_matching_candidates,
 )
 from app.services.matching_settings_service import get_or_create_matching_settings
 from app.services.audit_service import write_audit_log
 from app.services.api_auth import require_roles
+from app.services.performance import log_slow_operation, performance_timer
 
 
 router = APIRouter(
@@ -26,18 +27,13 @@ def check_client(
     db: Session = Depends(get_db),
     user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR", "OPERATEUR"))
 ):
+    started_at = performance_timer()
     client_full_name = build_full_name(client.prenom, client.nom)
     settings = get_or_create_matching_settings(db)
 
-    sanctions = db.query(SanctionEntry).filter(
-        SanctionEntry.statut == "ACTIF"
-    ).all()
-
-    listed_names = [
-        sanction.nom_complet or build_full_name(sanction.prenom, sanction.nom)
-        for sanction in sanctions
-    ]
-    name_scores = calculate_name_scores_batch(client_full_name, listed_names)
+    candidates = select_matching_candidates(
+        db, client_full_name, client.num_passeport
+    )
 
     matches = []
     highest_score = 0.0
@@ -45,7 +41,7 @@ def check_client(
     global_action = "OPERATION_AUTORISEE"
     generated_alerts_count = 0
 
-    for sanction, listed_name, name_score in zip(sanctions, listed_names, name_scores):
+    for sanction, listed_name, name_score in candidates:
         final_score = name_score
         matching_type = "FUZZY_NAME"
 
@@ -122,6 +118,13 @@ def check_client(
     )
 
     db.commit()
+
+    log_slow_operation(
+        "api_matching_check_client",
+        started_at,
+        result_count=len(matches),
+        candidate_count=len(candidates),
+    )
 
     return ClientCheckResponse(
         client_reference=client.client_reference,

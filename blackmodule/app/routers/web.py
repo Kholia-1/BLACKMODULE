@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import SanctionEntry, Alert, AuditLog, ImportBatch, User, MatchingSetting
+from app.models import SanctionEntry, SanctionAlias, Alert, AuditLog, ImportBatch, User, MatchingSetting
 from app.schemas import ClientCheckRequest
 from app.services.auth_service import authenticate_user, hash_password, verify_password
-from app.services.matching_service import build_full_name, calculate_name_scores_batch, classify_alert
+from app.services.matching_service import build_full_name, classify_alert, select_matching_candidates
 from app.services.audit_service import write_audit_log
 from app.services.import_service import (
     import_afb_ppe_csv,
@@ -39,6 +39,7 @@ from app.services.list_update_service import (
 )
 from app.scheduler import get_scheduler_status
 from app.security import get_csrf_token
+from app.services.performance import log_slow_operation, performance_timer
 from app.services.matching_settings_service import (
     get_or_create_matching_settings,
     update_matching_settings
@@ -274,6 +275,7 @@ def check_client_submit(
     num_passeport: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
+    started_at = performance_timer()
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
@@ -330,15 +332,9 @@ def check_client_submit(
 
     client_full_name = build_full_name(client.prenom, client.nom)
 
-    sanctions = db.query(SanctionEntry).filter(
-        SanctionEntry.statut == "ACTIF"
-    ).all()
-
-    listed_names = [
-        sanction.nom_complet or build_full_name(sanction.prenom, sanction.nom)
-        for sanction in sanctions
-    ]
-    name_scores = calculate_name_scores_batch(client_full_name, listed_names)
+    candidates = select_matching_candidates(
+        db, client_full_name, client.num_passeport
+    )
 
     matches = []
     highest_score = 0.0
@@ -347,7 +343,17 @@ def check_client_submit(
     generated_alerts_count = 0
     existing_alerts_count = 0
 
-    for sanction, listed_name, name_score in zip(sanctions, listed_names, name_scores):
+    active_alert_keys = set()
+    if candidates:
+        active_alert_keys = set(db.query(
+            Alert.sanction_entry_id, Alert.matching_type
+        ).filter(
+            Alert.client_reference == client.client_reference,
+            Alert.sanction_entry_id.in_([entry.id for entry, _, _ in candidates]),
+            Alert.statut.in_(["GENEREE", "EN_COURS", "ESCALADEE", "CONFIRMEE"]),
+        ).all())
+
+    for sanction, listed_name, name_score in candidates:
         final_score = name_score
         matching_type = "FUZZY_NAME"
 
@@ -392,14 +398,7 @@ def check_client_submit(
             })
 
             # Prévention des alertes doublons
-            existing_alert = db.query(Alert).filter(
-                Alert.client_reference == client.client_reference,
-                Alert.sanction_entry_id == sanction.id,
-                Alert.matching_type == matching_type,
-                Alert.statut.in_(["GENEREE", "EN_COURS", "ESCALADEE", "CONFIRMEE"])
-            ).first()
-
-            if not existing_alert:
+            if (sanction.id, matching_type) not in active_alert_keys:
                 alert = Alert(
                     client_reference=client.client_reference,
                     client_nom=client.nom.upper(),
@@ -451,6 +450,13 @@ def check_client_submit(
     )
 
     db.commit()
+
+    log_slow_operation(
+        "web_matching_check_client",
+        started_at,
+        result_count=len(matches),
+        candidate_count=len(candidates),
+    )
 
     result = {
         "client_reference": client.client_reference,
@@ -1072,6 +1078,7 @@ def web_sanctions(
     page: int = Query(1, ge=1),
     db: Session = Depends(get_db),
 ):
+    started_at = performance_timer()
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
@@ -1084,6 +1091,7 @@ def web_sanctions(
             SanctionEntry.prenom.ilike(search_value),
             SanctionEntry.nom_complet.ilike(search_value),
             SanctionEntry.num_passeport.ilike(search_value),
+            SanctionEntry.aliases.any(SanctionAlias.alias.ilike(search_value)),
         ))
 
     if source_liste:
@@ -1102,6 +1110,12 @@ def web_sanctions(
         .offset((page - 1) * SANCTIONS_PAGE_SIZE)
         .limit(SANCTIONS_PAGE_SIZE)
         .all()
+    )
+
+    log_slow_operation(
+        "web_sanctions",
+        started_at,
+        result_count=len(sanctions),
     )
 
     return templates.TemplateResponse(

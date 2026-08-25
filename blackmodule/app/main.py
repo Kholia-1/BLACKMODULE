@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -92,6 +92,20 @@ def home():
         "message": "BLACKMODULE API is running",
         "status": "OK"
     }
+
+
+@app.get("/health/live")
+def health_live():
+    return {"status": "OK"}
+
+
+@app.get("/health/ready")
+def health_ready(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1")).scalar()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    return {"status": "OK", "database": "ready"}
 
 
 @app.get("/db-check")

@@ -6,15 +6,16 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import SanctionEntry, Alert
+from app.models import Alert
 from app.services.audit_service import write_audit_log
 from app.services.matching_service import (
     build_full_name,
-    calculate_name_scores_batch,
-    classify_alert
+    classify_alert,
+    select_matching_candidates,
 )
 from app.services.matching_settings_service import get_or_create_matching_settings
 from app.config import BLACKMODULE_API_KEY
+from app.services.performance import log_slow_operation, performance_timer
 
 
 router = APIRouter(
@@ -207,6 +208,7 @@ def external_check_client(
     db: Session = Depends(get_db),
     authorized: bool = Depends(verify_api_key)
 ):
+    started_at = performance_timer()
     parsed_date = None
 
     if payload.date_naissance:
@@ -230,15 +232,9 @@ def external_check_client(
 
     settings = get_or_create_matching_settings(db)
 
-    sanctions = db.query(SanctionEntry).filter(
-        SanctionEntry.statut == "ACTIF"
-    ).all()
-
-    listed_names = [
-        sanction.nom_complet or build_full_name(sanction.prenom, sanction.nom)
-        for sanction in sanctions
-    ]
-    name_scores = calculate_name_scores_batch(client_full_name, listed_names)
+    candidates = select_matching_candidates(
+        db, client_full_name, payload.num_passeport
+    )
 
     matches = []
     highest_score = 0.0
@@ -247,7 +243,17 @@ def external_check_client(
     generated_alerts_count = 0
     existing_alerts_count = 0
 
-    for sanction, listed_name, name_score in zip(sanctions, listed_names, name_scores):
+    active_alert_keys = set()
+    if candidates:
+        active_alert_keys = set(db.query(
+            Alert.sanction_entry_id, Alert.matching_type
+        ).filter(
+            Alert.client_reference == client_reference,
+            Alert.sanction_entry_id.in_([entry.id for entry, _, _ in candidates]),
+            Alert.statut.in_(["GENEREE", "EN_COURS", "ESCALADEE", "CONFIRMEE"]),
+        ).all())
+
+    for sanction, listed_name, name_score in candidates:
         final_score = name_score
         matching_type = "FUZZY_NAME"
 
@@ -279,14 +285,7 @@ def external_check_client(
                 "action_recommandee": action_recommandee
             })
 
-            existing_alert = db.query(Alert).filter(
-                Alert.client_reference == client_reference,
-                Alert.sanction_entry_id == sanction.id,
-                Alert.matching_type == matching_type,
-                Alert.statut.in_(["GENEREE", "EN_COURS", "ESCALADEE", "CONFIRMEE"])
-            ).first()
-
-            if not existing_alert:
+            if (sanction.id, matching_type) not in active_alert_keys:
                 alert = Alert(
                     client_reference=client_reference,
                     client_nom=payload.nom.upper(),
@@ -331,6 +330,13 @@ def external_check_client(
     )
 
     db.commit()
+
+    log_slow_operation(
+        "external_api_matching_check_client",
+        started_at,
+        result_count=len(matches),
+        candidate_count=len(candidates),
+    )
 
     return {
         "success": True,

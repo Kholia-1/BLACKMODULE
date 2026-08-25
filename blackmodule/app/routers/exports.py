@@ -1,10 +1,14 @@
-from io import BytesIO
+import os
+import tempfile
 from datetime import datetime
+from io import BytesIO
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from fastapi.responses import FileResponse, StreamingResponse
+from sqlalchemy.orm import Session, selectinload
+from starlette.background import BackgroundTask
 from openpyxl import Workbook
+from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import Font, PatternFill, Alignment
 
 from app.database import get_db
@@ -12,12 +16,55 @@ from sqlalchemy import func
 from app.models import Alert, SanctionEntry, AuditLog, MatchingSetting
 from app.services.audit_service import write_audit_log
 from app.services.api_auth import get_session_user, require_roles
+from app.services.performance import log_slow_operation, performance_timer
 
 
 router = APIRouter(
     prefix="/api/exports",
     tags=["Exports"]
 )
+
+
+def _write_only_sheet(workbook: Workbook, title: str, headers: list[str]):
+    sheet = workbook.create_sheet(title)
+    header_fill = PatternFill("solid", fgColor="111827")
+    header_font = Font(color="FFFFFF", bold=True)
+    header_cells = []
+    for header in headers:
+        cell = WriteOnlyCell(sheet, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+        header_cells.append(cell)
+    sheet.append(header_cells)
+    return sheet
+
+
+def _temporary_excel_response(
+    workbook: Workbook,
+    filename: str,
+    *,
+    operation: str | None = None,
+    started_at: float | None = None,
+    result_count: int | None = None,
+) -> FileResponse:
+    temporary_file = tempfile.NamedTemporaryFile(
+        prefix="blackmodule_", suffix=".xlsx", delete=False
+    )
+    temporary_file.close()
+    try:
+        workbook.save(temporary_file.name)
+    except Exception:
+        os.unlink(temporary_file.name)
+        raise
+    if operation and started_at is not None:
+        log_slow_operation(operation, started_at, result_count=result_count)
+    return FileResponse(
+        temporary_file.name,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=filename,
+        background=BackgroundTask(os.unlink, temporary_file.name),
+    )
 
 
 @router.get("/alerts-excel")
@@ -32,6 +79,7 @@ def export_alerts_excel(
     db: Session = Depends(get_db),
     user: dict = Depends(get_session_user)
 ):
+    started_at = performance_timer()
     query = db.query(Alert)
     if critical_only == 1:
         query = query.filter(
@@ -70,11 +118,10 @@ def export_alerts_excel(
         except ValueError:
             pass
 
-    alerts = query.order_by(Alert.created_at.desc()).all()
+    exported_count = query.count()
+    alerts = query.order_by(Alert.created_at.desc()).yield_per(500)
 
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Alertes BLACKMODULE"
+    workbook = Workbook(write_only=True)
 
     headers = [
         "Référence client",
@@ -93,15 +140,7 @@ def export_alerts_excel(
         "Date traitement"
     ]
 
-    sheet.append(headers)
-
-    header_fill = PatternFill("solid", fgColor="111827")
-    header_font = Font(color="FFFFFF", bold=True)
-
-    for cell in sheet[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center")
+    sheet = _write_only_sheet(workbook, "Alertes BLACKMODULE", headers)
 
     for alert in alerts:
         sheet.append([
@@ -121,16 +160,6 @@ def export_alerts_excel(
             alert.treated_at.strftime("%Y-%m-%d %H:%M:%S") if alert.treated_at else ""
         ])
 
-    for column_cells in sheet.columns:
-        max_length = 0
-        column_letter = column_cells[0].column_letter
-
-        for cell in column_cells:
-            if cell.value:
-                max_length = max(max_length, len(str(cell.value)))
-
-        sheet.column_dimensions[column_letter].width = min(max_length + 3, 45)
-
     filter_description = (
         f"Filtres appliqués - "
         f"Statut: {statut or 'Tous'}, "
@@ -149,7 +178,7 @@ def export_alerts_excel(
         entity_id=None,
         description=(
             f"Export Excel des alertes généré. "
-            f"Nombre d'alertes exportées : {len(alerts)}. "
+            f"Nombre d'alertes exportées : {exported_count}. "
             f"{filter_description}"
         ),
         ip_address=None
@@ -157,18 +186,13 @@ def export_alerts_excel(
 
     db.commit()
 
-    output = BytesIO()
-    workbook.save(output)
-    output.seek(0)
-
     filename = f"blackmodule_alertes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": f"attachment; filename={filename}"
-        }
+    return _temporary_excel_response(
+        workbook,
+        filename,
+        operation="export_alerts_excel",
+        started_at=started_at,
+        result_count=exported_count,
     )
 
 @router.get("/sanctions-excel")
@@ -176,13 +200,12 @@ def export_sanctions_excel(
     db: Session = Depends(get_db),
     user: dict = Depends(get_session_user)
 ):
-    sanctions = db.query(SanctionEntry).order_by(
-        SanctionEntry.created_at.desc()
-    ).all()
+    started_at = performance_timer()
+    sanctions = db.query(SanctionEntry).options(
+        selectinload(SanctionEntry.aliases)
+    ).order_by(SanctionEntry.created_at.desc()).yield_per(500)
 
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Sanctions BLACKMODULE"
+    workbook = Workbook(write_only=True)
 
     headers = [
         "Source liste",
@@ -204,16 +227,9 @@ def export_sanctions_excel(
         "Date création"
     ]
 
-    sheet.append(headers)
+    sheet = _write_only_sheet(workbook, "Sanctions BLACKMODULE", headers)
 
-    header_fill = PatternFill("solid", fgColor="111827")
-    header_font = Font(color="FFFFFF", bold=True)
-
-    for cell in sheet[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center")
-
+    exported_count = 0
     for sanction in sanctions:
         aliases = ""
 
@@ -242,16 +258,7 @@ def export_sanctions_excel(
             sanction.statut,
             sanction.created_at.strftime("%Y-%m-%d %H:%M:%S") if sanction.created_at else ""
         ])
-
-    for column_cells in sheet.columns:
-        max_length = 0
-        column_letter = column_cells[0].column_letter
-
-        for cell in column_cells:
-            if cell.value:
-                max_length = max(max_length, len(str(cell.value)))
-
-        sheet.column_dimensions[column_letter].width = min(max_length + 3, 50)
+        exported_count += 1
 
     write_audit_log(
         db=db,
@@ -259,24 +266,19 @@ def export_sanctions_excel(
         action="EXPORT_SANCTIONS_EXCEL",
         entity_type="SanctionEntry",
         entity_id=None,
-        description=f"Export Excel des sanctions/PPE généré. Nombre d'entrées exportées : {len(sanctions)}.",
+        description=f"Export Excel des sanctions/PPE généré. Nombre d'entrées exportées : {exported_count}.",
         ip_address=None
     )
 
     db.commit()
 
-    output = BytesIO()
-    workbook.save(output)
-    output.seek(0)
-
     filename = f"blackmodule_sanctions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": f"attachment; filename={filename}"
-        }
+    return _temporary_excel_response(
+        workbook,
+        filename,
+        operation="export_sanctions_excel",
+        started_at=started_at,
+        result_count=exported_count,
     )
 
 @router.get("/audit-logs-excel")
@@ -289,6 +291,7 @@ def export_audit_logs_excel(
     db: Session = Depends(get_db),
     user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR"))
 ):
+    started_at = performance_timer()
     query = db.query(AuditLog)
 
     if action:
@@ -320,11 +323,9 @@ def export_audit_logs_excel(
 
     logs = query.order_by(
         AuditLog.created_at.desc()
-    ).limit(5000).all()
+    ).limit(5000).yield_per(500)
 
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Audit Logs BLACKMODULE"
+    workbook = Workbook(write_only=True)
 
     headers = [
         "Date",
@@ -336,16 +337,9 @@ def export_audit_logs_excel(
         "Adresse IP"
     ]
 
-    sheet.append(headers)
+    sheet = _write_only_sheet(workbook, "Audit Logs BLACKMODULE", headers)
 
-    header_fill = PatternFill("solid", fgColor="111827")
-    header_font = Font(color="FFFFFF", bold=True)
-
-    for cell in sheet[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center")
-
+    exported_count = 0
     for log in logs:
         sheet.append([
             log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "",
@@ -356,16 +350,7 @@ def export_audit_logs_excel(
             log.description or "",
             log.ip_address or ""
         ])
-
-    for column_cells in sheet.columns:
-        max_length = 0
-        column_letter = column_cells[0].column_letter
-
-        for cell in column_cells:
-            if cell.value:
-                max_length = max(max_length, len(str(cell.value)))
-
-        sheet.column_dimensions[column_letter].width = min(max_length + 3, 70)
+        exported_count += 1
 
     filter_description = (
         f"Filtres appliqués - "
@@ -384,7 +369,7 @@ def export_audit_logs_excel(
         entity_id=None,
         description=(
             f"Export Excel du journal d'audit généré. "
-            f"Nombre de lignes exportées : {len(logs)}. "
+            f"Nombre de lignes exportées : {exported_count}. "
             f"{filter_description}"
         ),
         ip_address=None
@@ -392,18 +377,13 @@ def export_audit_logs_excel(
 
     db.commit()
 
-    output = BytesIO()
-    workbook.save(output)
-    output.seek(0)
-
     filename = f"blackmodule_audit_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": f"attachment; filename={filename}"
-        }
+    return _temporary_excel_response(
+        workbook,
+        filename,
+        operation="export_audit_logs_excel",
+        started_at=started_at,
+        result_count=exported_count,
     )
 
 @router.get("/data-quality-excel")
