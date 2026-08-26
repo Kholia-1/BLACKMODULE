@@ -30,7 +30,8 @@ def update_matching_settings(
     exact_threshold: float,
     probable_threshold: float,
     possible_threshold: float,
-    updated_by: str
+    updated_by: str,
+    commit: bool = True,
 ) -> MatchingSetting:
 
     settings = get_or_create_matching_settings(db)
@@ -41,7 +42,8 @@ def update_matching_settings(
     settings.updated_by = updated_by
     settings.updated_at = datetime.utcnow()
 
-    db.commit()
-    db.refresh(settings)
+    if commit:
+        db.commit()
+        db.refresh(settings)
 
     return settings

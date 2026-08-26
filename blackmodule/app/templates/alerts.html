@@ -523,6 +523,7 @@
                 <tbody>
                     {% set user = request.session.get("user") %}
                     {% set role = user.get("role") if user else "" %}
+                    {% set permissions = user.get("permissions", []) if user else [] %}
                     {% set current_display_name = (user.full_name if user and user.full_name else (user.username if user else "")) %}
                     {% for alert in alerts %}
                     <tr id="alert-{{ alert.id }}">
@@ -561,7 +562,7 @@
                         <td>{{ alert.matching_type }}</td>
                         <td>{{ alert.created_at }}</td>
                        <td>
-                            {% if role in ["ADMIN", "SUPERVISEUR"] %}
+                            {% if "ALERTS_TREAT" in permissions %}
                                 <a class="btn" href="/web/alerts/{{ alert.id }}/treat">Traiter</a>
                             {% else %}
                                 <span class="badge badge-status">Lecture seule</span>
@@ -570,7 +571,7 @@
                         <td>
                             {% if alert.statut in ["FAUX_POSITIF", "CLOTUREE"] %}
                                 <span class="badge badge-status">-</span>
-                            {% elif role in ["ADMIN", "SUPERVISEUR"] %}
+                            {% elif "ALERTS_TREAT" in permissions %}
                                 <form method="post" action="/web/alerts/{{ alert.id }}/treat" class="quick-action-form" onsubmit="return confirm('Confirmer ce traitement rapide ?');">
                                     <select name="statut" required>
                                         <option value="EN_COURS" {% if alert.statut == "EN_COURS" %}selected{% endif %}>EN_COURS</option>

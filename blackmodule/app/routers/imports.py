@@ -28,7 +28,8 @@ from app.services.list_update_service import (
     auto_update_un_xml,
     auto_update_uksl_csv,
 )
-from app.services.api_auth import require_roles
+from app.services.api_auth import require_permission
+from app.services.authorization_service import PERMISSION_MANAGE_LISTS
 
 
 router = APIRouter(
@@ -163,7 +164,7 @@ async def _execute_import(
 async def upload_afb_ppe_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     _validate_extension(
         file.filename,
@@ -188,7 +189,7 @@ async def upload_afb_ppe_csv(
 async def upload_ofac_sdn_xml(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     _validate_extension(
         file.filename,
@@ -213,7 +214,7 @@ async def upload_ofac_sdn_xml(
 async def upload_ofac_consolidated_xml(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     _validate_extension(
         file.filename,
@@ -238,7 +239,7 @@ async def upload_ofac_consolidated_xml(
 async def upload_un_xml(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     _validate_extension(
         file.filename,
@@ -263,7 +264,7 @@ async def upload_un_xml(
 async def upload_eu_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     _validate_extension(
         file.filename,
@@ -288,7 +289,7 @@ async def upload_eu_csv(
 async def upload_ofsi_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     _validate_extension(
         file.filename,
@@ -313,7 +314,7 @@ async def upload_ofsi_csv(
 async def upload_ofsi_excel(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     _validate_extension(
         file.filename,
@@ -338,7 +339,7 @@ async def upload_ofsi_excel(
 async def upload_france_gel_json(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     _validate_extension(
         file.filename,
@@ -363,7 +364,7 @@ async def upload_france_gel_json(
 async def upload_france_gel_xml(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     _validate_extension(
         file.filename,
@@ -388,7 +389,7 @@ async def upload_france_gel_xml(
 async def upload_uksl_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     imported_by = user.get("username")
 
@@ -482,7 +483,7 @@ async def upload_uksl_csv(
 @router.post("/auto-update/ofac-sdn", response_model=ImportBatchResponse)
 def manual_auto_update_ofac_sdn(
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
         return auto_update_ofac_sdn(
@@ -502,7 +503,7 @@ def manual_auto_update_ofac_sdn(
 @router.post("/auto-update/ofac-consolidated", response_model=ImportBatchResponse)
 def manual_auto_update_ofac_consolidated(
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
         return auto_update_ofac_consolidated(
@@ -522,7 +523,7 @@ def manual_auto_update_ofac_consolidated(
 async def upload_eu_xml(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     imported_by = user.get("username")
 
@@ -615,7 +616,7 @@ async def upload_eu_xml(
 @router.post("/auto-update/france-gel", response_model=ImportBatchResponse)
 def manual_auto_update_france_gel(
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
         return auto_update_france_gel(
@@ -635,7 +636,7 @@ def manual_auto_update_france_gel(
 @router.post("/auto-update/eu", response_model=ImportBatchResponse)
 def manual_auto_update_eu(
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
         return auto_update_eu_xml(
@@ -655,7 +656,7 @@ def manual_auto_update_eu(
 @router.post("/auto-update/un", response_model=ImportBatchResponse)
 def manual_auto_update_un(
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
         return auto_update_un_xml(
@@ -675,7 +676,7 @@ def manual_auto_update_un(
 @router.post("/auto-update/uksl")
 def api_auto_update_uksl(
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN")),
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     result = auto_update_uksl_csv(
         db=db,

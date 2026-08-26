@@ -11,7 +11,8 @@ from app.services.matching_service import (
 )
 from app.services.matching_settings_service import get_or_create_matching_settings
 from app.services.audit_service import write_audit_log
-from app.services.api_auth import require_roles
+from app.services.api_auth import require_permission
+from app.services.authorization_service import PERMISSION_SCREEN_CLIENT
 from app.services.performance import log_slow_operation, performance_timer
 
 
@@ -25,7 +26,7 @@ router = APIRouter(
 def check_client(
     client: ClientCheckRequest,
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR", "OPERATEUR"))
+    user: dict = Depends(require_permission(PERMISSION_SCREEN_CLIENT))
 ):
     started_at = performance_timer()
     client_full_name = build_full_name(client.prenom, client.nom)

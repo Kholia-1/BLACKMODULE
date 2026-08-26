@@ -25,3 +25,9 @@ INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD")
 # En développement local HTTP peut être pratique ; en production cette valeur
 # doit impérativement être définie à true.
 SESSION_HTTPS_ONLY = os.getenv("SESSION_HTTPS_ONLY", "false").lower() == "true"
+
+SESSION_IDLE_TIMEOUT_MINUTES = int(os.getenv("SESSION_IDLE_TIMEOUT_MINUTES", "15"))
+SESSION_ACTIVITY_PERSIST_INTERVAL_MINUTES = int(
+    os.getenv("SESSION_ACTIVITY_PERSIST_INTERVAL_MINUTES", "5")
+)
+MAX_FAILED_LOGIN_ATTEMPTS = int(os.getenv("MAX_FAILED_LOGIN_ATTEMPTS", "5"))

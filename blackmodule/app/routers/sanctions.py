@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app.services.audit_service import write_audit_log
-from app.services.api_auth import get_session_user, require_roles
+from app.services.api_auth import get_session_user, require_permission
+from app.services.authorization_service import PERMISSION_MANAGE_LISTS, PERMISSION_SANCTIONS_VIEW
 from app.database import get_db
 from app.models import SanctionEntry
 from app.schemas import SanctionEntryCreate, SanctionEntryResponse
@@ -18,7 +19,7 @@ router = APIRouter(
 @router.get("/", response_model=list[SanctionEntryResponse])
 def list_sanctions(
     db: Session = Depends(get_db),
-    user: dict = Depends(get_session_user)
+    user: dict = Depends(require_permission(PERMISSION_SANCTIONS_VIEW))
 ):
     sanctions = db.query(SanctionEntry).order_by(SanctionEntry.created_at.desc()).all()
     return sanctions
@@ -28,7 +29,7 @@ def list_sanctions(
 def create_sanction(
     sanction: SanctionEntryCreate,
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN"))
+    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS))
 ):
     nom_complet = sanction.nom_complet
 
@@ -76,8 +77,9 @@ def create_sanction(
 @router.get("/{sanction_id}", response_model=SanctionEntryResponse)
 def get_sanction(
     sanction_id: UUID,
+    request: Request,
     db: Session = Depends(get_db),
-    user: dict = Depends(get_session_user)
+    user: dict = Depends(require_permission(PERMISSION_SANCTIONS_VIEW))
 ):
     sanction = db.query(SanctionEntry).filter(
         SanctionEntry.id == sanction_id
@@ -88,5 +90,16 @@ def get_sanction(
             status_code=404,
             detail="Entrée de sanction introuvable"
         )
+
+    write_audit_log(
+        db=db,
+        user_identifier=user.get("username"),
+        action="VIEW_SANCTION_DETAIL",
+        entity_type="SanctionEntry",
+        entity_id=str(sanction.id),
+        description="Consultation nominative via l'API des sanctions.",
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
 
     return sanction

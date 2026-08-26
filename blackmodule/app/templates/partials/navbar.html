@@ -1032,6 +1032,7 @@
 
 {% set user = request.session.get("user") %}
 {% set role = user.get("role") if user else "" %}
+{% set permissions = user.get("permissions", []) if user else [] %}
 {% set username = user.get("username") if user else "Utilisateur" %}
 {% set full_name = user.get("full_name") if user else "" %}
 {% set path = request.url.path %}
@@ -1040,7 +1041,7 @@
 {% set listes_paths = ["/web/imports", "/web/list-updates", "/web/scheduler-status", "/web/import-history"] %}
 {% set admin_paths = ["/web/users", "/web/external-api"] %}
 {% set audit_paths = ["/web/audit-logs", "/web/data-quality", "/web/matching-settings"] %}
-{% set notif_bell_roles = ["ADMIN", "SUPERVISEUR", "OPERATEUR"] %}
+{% set notif_bell_roles = ["SUPERVISEUR_CONFORMITE", "ANALYSTE_CONFORMITE"] %}
 
 <div class="top-user-bar">
     <div>
@@ -1054,8 +1055,8 @@
         </span>
 
         {% if user and role in notif_bell_roles %}
-            {% set critical_link = "/web/critical-alerts" if role in ["ADMIN", "SUPERVISEUR"] else "/web/alerts?niveau_alerte=ALERTE_EXACTE" %}
-            {% set item_link_base = "/web/critical-alerts" if role in ["ADMIN", "SUPERVISEUR"] else "/web/alerts" %}
+            {% set critical_link = "/web/critical-alerts" if "VIEW_CRITICAL_ALERTS" in permissions else "/web/alerts?niveau_alerte=ALERTE_EXACTE" %}
+            {% set item_link_base = "/web/critical-alerts" if "VIEW_CRITICAL_ALERTS" in permissions else "/web/alerts" %}
             <div class="notif-bell" id="notifBell" data-critical-link="{{ critical_link }}" data-item-link-base="{{ item_link_base }}">
                 <button type="button" class="bell-btn" id="bellBtn" aria-label="Notifications d'alertes critiques">
                     <svg viewBox="0 0 24 24">
@@ -1106,7 +1107,7 @@
         Dashboard
     </a>
 
-    {% if role in ["ADMIN", "SUPERVISEUR", "OPERATEUR"] %}
+    {% if "SCREEN_CLIENT" in permissions %}
         <div class="nav-group {% if path in filtrage_paths %}active{% endif %}">
             <button type="button" class="nav-group-toggle">
                 Filtrage &amp; Conformité
@@ -1126,7 +1127,7 @@
                     Alertes
                 </a>
 
-                {% if role in ["ADMIN", "SUPERVISEUR"] %}
+                {% if "VIEW_CRITICAL_ALERTS" in permissions %}
                     <a href="/web/critical-alerts" class="{% if path == '/web/critical-alerts' %}active{% endif %}">
                         Alertes critiques
                     </a>
@@ -1143,7 +1144,7 @@
         </a>
     {% endif %}
 
-    {% if role in ["ADMIN", "SUPERVISEUR"] %}
+    {% if "LISTS_MANAGE" in permissions or "SANCTIONS_VIEW" in permissions %}
         <div class="nav-group {% if path in listes_paths %}active{% endif %}">
             <button type="button" class="nav-group-toggle">
                 Listes de sanctions
@@ -1151,7 +1152,7 @@
             </button>
 
             <div class="nav-dropdown">
-                {% if role == "ADMIN" %}
+                {% if "LISTS_MANAGE" in permissions %}
                     <a href="/web/imports" class="{% if path == '/web/imports' %}active{% endif %}">
                         Imports
                     </a>
@@ -1169,7 +1170,7 @@
         </div>
     {% endif %}
 
-    {% if role == "ADMIN" %}
+    {% if "USERS_MANAGE" in permissions or "MANAGE_TECHNICAL_CONFIGURATION" in permissions %}
         <div class="nav-group {% if path in admin_paths %}active{% endif %}">
             <button type="button" class="nav-group-toggle">
                 Administration
@@ -1177,9 +1178,9 @@
             </button>
 
             <div class="nav-dropdown">
-                <a href="/web/users" class="{% if path == '/web/users' %}active{% endif %}">
+                {% if "USERS_MANAGE" in permissions %}<a href="/web/users" class="{% if path == '/web/users' %}active{% endif %}">
                     Utilisateurs
-                </a>
+                </a>{% endif %}
                 <a href="/web/external-api" class="{% if path == '/web/external-api' %}active{% endif %}">
                     API externe
                 </a>
@@ -1187,7 +1188,7 @@
         </div>
     {% endif %}
 
-    {% if role in ["ADMIN", "SUPERVISEUR"] %}
+    {% if "AUDIT_VIEW" in permissions or "MATCHING_SETTINGS_CHANGE" in permissions %}
         <div class="nav-group {% if path in audit_paths %}active{% endif %}">
             <button type="button" class="nav-group-toggle">
                 Audit &amp; Qualité
@@ -1201,9 +1202,10 @@
                 <a href="/web/data-quality" class="{% if path == '/web/data-quality' %}active{% endif %}">
                     Qualité des données
                 </a>
-                <a href="/web/matching-settings" class="{% if path == '/web/matching-settings' %}active{% endif %}">
+                {% if "MATCHING_SETTINGS_CHANGE" in permissions %}<a href="/web/matching-settings" class="{% if path == '/web/matching-settings' %}active{% endif %}">
                     Paramètres de matching
-                </a>
+                </a>{% endif %}
+                {% if "VIEW_APPROVALS" in permissions %}<a href="/web/approvals" class="{% if path == '/web/approvals' %}active{% endif %}">Validations</a>{% endif %}
             </div>
         </div>
     {% endif %}

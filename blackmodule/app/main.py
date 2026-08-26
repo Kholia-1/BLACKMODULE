@@ -13,6 +13,7 @@ from app.database import Base, engine, get_db, SessionLocal
 from app import models
 from app.services.auth_service import create_default_admin
 from app.security import CSRFMiddleware
+from app.services.session_security_service import SessionActivityMiddleware
 
 from app.routers import sanctions
 from app.routers import matching
@@ -32,6 +33,7 @@ app = FastAPI(
 )
 
 app.add_middleware(CSRFMiddleware)
+app.add_middleware(SessionActivityMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
@@ -66,6 +68,41 @@ def startup():
         conn.execute(text(
             "ALTER TABLE sanction_entries ALTER COLUMN nationalite TYPE VARCHAR(255)"
         ))
+
+        for column_def in [
+            "role_assigned_at TIMESTAMP",
+            "last_login_at TIMESTAMP",
+            "last_activity_at TIMESTAMP",
+            "failed_login_attempts INTEGER NOT NULL DEFAULT 0",
+            "locked_at TIMESTAMP",
+        ]:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {column_def}"))
+
+        conn.execute(text("""
+            UPDATE users
+            SET role = CASE role
+                WHEN 'ADMIN' THEN 'ADMIN_TECHNIQUE'
+                WHEN 'SUPERVISEUR' THEN 'SUPERVISEUR_CONFORMITE'
+                WHEN 'OPERATEUR' THEN 'ANALYSTE_CONFORMITE'
+                WHEN 'LECTEUR' THEN 'CONSULTATION'
+                ELSE role
+            END
+            WHERE role IN ('ADMIN', 'SUPERVISEUR', 'OPERATEUR', 'LECTEUR')
+        """))
+        conn.execute(text("""
+            UPDATE users
+            SET role = 'CONSULTATION'
+            WHERE role IS NULL OR role NOT IN (
+                'ADMIN_TECHNIQUE', 'SUPERVISEUR_CONFORMITE',
+                'ANALYSTE_CONFORMITE', 'GESTIONNAIRE_LISTES',
+                'CONSULTATION', 'AUDITEUR'
+            )
+        """))
+        conn.execute(text("""
+            UPDATE users
+            SET role_assigned_at = COALESCE(role_assigned_at, created_at, NOW())
+            WHERE role_assigned_at IS NULL
+        """))
 
     db = SessionLocal()
     try:

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><title>BLACKMODULE - Validations</title></head>
+<body>
+{% include "partials/navbar.html" %}
+<main>
+  <h1>Validations à quatre yeux</h1>
+  {% if request.query_params.get("message") %}<p>{{ request.query_params.get("message") }}</p>{% endif %}
+  <table>
+    <thead><tr><th>Type</th><th>Cible</th><th>Initiateur</th><th>Créée le</th><th>Statut</th><th>Relecteur</th><th>Action</th></tr></thead>
+    <tbody>
+    {% for approval in approvals %}
+      <tr>
+        <td>{{ approval.operation_type }}</td><td>{{ approval.target_entity_type }}: {{ approval.target_entity_id }}</td>
+        <td>{{ approval.initiated_by }}</td><td>{{ approval.created_at }}</td><td>{{ approval.status }}</td><td>{{ approval.reviewed_by or "-" }}</td>
+        <td>{% if approval.status == pending_status and "APPROVAL_VALIDATE" in request.session.get("user", {}).get("permissions", []) %}
+          <form method="post" action="/web/approvals/{{ approval.id }}/review">
+            <input name="comment" placeholder="Commentaire">
+            <button name="decision" value="APPROVE" type="submit">Valider</button>
+            <button name="decision" value="REJECT" type="submit">Rejeter</button>
+          </form>
+        {% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="7">Aucune demande.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

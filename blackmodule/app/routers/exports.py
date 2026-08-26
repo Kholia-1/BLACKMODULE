@@ -15,7 +15,8 @@ from app.database import get_db
 from sqlalchemy import func
 from app.models import Alert, SanctionEntry, AuditLog, MatchingSetting
 from app.services.audit_service import write_audit_log
-from app.services.api_auth import get_session_user, require_roles
+from app.services.api_auth import get_session_user, require_permission
+from app.services.authorization_service import PERMISSION_EXPORT_DATA
 from app.services.performance import log_slow_operation, performance_timer
 
 
@@ -289,7 +290,7 @@ def export_audit_logs_excel(
     date_from: str | None = None,
     date_to: str | None = None,
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR"))
+    user: dict = Depends(require_permission(PERMISSION_EXPORT_DATA))
 ):
     started_at = performance_timer()
     query = db.query(AuditLog)
@@ -389,7 +390,7 @@ def export_audit_logs_excel(
 @router.get("/data-quality-excel")
 def export_data_quality_excel(
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR"))
+    user: dict = Depends(require_permission(PERMISSION_EXPORT_DATA))
 ):
     total_sanctions = db.query(SanctionEntry).count()
 
@@ -591,7 +592,7 @@ def export_data_quality_excel(
 @router.get("/matching-settings-excel")
 def export_matching_settings_excel(
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR"))
+    user: dict = Depends(require_permission(PERMISSION_EXPORT_DATA))
 ):
     settings = db.query(MatchingSetting).first()
 

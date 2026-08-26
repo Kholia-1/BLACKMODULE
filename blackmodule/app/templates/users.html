@@ -500,11 +500,17 @@
                 <table>
                     <thead>
                         <tr>
+                            <th>Identifiant</th>
                             <th>Utilisateur</th>
                             <th>Email</th>
                             <th>Rôle</th>
                             <th>Statut</th>
                             <th>Date création</th>
+                            <th>Rôle attribué</th>
+                            <th>Dernière connexion</th>
+                            <th>Dernière activité</th>
+                            <th>Verrouillage</th>
+                            <th>Échecs</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -512,6 +518,7 @@
                     <tbody id="user-table-body">
                         {% for user in users %}
                         <tr data-search="{{ (user.username ~ ' ' ~ (user.full_name or '') ~ ' ' ~ (user.email or '') ~ ' ' ~ user.role)|lower }}">
+                            <td>{{ user.id }}</td>
                             <td>
                                 <div class="user-cell">
                                     <div class="avatar">{{ (user.full_name or user.username)[0]|upper }}</div>
@@ -524,15 +531,7 @@
                             <td>{{ user.email if user.email else "-" }}</td>
 
                             <td>
-                                {% if user.role == "ADMIN" %}
-                                    <span class="badge badge-admin">{{ user.role }}</span>
-                                {% elif user.role == "SUPERVISEUR" %}
-                                    <span class="badge badge-superviseur">{{ user.role }}</span>
-                                {% elif user.role == "OPERATEUR" %}
-                                    <span class="badge badge-operateur">{{ user.role }}</span>
-                                {% else %}
-                                    <span class="badge badge-lecteur">{{ user.role }}</span>
-                                {% endif %}
+                                <span class="badge badge-lecteur">{{ user.role }}</span>
                             </td>
 
                             <td>
@@ -546,6 +545,11 @@
                             <td>
                                 {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else "-" }}
                             </td>
+                            <td>{{ user.role_assigned_at.strftime('%Y-%m-%d %H:%M') if user.role_assigned_at else "-" }}</td>
+                            <td>{{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else "-" }}</td>
+                            <td>{{ user.last_activity_at.strftime('%Y-%m-%d %H:%M') if user.last_activity_at else "-" }}</td>
+                            <td>{{ "OUI" if user.locked_at else "NON" }}</td>
+                            <td>{{ user.failed_login_attempts or 0 }}</td>
 
                             <td>
                             <div class="row-actions">
@@ -558,6 +562,11 @@
                                         <button class="btn-success" type="submit">Activer</button>
                                     {% endif %}
                                 </form>
+                                {% if user.locked_at %}
+                                <form method="post" action="/web/users/{{ user.id }}/unlock">
+                                    <button class="btn-success" type="submit">Déverrouiller</button>
+                                </form>
+                                {% endif %}
                             </div>
                             </td>
                         </tr>
@@ -600,10 +609,12 @@
 
                 <label>Rôle</label>
                 <select name="role" required>
-                    <option value="LECTEUR">LECTEUR</option>
-                    <option value="OPERATEUR">OPERATEUR</option>
-                    <option value="SUPERVISEUR">SUPERVISEUR</option>
-                    <option value="ADMIN">ADMIN</option>
+                    <option value="CONSULTATION">CONSULTATION</option>
+                    <option value="ANALYSTE_CONFORMITE">ANALYSTE_CONFORMITE</option>
+                    <option value="SUPERVISEUR_CONFORMITE">SUPERVISEUR_CONFORMITE</option>
+                    <option value="GESTIONNAIRE_LISTES">GESTIONNAIRE_LISTES</option>
+                    <option value="AUDITEUR">AUDITEUR</option>
+                    <option value="ADMIN_TECHNIQUE">ADMIN_TECHNIQUE</option>
                 </select>
 
                 <button type="submit">Créer l'utilisateur</button>

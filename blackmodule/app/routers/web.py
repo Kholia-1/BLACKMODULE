@@ -11,9 +11,20 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import SanctionEntry, SanctionAlias, Alert, AuditLog, ImportBatch, User, MatchingSetting
+from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, AuditLog, ImportBatch, User, MatchingSetting
 from app.schemas import ClientCheckRequest
 from app.services.auth_service import authenticate_user, hash_password, verify_password
+from app.services.authorization_service import (
+    ALL_ROLES, PERMISSION_MANAGE_LISTS, PERMISSION_MANAGE_MATCHING_SETTINGS,
+    PERMISSION_MANAGE_TECHNICAL_CONFIGURATION, PERMISSION_MANAGE_USERS,
+    PERMISSION_REVIEW_FOUR_EYES, PERMISSION_SCREEN_CLIENT, PERMISSION_TREAT_ALERTS,
+    PERMISSION_VIEW_ALERTS, PERMISSION_VIEW_APPROVALS, PERMISSION_VIEW_AUDIT, PERMISSION_VIEW_CRITICAL_ALERTS,
+    PERMISSION_VIEW_LISTS, ROLE_ADMIN_TECHNIQUE, has_permission, session_user_payload,
+)
+from app.services.approval_service import (
+    OP_ALERT_TREATMENT, OP_MATCHING_SETTINGS, PENDING, create_approval_request,
+    review_approval_request,
+)
 from app.services.matching_service import build_full_name, classify_alert, select_matching_candidates
 from app.services.audit_service import write_audit_log
 from app.services.import_service import (
@@ -58,9 +69,8 @@ def get_current_user(request: Request):
     return request.session.get("user")
 
 
-def require_role(request: Request, allowed_roles: list[str]) -> bool:
-    user = get_current_user(request)
-    return bool(user and user.get("role") in allowed_roles)
+def require_permission(request: Request, permission: str) -> bool:
+    return has_permission(get_current_user(request), permission)
 
 
 def current_username(request: Request, fallback: str = "SYSTEM") -> str:
@@ -94,7 +104,14 @@ def require_admin_or_403(request: Request, db: Session, route: str, description:
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN"]):
+    if route.startswith("/web/users"):
+        permission = PERMISSION_MANAGE_USERS
+    elif route.startswith("/web/import") or route.startswith("/web/list-updates"):
+        permission = PERMISSION_MANAGE_LISTS
+    else:
+        permission = PERMISSION_MANAGE_TECHNICAL_CONFIGURATION
+
+    if not require_permission(request, permission):
         log_access_denied(db=db, request=request, route=route, description=description)
         return forbidden_page(request)
 
@@ -117,21 +134,40 @@ def login_submit(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = authenticate_user(db=db, username=username, password=password)
+    result = authenticate_user(db=db, username=username, password=password)
 
-    if not user:
+    if not result.user:
+        write_audit_log(
+            db=db,
+            user_identifier=username.strip() or None,
+            action="LOGIN_FAILED",
+            entity_type="User",
+            entity_id=None,
+            description="Tentative de connexion refusée.",
+            ip_address=request.client.host if request.client else None,
+        )
+        if result.locked_now:
+            write_audit_log(
+                db=db,
+                user_identifier=username.strip() or None,
+                action="ACCOUNT_LOCKED",
+                entity_type="User",
+                entity_id=None,
+                description="Compte verrouillé après cinq échecs de connexion.",
+                ip_address=request.client.host if request.client else None,
+            )
+        db.commit()
         return templates.TemplateResponse(
             request=request,
             name="login.html",
             context={"request": request, "error": "Identifiants incorrects ou compte désactivé."},
         )
 
-    request.session["user"] = {
-        "id": str(user.id),
-        "username": user.username,
-        "full_name": user.full_name,
-        "role": user.role,
-    }
+    user = result.user
+
+    request.session["user"] = session_user_payload(user)
+    request.session["last_activity_at"] = user.last_activity_at.isoformat()
+    request.session["last_activity_persisted_at"] = user.last_activity_at.isoformat()
 
     write_audit_log(
         db=db,
@@ -142,6 +178,16 @@ def login_submit(
         description=f"Connexion réussie pour l'utilisateur {user.username}.",
         ip_address=request.client.host if request.client else None,
     )
+    if user.username == "admin":
+        write_audit_log(
+            db=db,
+            user_identifier=user.username,
+            action="BOOTSTRAP_ADMIN_LOGIN",
+            entity_type="User",
+            entity_id=str(user.id),
+            description="Utilisation du compte technique bootstrap.",
+            ip_address=request.client.host if request.client else None,
+        )
     db.commit()
 
     return RedirectResponse(url="/web/dashboard", status_code=303)
@@ -236,7 +282,7 @@ def check_client_page(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR", "OPERATEUR"]):
+    if not require_permission(request, PERMISSION_SCREEN_CLIENT):
         log_access_denied(
             db=db,
             request=request,
@@ -279,7 +325,7 @@ def check_client_submit(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR", "OPERATEUR"]):
+    if not require_permission(request, PERMISSION_SCREEN_CLIENT):
         log_access_denied(
             db=db,
             request=request,
@@ -525,6 +571,10 @@ def web_alerts(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
+    if not require_permission(request, PERMISSION_VIEW_ALERTS):
+        log_access_denied(db, request, "/web/alerts", "Tentative d'accès refusée aux alertes.")
+        return forbidden_page(request)
+
     query = db.query(Alert)
 
     current_status = None
@@ -635,7 +685,7 @@ def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR"]):
+    if not require_permission(request, PERMISSION_TREAT_ALERTS):
         log_access_denied(
             db=db,
             request=request,
@@ -653,6 +703,17 @@ def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends
         sanction_entry = db.query(SanctionEntry).options(
             selectinload(SanctionEntry.aliases)
         ).filter(SanctionEntry.id == alert.sanction_entry_id).first()
+        if sanction_entry:
+            write_audit_log(
+                db=db,
+                user_identifier=current_username(request),
+                action="VIEW_SANCTION_DETAIL",
+                entity_type="SanctionEntry",
+                entity_id=str(sanction_entry.id),
+                description="Consultation détaillée d'une entrée de sanction depuis une alerte.",
+                ip_address=request.client.host if request.client else None,
+            )
+            db.commit()
 
     previous_alerts_count = db.query(Alert).filter(
         Alert.client_reference == alert.client_reference,
@@ -686,7 +747,7 @@ def web_treat_alert_submit(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR"]):
+    if not require_permission(request, PERMISSION_TREAT_ALERTS):
         log_access_denied(
             db=db,
             request=request,
@@ -706,6 +767,25 @@ def web_treat_alert_submit(
         raise HTTPException(status_code=404, detail="Alerte introuvable")
 
     username = current_username(request, fallback=treated_by)
+    if new_status in {"FAUX_POSITIF", "CONFIRMEE", "CLOTUREE"}:
+        create_approval_request(
+            db=db,
+            operation_type=OP_ALERT_TREATMENT,
+            initiator=get_current_user(request),
+            target_entity_type="Alert",
+            target_entity_id=str(alert.id),
+            old_values={"statut": alert.statut},
+            new_values={"statut": new_status, "treatment_comment": treatment_comment},
+            comment=treatment_comment,
+            ip_address=request.client.host if request.client else None,
+        )
+        db.commit()
+        redirect_base = return_to if return_to and return_to.startswith("/web/") else "/web/alerts"
+        return RedirectResponse(
+            url=f"{redirect_base}?message=Décision soumise à validation par un second utilisateur",
+            status_code=303,
+        )
+
     alert.statut = new_status
     alert.treated_by = username
     alert.treatment_comment = treatment_comment
@@ -916,7 +996,7 @@ async def web_import_uksl_csv(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN"]):
+    if not require_permission(request, PERMISSION_MANAGE_LISTS):
         log_access_denied(
             db=db,
             request=request,
@@ -1146,7 +1226,7 @@ def web_import_history(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR"]):
+    if not require_permission(request, PERMISSION_VIEW_LISTS):
         log_access_denied(db, request, "/web/import-history", "Tentative d'accès refusée à l'historique des imports.")
         return forbidden_page(request)
 
@@ -1195,7 +1275,7 @@ def web_audit_logs(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR"]):
+    if not require_permission(request, PERMISSION_VIEW_AUDIT):
         log_access_denied(db, request, "/web/audit-logs", "Tentative d'accès refusée au journal d'audit.")
         return forbidden_page(request)
 
@@ -1275,7 +1355,7 @@ def web_create_user(
     if denied_response:
         return denied_response
 
-    allowed_roles = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "LECTEUR"]
+    allowed_roles = ALL_ROLES
     role = role.upper()
     if role not in allowed_roles:
         raise HTTPException(status_code=400, detail="Rôle invalide.")
@@ -1296,6 +1376,7 @@ def web_create_user(
         password_hash=hash_password(password),
         role=role,
         statut="ACTIF",
+        role_assigned_at=datetime.utcnow(),
     )
 
     db.add(new_user)
@@ -1329,7 +1410,16 @@ def web_toggle_user_status(user_id: UUID, request: Request, db: Session = Depend
     if current_user and current_user.get("id") == str(user.id):
         return RedirectResponse(url="/web/users?message=Impossible de désactiver votre propre compte", status_code=303)
 
-    user.statut = "INACTIF" if user.statut == "ACTIF" else "ACTIF"
+    next_status = "INACTIF" if user.statut == "ACTIF" else "ACTIF"
+    if next_status == "INACTIF" and user.role == ROLE_ADMIN_TECHNIQUE:
+        remaining_admins = db.query(User).filter(
+            User.role == ROLE_ADMIN_TECHNIQUE,
+            User.statut == "ACTIF",
+            User.id != user.id,
+        ).count()
+        if remaining_admins == 0:
+            return RedirectResponse(url="/web/users?message=Conservez au moins un administrateur technique actif", status_code=303)
+    user.statut = next_status
 
     write_audit_log(
         db=db,
@@ -1372,7 +1462,7 @@ def web_edit_user_submit(
     if denied_response:
         return denied_response
 
-    allowed_roles = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "LECTEUR"]
+    allowed_roles = ALL_ROLES
     allowed_statuses = ["ACTIF", "INACTIF"]
     role = role.upper()
     statut = statut.upper()
@@ -1390,12 +1480,23 @@ def web_edit_user_submit(
     if current_user and current_user.get("id") == str(user.id) and statut == "INACTIF":
         return RedirectResponse(url="/web/users?message=Impossible de désactiver votre propre compte", status_code=303)
 
+    if (statut == "INACTIF" or role != ROLE_ADMIN_TECHNIQUE) and user.role == ROLE_ADMIN_TECHNIQUE:
+        remaining_admins = db.query(User).filter(
+            User.role == ROLE_ADMIN_TECHNIQUE,
+            User.statut == "ACTIF",
+            User.id != user.id,
+        ).count()
+        if remaining_admins == 0:
+            return RedirectResponse(url="/web/users?message=Conservez au moins un administrateur technique actif", status_code=303)
+
     old_role = user.role
     old_status = user.statut
     user.full_name = full_name.strip() if full_name else None
     user.email = email.strip() if email else None
     user.role = role
     user.statut = statut
+    if old_role != role:
+        user.role_assigned_at = datetime.utcnow()
 
     write_audit_log(
         db=db,
@@ -1413,6 +1514,26 @@ def web_edit_user_submit(
     db.commit()
 
     return RedirectResponse(url="/web/users?message=Utilisateur modifié avec succès", status_code=303)
+
+
+@router.post("/users/{user_id}/unlock")
+def web_unlock_user(user_id: UUID, request: Request, db: Session = Depends(get_db)):
+    denied_response = require_admin_or_403(
+        request, db, f"/web/users/{user_id}/unlock", "Tentative de déverrouillage non autorisée."
+    )
+    if denied_response:
+        return denied_response
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    user.failed_login_attempts = 0
+    user.locked_at = None
+    write_audit_log(
+        db, current_username(request), "ACCOUNT_UNLOCKED", "User", str(user.id),
+        "Compte déverrouillé par un administrateur technique.", request.client.host if request.client else None,
+    )
+    db.commit()
+    return RedirectResponse(url="/web/users?message=Compte déverrouillé", status_code=303)
 
 
 @router.get("/change-password")
@@ -1588,7 +1709,7 @@ def web_scheduler_status(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN"]):
+    if not require_permission(request, PERMISSION_MANAGE_LISTS):
         log_access_denied(
             db=db,
             request=request,
@@ -1685,7 +1806,7 @@ async def web_import_eu_xml(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN"]):
+    if not require_permission(request, PERMISSION_MANAGE_LISTS):
         log_access_denied(
             db=db,
             request=request,
@@ -1812,7 +1933,7 @@ def web_data_quality(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR"]):
+    if not require_permission(request, PERMISSION_VIEW_AUDIT):
         log_access_denied(
             db=db,
             request=request,
@@ -1930,7 +2051,7 @@ def web_matching_settings_page(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR"]):
+    if not require_permission(request, PERMISSION_MANAGE_MATCHING_SETTINGS):
         log_access_denied(
             db=db,
             request=request,
@@ -1971,7 +2092,7 @@ def web_matching_settings_submit(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR"]):
+    if not require_permission(request, PERMISSION_MANAGE_MATCHING_SETTINGS):
         log_access_denied(
             db=db,
             request=request,
@@ -2016,29 +2137,27 @@ def web_matching_settings_submit(
         f"Possible={old_settings.possible_threshold}"
     )
 
-    settings = update_matching_settings(
+    create_approval_request(
         db=db,
-        exact_threshold=exact_threshold,
-        probable_threshold=probable_threshold,
-        possible_threshold=possible_threshold,
-        updated_by=username
+        operation_type=OP_MATCHING_SETTINGS,
+        initiator=current_user,
+        target_entity_type="MatchingSetting",
+        target_entity_id=str(old_settings.id),
+        old_values={
+            "exact_threshold": old_settings.exact_threshold,
+            "probable_threshold": old_settings.probable_threshold,
+            "possible_threshold": old_settings.possible_threshold,
+        },
+        new_values={
+            "exact_threshold": exact_threshold,
+            "probable_threshold": probable_threshold,
+            "possible_threshold": possible_threshold,
+        },
+        comment="Modification des seuils de matching.",
+        ip_address=request.client.host if request.client else None,
     )
 
-    write_audit_log(
-        db=db,
-        user_identifier=username,
-        action="UPDATE_MATCHING_SETTINGS",
-        entity_type="MatchingSetting",
-        entity_id=str(settings.id),
-        description=(
-            f"Modification des seuils de matching. "
-            f"Anciennes valeurs : {old_values}. "
-            f"Nouvelles valeurs : Exacte={exact_threshold}, "
-            f"Probable={probable_threshold}, Possible={possible_threshold}."
-        ),
-        ip_address=request.client.host if request.client else None
-    )
-
+    settings = old_settings
     db.commit()
 
     history_logs = db.query(AuditLog).filter(
@@ -2070,7 +2189,7 @@ def web_critical_alerts(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR"]):
+    if not require_permission(request, PERMISSION_VIEW_CRITICAL_ALERTS):
         log_access_denied(
             db=db,
             request=request,
@@ -2147,7 +2266,7 @@ def web_matching_settings_reset(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN", "SUPERVISEUR"]):
+    if not require_permission(request, PERMISSION_MANAGE_MATCHING_SETTINGS):
         log_access_denied(
             db=db,
             request=request,
@@ -2167,20 +2286,28 @@ def web_matching_settings_reset(
         f"Possible={old_settings.possible_threshold}"
     )
 
-    settings = update_matching_settings(
+    create_approval_request(
         db=db,
-        exact_threshold=90.0,
-        probable_threshold=75.0,
-        possible_threshold=60.0,
-        updated_by=username
+        operation_type=OP_MATCHING_SETTINGS,
+        initiator=current_user,
+        target_entity_type="MatchingSetting",
+        target_entity_id=str(old_settings.id),
+        old_values={
+            "exact_threshold": old_settings.exact_threshold,
+            "probable_threshold": old_settings.probable_threshold,
+            "possible_threshold": old_settings.possible_threshold,
+        },
+        new_values={"exact_threshold": 90.0, "probable_threshold": 75.0, "possible_threshold": 60.0},
+        comment="Réinitialisation des seuils de matching.",
+        ip_address=request.client.host if request.client else None,
     )
 
     write_audit_log(
         db=db,
         user_identifier=username,
-        action="RESET_MATCHING_SETTINGS",
+        action="RESET_MATCHING_SETTINGS_REQUESTED",
         entity_type="MatchingSetting",
-        entity_id=str(settings.id),
+        entity_id=str(old_settings.id),
         description=(
             f"Réinitialisation des seuils de matching aux valeurs par défaut. "
             f"Anciennes valeurs : {old_values}. "
@@ -2195,6 +2322,58 @@ def web_matching_settings_reset(
         url="/web/matching-settings?message=Seuils restaurés aux valeurs par défaut&success=True",
         status_code=303
     )
+
+@router.get("/approvals")
+def web_approvals(request: Request, db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_VIEW_APPROVALS):
+        log_access_denied(db, request, "/web/approvals", "Tentative d'accès refusée aux validations.")
+        return forbidden_page(request)
+    approvals = db.query(ApprovalRequest).order_by(ApprovalRequest.created_at.desc()).limit(200).all()
+    return templates.TemplateResponse(
+        request=request,
+        name="approvals.html",
+        context={"request": request, "approvals": approvals, "pending_status": PENDING},
+    )
+
+
+@router.post("/approvals/{approval_id}/review")
+def web_review_approval(
+    approval_id: UUID,
+    request: Request,
+    decision: str = Form(...),
+    comment: str = Form(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_REVIEW_FOUR_EYES):
+        log_access_denied(db, request, f"/web/approvals/{approval_id}/review", "Tentative de validation non autorisée.")
+        return forbidden_page(request)
+    approval = (
+        db.query(ApprovalRequest)
+        .filter(ApprovalRequest.id == approval_id)
+        .with_for_update()
+        .first()
+    )
+    if not approval:
+        raise HTTPException(status_code=404, detail="Demande introuvable.")
+    try:
+        review_approval_request(
+            db=db,
+            approval=approval,
+            reviewer=get_current_user(request),
+            approved=decision.upper() == "APPROVE",
+            comment=comment,
+            ip_address=request.client.host if request.client else None,
+        )
+        db.commit()
+    except (PermissionError, ValueError) as exc:
+        db.rollback()
+        return RedirectResponse(url=f"/web/approvals?message={str(exc)}", status_code=303)
+    return RedirectResponse(url="/web/approvals?message=Demande traitée", status_code=303)
+
 
 @router.get("/profile")
 def web_profile(
@@ -2231,7 +2410,7 @@ def web_update_france_gel(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN"]):
+    if not require_permission(request, PERMISSION_MANAGE_LISTS):
         log_access_denied(
             db=db,
             request=request,
@@ -2285,7 +2464,7 @@ def web_update_eu(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN"]):
+    if not require_permission(request, PERMISSION_MANAGE_LISTS):
         log_access_denied(
             db=db,
             request=request,
@@ -2335,7 +2514,7 @@ def web_update_un(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN"]):
+    if not require_permission(request, PERMISSION_MANAGE_LISTS):
         log_access_denied(
             db=db,
             request=request,
@@ -2384,7 +2563,7 @@ def web_external_api_page(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_role(request, ["ADMIN"]):
+    if not require_permission(request, PERMISSION_MANAGE_TECHNICAL_CONFIGURATION):
         log_access_denied(
             db=db,
             request=request,

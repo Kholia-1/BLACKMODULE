@@ -175,7 +175,34 @@ class User(Base):
 
     password_hash = Column(String(255), nullable=False)
 
-    role = Column(String(30), nullable=False, default="LECTEUR")
+    role = Column(String(50), nullable=False, default="CONSULTATION")
     statut = Column(String(20), nullable=False, default="ACTIF")
 
     created_at = Column(DateTime, default=datetime.utcnow)
+    role_assigned_at = Column(DateTime, nullable=True)
+    last_login_at = Column(DateTime, nullable=True)
+    last_activity_at = Column(DateTime, nullable=True)
+    failed_login_attempts = Column(Integer, nullable=False, default=0)
+    locked_at = Column(DateTime, nullable=True)
+
+
+class ApprovalRequest(Base):
+    __tablename__ = "approval_requests"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    operation_type = Column(String(100), nullable=False)
+    status = Column(String(30), nullable=False, default="EN_ATTENTE_VALIDATION")
+
+    initiator_user_id = Column(String(100), nullable=True)
+    initiated_by = Column(String(100), nullable=False)
+    reviewer_user_id = Column(String(100), nullable=True)
+    reviewed_by = Column(String(100), nullable=True)
+
+    target_entity_type = Column(String(100), nullable=False)
+    target_entity_id = Column(String(100), nullable=False)
+    old_values = Column(Text, nullable=True)
+    new_values = Column(Text, nullable=True)
+    initiator_comment = Column(Text, nullable=True)
+    reviewer_comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime, nullable=True)

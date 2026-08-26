@@ -1,14 +1,16 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Alert
 from app.schemas import AlertResponse, AlertTreatmentRequest
 from app.services.audit_service import write_audit_log
-from app.services.api_auth import get_session_user, require_roles
+from app.services.api_auth import get_session_user, require_permission
+from app.services.approval_service import OP_ALERT_TREATMENT, create_approval_request
+from app.services.authorization_service import PERMISSION_TREAT_ALERTS, PERMISSION_VIEW_ALERTS
 
 
 router = APIRouter(
@@ -28,7 +30,7 @@ def list_alerts(
         description="Filtrer par niveau : ALERTE_EXACTE, ALERTE_PROBABLE, ALERTE_POSSIBLE"
     ),
     db: Session = Depends(get_db),
-    user: dict = Depends(get_session_user)
+    user: dict = Depends(require_permission(PERMISSION_VIEW_ALERTS))
 ):
     """
     Liste toutes les alertes générées par le moteur de matching.
@@ -51,7 +53,7 @@ def list_alerts(
 @router.get("/critical-notifications")
 def get_critical_notifications(
     db: Session = Depends(get_db),
-    user: dict = Depends(get_session_user)
+    user: dict = Depends(require_permission(PERMISSION_VIEW_ALERTS))
 ):
     """
     Fournit le contenu de la cloche de notifications : nombre et liste
@@ -88,7 +90,7 @@ def get_critical_notifications(
 def get_alert(
     alert_id: UUID,
     db: Session = Depends(get_db),
-    user: dict = Depends(get_session_user)
+    user: dict = Depends(require_permission(PERMISSION_VIEW_ALERTS))
 ):
     """
     Récupère une alerte précise à partir de son ID.
@@ -109,8 +111,9 @@ def get_alert(
 def treat_alert(
     alert_id: UUID,
     treatment: AlertTreatmentRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    user: dict = Depends(require_roles("ADMIN", "SUPERVISEUR"))
+    user: dict = Depends(require_permission(PERMISSION_TREAT_ALERTS))
 ):
     """
     Traite une alerte de conformité.
@@ -147,6 +150,21 @@ def treat_alert(
             status_code=404,
             detail="Alerte introuvable"
         )
+
+    if new_status in {"FAUX_POSITIF", "CONFIRMEE", "CLOTUREE"}:
+        create_approval_request(
+            db=db,
+            operation_type=OP_ALERT_TREATMENT,
+            initiator=user,
+            target_entity_type="Alert",
+            target_entity_id=str(alert.id),
+            old_values={"statut": alert.statut},
+            new_values={"statut": new_status, "treatment_comment": treatment.treatment_comment},
+            comment=treatment.treatment_comment,
+            ip_address=request.client.host if request.client else None,
+        )
+        db.commit()
+        return alert
 
     # 1. Mise à jour de l'alerte
     treated_by = user.get("username")

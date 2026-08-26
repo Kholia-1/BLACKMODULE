@@ -178,10 +178,12 @@
 
             <label>Rôle</label>
             <select name="role" required>
-                <option value="LECTEUR" {% if user.role == "LECTEUR" %}selected{% endif %}>LECTEUR</option>
-                <option value="OPERATEUR" {% if user.role == "OPERATEUR" %}selected{% endif %}>OPERATEUR</option>
-                <option value="SUPERVISEUR" {% if user.role == "SUPERVISEUR" %}selected{% endif %}>SUPERVISEUR</option>
-                <option value="ADMIN" {% if user.role == "ADMIN" %}selected{% endif %}>ADMIN</option>
+                <option value="CONSULTATION" {% if user.role == "CONSULTATION" %}selected{% endif %}>CONSULTATION</option>
+                <option value="ANALYSTE_CONFORMITE" {% if user.role == "ANALYSTE_CONFORMITE" %}selected{% endif %}>ANALYSTE_CONFORMITE</option>
+                <option value="SUPERVISEUR_CONFORMITE" {% if user.role == "SUPERVISEUR_CONFORMITE" %}selected{% endif %}>SUPERVISEUR_CONFORMITE</option>
+                <option value="GESTIONNAIRE_LISTES" {% if user.role == "GESTIONNAIRE_LISTES" %}selected{% endif %}>GESTIONNAIRE_LISTES</option>
+                <option value="AUDITEUR" {% if user.role == "AUDITEUR" %}selected{% endif %}>AUDITEUR</option>
+                <option value="ADMIN_TECHNIQUE" {% if user.role == "ADMIN_TECHNIQUE" %}selected{% endif %}>ADMIN_TECHNIQUE</option>
             </select>
 
             <label>Statut</label>
