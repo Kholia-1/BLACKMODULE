@@ -283,6 +283,9 @@ def parse_ofac_sdn_xml(file_content: bytes) -> list[dict]:
 
         normalized_entries.append({
             "source_liste": "OFAC_SDN",
+            # uid is OFAC's published stable identifier; it must not be
+            # replaced by a name-based/fuzzy comparison during reconciliation.
+            "source_record_id": uid,
             "type_entite": type_entite,
             "nom": nom.upper() if nom else nom_complet.upper(),
             "prenom": prenom.upper() if prenom else None,

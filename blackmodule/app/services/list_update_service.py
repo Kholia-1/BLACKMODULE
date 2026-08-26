@@ -22,6 +22,13 @@ from app.services.import_service import (
     import_uksl_csv,
     import_un_xml,
 )
+from app.services.list_version_service import SourceOperationInProgress, SuspiciousListDropError, synchronize_source_version
+from app.services.parsers.ofac_sdn_parser import parse_ofac_sdn_xml
+from app.services.parsers.ofac_consolidated_parser import parse_ofac_consolidated_xml
+from app.services.parsers.france_gel_parser import parse_france_gel_json
+from app.services.parsers.eu_parser import parse_eu_xml
+from app.services.parsers.un_parser import parse_un_xml
+from app.services.parsers.uksl_parser import parse_uksl_csv
 
 
 # The legacy www.treasury.gov download URLs now reject automated requests. OFAC
@@ -55,6 +62,7 @@ class OfficialSource:
     importer: Callable
     timeout_seconds: int
     maximum_age_days: int
+    parser: Callable | None = None
 
 
 @dataclass(frozen=True)
@@ -69,27 +77,28 @@ class DownloadedFile:
 OFFICIAL_SOURCES = {
     "OFAC_SDN": OfficialSource(
         "OFAC_SDN", "sdn.xml", "XML", OFAC_SDN_XML_URL,
-        import_ofac_sdn_xml, 90, 2,
+        import_ofac_sdn_xml, 90, 2, parse_ofac_sdn_xml,
     ),
     "OFAC_CONSOLIDATED": OfficialSource(
         "OFAC_CONSOLIDATED", "cons_advanced.xml", "XML",
         OFAC_CONSOLIDATED_XML_URL, import_ofac_consolidated_xml, 90, 2,
+        parse_ofac_consolidated_xml,
     ),
     "FR_GEL": OfficialSource(
         "FR_GEL", "france_gel.json", "JSON", FR_GEL_JSON_URL,
-        import_france_gel_json, 90, 2,
+        import_france_gel_json, 90, 2, parse_france_gel_json,
     ),
     "UE": OfficialSource(
         "UE", "eu_financial_sanctions.xml", "XML", EU_XML_URL,
-        import_eu_xml, 180, 9,
+        import_eu_xml, 180, 9, parse_eu_xml,
     ),
     "ONU": OfficialSource(
         "ONU", "un_consolidated.xml", "XML", UN_XML_URL,
-        import_un_xml, 90, 9,
+        import_un_xml, 90, 9, parse_un_xml,
     ),
     "UKSL": OfficialSource(
         "UKSL", "UK-Sanctions-List.csv", "CSV", UKSL_CSV_URL,
-        import_uksl_csv, 90, 35,
+        import_uksl_csv, 90, 35, parse_uksl_csv,
     ),
 }
 
@@ -149,6 +158,17 @@ def download_official_file(source: OfficialSource) -> DownloadedFile:
         timeout=source.timeout_seconds,
     )
     response.raise_for_status()
+    content_length = response.headers.get("Content-Length")
+    content_encoding = response.headers.get("Content-Encoding")
+    if content_length and not content_encoding:
+        try:
+            if int(content_length) != len(response.content):
+                raise ValueError(
+                    f"Téléchargement incomplet: {len(response.content)} octets reçus sur {content_length} annoncés."
+                )
+        except ValueError as exc:
+            if "Téléchargement incomplet" in str(exc):
+                raise
     _validate_content(response.content, source.file_type)
 
     return DownloadedFile(
@@ -213,6 +233,53 @@ def _batch_for_download(
     )
 
 
+def queue_official_update(db: Session, source_key: str, imported_by: str) -> ImportBatch:
+    """Persist a quick, traceable request before the scheduler does the work."""
+    source = OFFICIAL_SOURCES[source_key]
+    running = db.query(ImportBatch).filter(
+        ImportBatch.source_liste == source.source_liste,
+        ImportBatch.status == "EN_COURS",
+    ).first()
+    if running:
+        raise SourceOperationInProgress(
+            f"Une mise a jour {source.source_liste} est déjà en cours ({running.id})."
+        )
+    batch = _batch_for_download(source, imported_by, status="EN_COURS")
+    db.add(batch)
+    db.flush()
+    _write_import_audit(
+        db, batch, imported_by, f"AUTO_UPDATE_{source.source_liste}_QUEUED",
+        f"Mise a jour officielle {source.source_liste} programmee.",
+    )
+    db.commit()
+    db.refresh(batch)
+    return batch
+
+
+def interrupted_official_updates(db: Session) -> list[ImportBatch]:
+    """Rows persisted before a process stop are safely re-scheduled on boot."""
+    return db.query(ImportBatch).filter(
+        ImportBatch.status == "EN_COURS",
+        ImportBatch.source_liste.in_([source.source_liste for source in OFFICIAL_SOURCES.values()]),
+    ).all()
+
+
+def mark_interrupted_update_failed(
+    db: Session, batch_id, source_key: str, imported_by: str, error: Exception,
+) -> None:
+    """Last-resort terminal state if the worker fails outside _auto_update."""
+    batch = db.query(ImportBatch).filter(ImportBatch.id == batch_id).first()
+    if not batch or batch.status != "EN_COURS":
+        return
+    batch.status = "FAILED"
+    batch.error_message = str(error)[:1000]
+    _write_import_audit(
+        db, batch, imported_by, f"AUTO_UPDATE_{source_key}_FAILED",
+        "Echec inattendu du traitement programme; reprise possible par une nouvelle demande.",
+    )
+    db.commit()
+
+
 def _apply_import_result(import_batch: ImportBatch, result: dict) -> None:
     if result.get("total_records", 0) <= 0:
         raise ValueError(
@@ -248,21 +315,26 @@ def _record_failed_attempt(
     imported_by: str,
     error: Exception,
     downloaded: DownloadedFile | None,
+    existing_batch_id=None,
 ) -> ImportBatch:
-    failed_batch = _batch_for_download(
-        source,
-        imported_by,
-        downloaded,
-        status="FAILED",
-        error_message=str(error)[:1000],
-    )
-    db.add(failed_batch)
+    review_required = isinstance(error, SuspiciousListDropError)
+    failed_batch = db.query(ImportBatch).filter(ImportBatch.id == existing_batch_id).first() if existing_batch_id else None
+    if not failed_batch:
+        failed_batch = _batch_for_download(source, imported_by, downloaded)
+        db.add(failed_batch)
+    if downloaded:
+        failed_batch.downloaded_at = downloaded.downloaded_at
+        failed_batch.published_at = downloaded.published_at
+        failed_batch.file_size_bytes = downloaded.file_size_bytes
+        failed_batch.file_hash = downloaded.file_hash
+    failed_batch.status = "A_VERIFIER" if review_required else "FAILED"
+    failed_batch.error_message = str(error)[:1000]
     db.flush()
     _write_import_audit(
         db,
         failed_batch,
         imported_by,
-        f"AUTO_UPDATE_{source.source_liste}_FAILED",
+        f"AUTO_UPDATE_{source.source_liste}_{'REVIEW_REQUIRED' if review_required else 'FAILED'}",
         f"Echec de mise a jour automatique {source.source_liste}: {str(error)[:500]}",
     )
     write_audit_log(
@@ -273,7 +345,7 @@ def _record_failed_attempt(
         entity_id=source.source_liste,
         description=(
             f"Alerte applicative: la mise a jour automatique {source.source_liste} "
-            f"a echoue. {str(error)[:500]}"
+            f"a {'été bloquée pour vérification' if review_required else 'échoué'}. {str(error)[:500]}"
         ),
         ip_address=None,
     )
@@ -282,7 +354,7 @@ def _record_failed_attempt(
     return failed_batch
 
 
-def _auto_update(db: Session, source: OfficialSource, imported_by: str) -> ImportBatch:
+def _auto_update(db: Session, source: OfficialSource, imported_by: str, existing_batch_id=None) -> ImportBatch:
     downloaded: DownloadedFile | None = None
     try:
         downloaded = download_official_file(source)
@@ -293,9 +365,16 @@ def _auto_update(db: Session, source: OfficialSource, imported_by: str) -> Impor
         if previous_batch:
             # A successful check with identical data remains an explicit attempt:
             # it drives both last_attempt and last_success freshness indicators.
-            import_batch = _batch_for_download(source, imported_by, downloaded, status="SUCCESS")
+            import_batch = db.query(ImportBatch).filter(ImportBatch.id == existing_batch_id).first() if existing_batch_id else None
+            if not import_batch:
+                import_batch = _batch_for_download(source, imported_by, downloaded, status="SUCCESS")
+                db.add(import_batch)
+            import_batch.downloaded_at = downloaded.downloaded_at
+            import_batch.published_at = downloaded.published_at
+            import_batch.file_size_bytes = downloaded.file_size_bytes
+            import_batch.file_hash = downloaded.file_hash
+            import_batch.status = "SUCCESS"
             import_batch.total_records = previous_batch.total_records
-            db.add(import_batch)
             db.flush()
             _write_import_audit(
                 db,
@@ -308,10 +387,35 @@ def _auto_update(db: Session, source: OfficialSource, imported_by: str) -> Impor
             db.refresh(import_batch)
             return import_batch
 
-        import_batch = _batch_for_download(source, imported_by, downloaded)
-        db.add(import_batch)
+        import_batch = db.query(ImportBatch).filter(ImportBatch.id == existing_batch_id).first() if existing_batch_id else None
+        if not import_batch:
+            import_batch = _batch_for_download(source, imported_by, downloaded)
+            db.add(import_batch)
+        else:
+            import_batch.downloaded_at = downloaded.downloaded_at
+            import_batch.published_at = downloaded.published_at
+            import_batch.file_size_bytes = downloaded.file_size_bytes
+            import_batch.file_hash = downloaded.file_hash
         db.flush()
-        _apply_import_result(import_batch, source.importer(db=db, file_content=downloaded.content))
+        if source.parser:
+            # The reconciliation owns delist/reactivate decisions.  It is
+            # deliberately source-scoped and uses official IDs when present;
+            # no fuzzy matching is ever used for a regulatory list update.
+            _, result = synchronize_source_version(
+                db,
+                source_liste=source.source_liste,
+                import_batch=import_batch,
+                source_url=source.url,
+                downloaded_at=downloaded.downloaded_at,
+                published_at=downloaded.published_at,
+                file_hash=downloaded.file_hash,
+                archive_content=downloaded.content,
+                entries=source.parser(downloaded.content),
+                imported_by=imported_by,
+            )
+        else:
+            result = source.importer(db=db, file_content=downloaded.content)
+        _apply_import_result(import_batch, result)
         _write_import_audit(
             db,
             import_batch,
@@ -328,34 +432,34 @@ def _auto_update(db: Session, source: OfficialSource, imported_by: str) -> Impor
         return import_batch
     except Exception as error:
         db.rollback()
-        _record_failed_attempt(db, source, imported_by, error, downloaded)
+        _record_failed_attempt(db, source, imported_by, error, downloaded, existing_batch_id)
         raise
 
 
-def auto_update_ofac_sdn(db: Session, imported_by: str = "DAILY_SCHEDULER") -> ImportBatch:
-    return _auto_update(db, OFFICIAL_SOURCES["OFAC_SDN"], imported_by)
+def auto_update_ofac_sdn(db: Session, imported_by: str = "DAILY_SCHEDULER", existing_batch_id=None) -> ImportBatch:
+    return _auto_update(db, OFFICIAL_SOURCES["OFAC_SDN"], imported_by, existing_batch_id)
 
 
 def auto_update_ofac_consolidated(
-    db: Session, imported_by: str = "DAILY_SCHEDULER"
+    db: Session, imported_by: str = "DAILY_SCHEDULER", existing_batch_id=None
 ) -> ImportBatch:
-    return _auto_update(db, OFFICIAL_SOURCES["OFAC_CONSOLIDATED"], imported_by)
+    return _auto_update(db, OFFICIAL_SOURCES["OFAC_CONSOLIDATED"], imported_by, existing_batch_id)
 
 
-def auto_update_france_gel(db: Session, imported_by: str = "DAILY_SCHEDULER") -> ImportBatch:
-    return _auto_update(db, OFFICIAL_SOURCES["FR_GEL"], imported_by)
+def auto_update_france_gel(db: Session, imported_by: str = "DAILY_SCHEDULER", existing_batch_id=None) -> ImportBatch:
+    return _auto_update(db, OFFICIAL_SOURCES["FR_GEL"], imported_by, existing_batch_id)
 
 
-def auto_update_eu_xml(db: Session, imported_by: str = "WEEKLY_SCHEDULER") -> ImportBatch:
-    return _auto_update(db, OFFICIAL_SOURCES["UE"], imported_by)
+def auto_update_eu_xml(db: Session, imported_by: str = "WEEKLY_SCHEDULER", existing_batch_id=None) -> ImportBatch:
+    return _auto_update(db, OFFICIAL_SOURCES["UE"], imported_by, existing_batch_id)
 
 
-def auto_update_un_xml(db: Session, imported_by: str = "WEEKLY_SCHEDULER") -> ImportBatch:
-    return _auto_update(db, OFFICIAL_SOURCES["ONU"], imported_by)
+def auto_update_un_xml(db: Session, imported_by: str = "WEEKLY_SCHEDULER", existing_batch_id=None) -> ImportBatch:
+    return _auto_update(db, OFFICIAL_SOURCES["ONU"], imported_by, existing_batch_id)
 
 
-def auto_update_uksl_csv(db: Session, imported_by: str = "SCHEDULER") -> ImportBatch:
-    return _auto_update(db, OFFICIAL_SOURCES["UKSL"], imported_by)
+def auto_update_uksl_csv(db: Session, imported_by: str = "SCHEDULER", existing_batch_id=None) -> ImportBatch:
+    return _auto_update(db, OFFICIAL_SOURCES["UKSL"], imported_by, existing_batch_id)
 
 
 def get_list_freshness(db: Session, now: datetime | None = None) -> list[dict]:
@@ -375,7 +479,7 @@ def get_list_freshness(db: Session, now: datetime | None = None) -> list[dict]:
         if last_success_at:
             age_days = max(0, (current_time - last_success_at).total_seconds() / 86400)
 
-        if last_attempt and last_attempt.status == "FAILED":
+        if last_attempt and last_attempt.status in {"FAILED", "A_VERIFIER"}:
             status = "ECHEC"
         elif not last_success_at or age_days is None or age_days > maximum_age_days:
             status = "EN_RETARD"

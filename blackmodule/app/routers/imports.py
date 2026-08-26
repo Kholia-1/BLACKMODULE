@@ -29,7 +29,9 @@ from app.services.list_update_service import (
     auto_update_eu_xml,
     auto_update_un_xml,
     auto_update_uksl_csv,
+    queue_official_update,
 )
+from app.scheduler import enqueue_manual_update
 from app.services.api_auth import require_permission
 from app.services.authorization_service import PERMISSION_LISTS_IMPORT, PERMISSION_MANAGE_LISTS
 
@@ -38,6 +40,13 @@ router = APIRouter(
     prefix="/api/imports",
     tags=["Imports"],
 )
+
+
+def _queue_api_official_update(db: Session, source_key: str, username: str) -> ImportBatch:
+    """Persist EN_COURS then let the application scheduler do the slow work."""
+    batch = queue_official_update(db, source_key, username)
+    enqueue_manual_update(source_key, str(batch.id), username)
+    return batch
 
 
 def _validate_extension(filename: str, allowed_extensions: list[str], message: str):
@@ -492,10 +501,7 @@ def manual_auto_update_ofac_sdn(
     user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
-        return auto_update_ofac_sdn(
-            db=db,
-            imported_by=user.get("username"),
-        )
+        return _queue_api_official_update(db, "OFAC_SDN", user.get("username"))
 
     except Exception as e:
         print("ERREUR AUTO UPDATE OFAC SDN =", repr(e))
@@ -512,10 +518,7 @@ def manual_auto_update_ofac_consolidated(
     user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
-        return auto_update_ofac_consolidated(
-            db=db,
-            imported_by=user.get("username"),
-        )
+        return _queue_api_official_update(db, "OFAC_CONSOLIDATED", user.get("username"))
 
     except Exception as e:
         print("ERREUR AUTO UPDATE OFAC CONSOLIDATED =", repr(e))
@@ -625,10 +628,7 @@ def manual_auto_update_france_gel(
     user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
-        return auto_update_france_gel(
-            db=db,
-            imported_by=user.get("username")
-        )
+        return _queue_api_official_update(db, "FR_GEL", user.get("username"))
 
     except Exception as e:
         print("ERREUR AUTO UPDATE FRANCE GEL =", repr(e))
@@ -645,10 +645,7 @@ def manual_auto_update_eu(
     user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
-        return auto_update_eu_xml(
-            db=db,
-            imported_by=user.get("username")
-        )
+        return _queue_api_official_update(db, "UE", user.get("username"))
 
     except Exception as e:
         print("ERREUR AUTO UPDATE UE =", repr(e))
@@ -665,10 +662,7 @@ def manual_auto_update_un(
     user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
-        return auto_update_un_xml(
-            db=db,
-            imported_by=user.get("username")
-        )
+        return _queue_api_official_update(db, "ONU", user.get("username"))
 
     except Exception as e:
         print("ERREUR AUTO UPDATE ONU =", repr(e))
@@ -685,13 +679,10 @@ def api_auto_update_uksl(
     user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
     try:
-        import_batch = auto_update_uksl_csv(
-            db=db,
-            imported_by=user.get("username"),
-        )
+        import_batch = _queue_api_official_update(db, "UKSL", user.get("username"))
         return {
             "success": True,
-            "message": "Mise a jour UKSL effectuee avec succes.",
+            "message": "Mise a jour UKSL programmee.",
             "batch_id": import_batch.id,
             "source_liste": "UKSL",
             "total_records": import_batch.total_records,

@@ -169,6 +169,10 @@ def detect_type_entite(row):
 
 
 def parse_json_record(row):
+    source_record_id = first_clean_value(
+        row,
+        ["id", "identifiantUnique", "idRegistre", "reference", "numero", "uid"],
+    )
     nom = first_clean_value(row, ["nom", "lastName", "name", "patronyme"])
     prenom = first_clean_value(row, ["prenom", "firstName", "givenName"])
     denomination = first_clean_value(row, ["denomination", "raisonSociale", "companyName", "nomSociete"])
@@ -207,6 +211,7 @@ def parse_json_record(row):
     hash_signature = generate_hash_signature("FR_GEL", nom, prenom, date_naissance, num_passeport)
     return {
         "source_liste": "FR_GEL",
+        "source_record_id": source_record_id,
         "type_entite": type_entite,
         "nom": nom.upper()[:150] if nom else None,
         "prenom": prenom.upper()[:150] if prenom else None,
@@ -260,6 +265,9 @@ def parse_france_gel_xml(file_content: bytes) -> list[dict]:
     entries, seen = [], set()
 
     for record in records:
+        source_record_id = get_child_text(
+            record, ["id", "identifiantUnique", "idRegistre", "reference", "numero", "uid"]
+        )
         nom = get_child_text(record, ["nom", "lastName", "name"])
         prenom = get_child_text(record, ["prenom", "firstName", "givenName"])
         nom_complet = get_child_text(record, ["nomComplet", "nom_complet", "fullName", "nameComplete", "denomination"])
@@ -295,6 +303,7 @@ def parse_france_gel_xml(file_content: bytes) -> list[dict]:
         seen.add(hash_signature)
         entries.append({
             "source_liste": "FR_GEL",
+            "source_record_id": source_record_id,
             "type_entite": type_entite,
             "nom": nom.upper()[:150] if nom else None,
             "prenom": prenom.upper()[:150] if prenom else None,

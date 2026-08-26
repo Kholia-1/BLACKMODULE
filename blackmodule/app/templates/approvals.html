@@ -88,9 +88,9 @@
                         <thead><tr><th>Type</th><th>Cible</th><th>Initiateur</th><th>Créée le</th><th>Statut</th><th>Validateur</th><th>Action</th></tr></thead>
                         <tbody>
                             {% for approval in approvals %}
-                                {% set operation_labels = {"MATCHING_SETTINGS_UPDATE": "Modification des seuils", "ALERT_TREATMENT": "Décision sur alerte"} %}
-                                {% set status_labels = {"EN_ATTENTE_VALIDATION": "En attente", "VALIDE": "Validée", "REJETE": "Rejetée"} %}
-                                {% set status_classes = {"EN_ATTENTE_VALIDATION": "badge-pending", "VALIDE": "badge-approved", "REJETE": "badge-rejected"} %}
+                                {% set operation_labels = {"MATCHING_SETTINGS_UPDATE": "Modification des seuils", "ALERT_TREATMENT": "Décision sur alerte", "LIST_VERSION_RESTORE": "Restauration d'une version de liste"} %}
+                                {% set status_labels = {"EN_ATTENTE_VALIDATION": "En attente", "VALIDE": "Validée", "REJETE": "Rejetée", "OBSOLETE": "Obsolète — à revalider"} %}
+                                {% set status_classes = {"EN_ATTENTE_VALIDATION": "badge-pending", "VALIDE": "badge-approved", "REJETE": "badge-rejected", "OBSOLETE": "badge-rejected"} %}
                                 <tr>
                                     <td><span class="badge badge-type">{{ operation_labels.get(approval.operation_type, approval.operation_type) }}</span></td>
                                     <td>{{ approval.target_entity_type }}<br><span class="nowrap">{{ approval.target_entity_id }}</span></td>

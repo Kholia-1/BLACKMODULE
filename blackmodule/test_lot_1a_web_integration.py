@@ -6,6 +6,8 @@ payload from the central role matrix before authorizing or rendering a page.
 """
 
 import unittest
+import json
+from datetime import datetime
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -13,7 +15,7 @@ from fastapi.testclient import TestClient
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.database import get_db
-from app.models import ApprovalRequest
+from app.models import ApprovalRequest, ImportBatch, ListVersion, ListVersionActivation, ListVersionEntry
 from app.routers import alerts, imports, web
 from app.services.authorization_service import (
     ROLE_ADMIN_TECHNIQUE,
@@ -58,13 +60,14 @@ class _Query:
 
 
 class _Db:
-    def __init__(self, approvals=()):
-        self.approvals = list(approvals)
+    def __init__(self, approvals=(), versions=(), batches=(), changes=(), activations=()):
+        self.items_by_model = {
+            ApprovalRequest: list(approvals), ListVersion: list(versions), ImportBatch: list(batches),
+            ListVersionEntry: list(changes), ListVersionActivation: list(activations),
+        }
 
     def query(self, *_args):
-        if _args and _args[0] is ApprovalRequest:
-            return _Query(self.approvals)
-        return _Query()
+        return _Query(self.items_by_model.get(_args[0], ()) if _args else ())
 
     def add(self, _item):
         pass
@@ -76,10 +79,10 @@ class _Db:
         pass
 
 
-def _integration_app(approvals=()) -> FastAPI:
+def _integration_app(approvals=(), versions=(), batches=(), changes=(), activations=()) -> FastAPI:
     app = FastAPI()
     app.add_middleware(SessionMiddleware, secret_key="blackmodule-rbac-test")
-    db = _Db(approvals)
+    db = _Db(approvals, versions, batches, changes, activations)
 
     @app.get("/_test/login/{role}")
     def login(request: Request, role: str):
@@ -115,6 +118,7 @@ class Lot1AWebIntegrationTests(unittest.TestCase):
             "/web/list-updates",
             "/web/scheduler-status",
             "/web/import-history",
+            "/web/list-versions",
             "/web/approvals",
             "/api/alerts/critical-notifications",
         ):
@@ -129,6 +133,7 @@ class Lot1AWebIntegrationTests(unittest.TestCase):
         self.assertIn("Importer les listes", response.text)
         self.assertIn("Scheduler", response.text)
         self.assertIn("Historique des imports", response.text)
+        self.assertIn("Versions et restaurations", response.text)
         self.assertIn("Administration", response.text)
         self.assertIn("Audit &amp; Qualité", response.text)
         self.assertIn("Demandes de validation", response.text)
@@ -203,6 +208,63 @@ class Lot1AWebIntegrationTests(unittest.TestCase):
             follow_redirects=False,
         )
         self.assertEqual(response.status_code, 303)
+
+    def test_07_list_versions_uses_human_labels_and_safe_actions(self):
+        active = ListVersion(
+            id=uuid4(), source_liste="OFAC_SDN", technical_version="V-active", file_hash="a" * 64,
+            archive_content=b"archive", archive_compression="gzip", status="ACTIVE", total_entries=12,
+            added_entries=1, modified_entries=2, delisted_entries=0, reactivated_entries=0,
+            downloaded_at=datetime(2026, 8, 26, 14, 42),
+        )
+        archived = ListVersion(
+            id=uuid4(), source_liste="OFAC_CONSOLIDATED", technical_version="V-archivee", file_hash="b" * 64,
+            archive_content=b"archive", archive_compression="gzip", status="ARCHIVED", total_entries=9,
+            downloaded_at=datetime(2026, 8, 25, 9, 15),
+        )
+        legacy = ImportBatch(
+            id=uuid4(), source_liste="FR_GEL", status="SUCCESS", file_hash="c" * 64,
+            total_records=4, imported_at=datetime(2026, 8, 24, 8, 0),
+        )
+        client = TestClient(_integration_app(versions=[active, archived], batches=[legacy]))
+        self.assertEqual(client.get(f"/_test/login/{ROLE_ADMIN_TECHNIQUE}").status_code, 200)
+        response = client.get("/web/list-versions")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Versions et restaurations des listes", response.text)
+        self.assertIn("OFAC SDN", response.text)
+        self.assertIn("OFAC Consolidated", response.text)
+        self.assertIn("France Gel", response.text)
+        self.assertIn("26/08/2026 14:42", response.text)
+        self.assertIn("Version active", response.text)
+        self.assertIn("Versions archivées restaurables", response.text)
+        self.assertIn("<strong>1</strong><span>Versions archivées restaurables</span>", response.text)
+        self.assertIn("Non restaurable", response.text)
+        self.assertIn("Import réalisé avant la mise en place de l'archivage des versions.", response.text)
+        self.assertIn("Voir le détail", response.text)
+        self.assertIn(f"/web/list-versions/{archived.id}#restauration", response.text)
+        self.assertNotIn(f"/web/list-versions/{active.id}#restauration", response.text)
+        self.assertNotIn(">OFAC_SDN<", response.text)
+
+    def test_08_list_version_detail_uses_human_change_labels(self):
+        version = ListVersion(
+            id=uuid4(), source_liste="UE", technical_version="V-detail", file_hash="d" * 64,
+            archive_content=b"archive", archive_compression="gzip", status="ACTIVE", total_entries=1,
+            active_entries=1, downloaded_at=datetime(2026, 8, 26, 14, 42),
+        )
+        change = ListVersionEntry(
+            id=uuid4(), list_version_id=version.id, sanction_entry_id=uuid4(), source_record_id="EU-42",
+            change_type="MODIFICATION", entry_snapshot=json.dumps({"nom_complet": "Personne exemple"}),
+            created_at=datetime(2026, 8, 26, 14, 43),
+        )
+        client = TestClient(_integration_app(versions=[version], changes=[change]))
+        self.assertEqual(client.get(f"/_test/login/{ROLE_ADMIN_TECHNIQUE}").status_code, 200)
+        response = client.get(f"/web/list-versions/{version.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Union européenne", response.text)
+        self.assertIn("Modification", response.text)
+        self.assertIn("Personne exemple", response.text)
+        self.assertIn("26/08/2026 14:43", response.text)
+        self.assertIn("SHA-256", response.text)
+        self.assertIn("Version active", response.text)
 
 
 if __name__ == "__main__":

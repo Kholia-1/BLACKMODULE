@@ -397,6 +397,7 @@ def parse_uksl_csv(file_content: bytes):
         item = {
             "source_liste": "UKSL",
             "reference_externe": reference_externe,
+            "source_record_id": reference_externe,
             "type_entite": type_entite,
             "nom": nom[:150] if nom else None,
             "prenom": prenom[:150] if prenom else None,

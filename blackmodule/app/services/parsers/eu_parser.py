@@ -197,6 +197,11 @@ def parse_eu_xml(file_content: bytes) -> list[dict]:
     seen = set()
 
     for record in records:
+        source_record_id = (
+            attr(record, ["logicalId", "euReferenceNumber", "unitedNationId", "id"])
+            or first_child_attr(record, ["sanctionEntity", "subject"], ["logicalId", "euReferenceNumber", "id"])
+            or first_text(record, ["euReferenceNumber", "logicalId", "unitedNationId"])
+        )
         name_values = all_child_attrs(record, ["nameAlias", "alias", "name"], ["wholeName", "name", "alias", "lastName", "firstName", "middleName"])
         name_values += [v for v in texts(record, ["wholeName", "nameAlias", "alias", "name", "fullName"]) if v not in name_values]
 
@@ -249,6 +254,7 @@ def parse_eu_xml(file_content: bytes) -> list[dict]:
 
         entries.append({
             "source_liste": "UE",
+            "source_record_id": source_record_id,
             "type_entite": type_entite,
             "nom": nom.upper()[:150] if nom else None,
             "prenom": prenom.upper()[:150] if prenom else None,

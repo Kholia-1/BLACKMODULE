@@ -1039,7 +1039,7 @@
 {% set path = request.url.path %}
 
 {% set filtrage_paths = ["/web/check-client", "/web/sanctions", "/web/alerts", "/web/critical-alerts"] %}
-{% set listes_paths = ["/web/imports", "/web/list-updates", "/web/scheduler-status", "/web/import-history"] %}
+{% set listes_paths = ["/web/imports", "/web/list-updates", "/web/scheduler-status", "/web/import-history", "/web/list-versions"] %}
 {% set admin_paths = ["/web/users", "/web/external-api"] %}
 {% set audit_paths = ["/web/audit-logs", "/web/data-quality", "/web/matching-settings"] %}
 
@@ -1177,6 +1177,9 @@
                     </a>
                     <a href="/web/import-history" class="{% if path == '/web/import-history' %}active{% endif %}">
                         Historique des imports
+                    </a>
+                    <a href="/web/list-versions" class="{% if path == '/web/list-versions' %}active{% endif %}">
+                        Versions et restaurations
                     </a>
                 {% endif %}
             </div>

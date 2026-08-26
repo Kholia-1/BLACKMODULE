@@ -98,6 +98,10 @@ def parse_un_xml(file_content: bytes) -> list[dict]:
     individuals = root.findall(".//INDIVIDUAL")
 
     for individual in individuals:
+        source_record_id = (
+            get_text_from_child(individual, "DATAID")
+            or get_text_from_child(individual, "REFERENCE_NUMBER")
+        )
         first_name = get_text_from_child(individual, "FIRST_NAME")
         second_name = get_text_from_child(individual, "SECOND_NAME")
         third_name = get_text_from_child(individual, "THIRD_NAME")
@@ -218,6 +222,7 @@ def parse_un_xml(file_content: bytes) -> list[dict]:
 
         normalized_entries.append({
             "source_liste": "ONU",
+            "source_record_id": source_record_id,
             "type_entite": "PERSONNE_PHYSIQUE",
             "nom": nom.upper() if nom else full_name.upper(),
             "prenom": prenom.upper() if prenom else None,
@@ -243,6 +248,10 @@ def parse_un_xml(file_content: bytes) -> list[dict]:
     entities = root.findall(".//ENTITY")
 
     for entity in entities:
+        source_record_id = (
+            get_text_from_child(entity, "DATAID")
+            or get_text_from_child(entity, "REFERENCE_NUMBER")
+        )
         first_name = get_text_from_child(entity, "FIRST_NAME")
 
         if not first_name:
@@ -277,6 +286,7 @@ def parse_un_xml(file_content: bytes) -> list[dict]:
 
         normalized_entries.append({
             "source_liste": "ONU",
+            "source_record_id": source_record_id,
             "type_entite": "PERSONNE_MORALE",
             "nom": nom_complet.upper(),
             "prenom": None,

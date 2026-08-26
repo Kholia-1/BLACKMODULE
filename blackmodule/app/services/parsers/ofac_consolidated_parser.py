@@ -357,6 +357,13 @@ def parse_ofac_consolidated_xml(file_content: bytes) -> list[dict]:
     normalized_entries = []
 
     for party in parties:
+        fixed_reference = next(
+            (
+                value for key, value in party.attrib.items()
+                if key.lower() in {"fixedref", "id", "partyid", "uid"} and value
+            ),
+            None,
+        )
         nom_complet, aliases = extract_names_from_party(party)
 
         if not nom_complet:
@@ -393,6 +400,12 @@ def parse_ofac_consolidated_xml(file_content: bytes) -> list[dict]:
 
         normalized_entries.append({
             "source_liste": "OFAC_CONSOLIDATED",
+            # Advanced XML publications differ by schema revision.  Use an
+            # official party identifier when available, otherwise the
+            # reconciliation service falls back to the deterministic signature.
+            "source_record_id": fixed_reference or next(iter(get_texts_by_tag_exact(
+                party, ["UID", "UniqueID", "DistinctPartyID", "PartyID", "Reference"]
+            )), None),
             "type_entite": type_entite,
             "nom": nom.upper() if nom else None,
             "prenom": prenom.upper() if prenom else None,

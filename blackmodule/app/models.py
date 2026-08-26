@@ -9,7 +9,9 @@ from sqlalchemy import (
     Integer,
     Numeric,
     ForeignKey,
-    Float
+    Float,
+    LargeBinary,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -44,6 +46,9 @@ class SanctionEntry(Base):
 
     statut = Column(String(30), default="ACTIF")
     hash_signature = Column(String(64), unique=True, nullable=True)
+    source_record_id = Column(String(255), nullable=True, index=True)
+    delisted_at = Column(DateTime, nullable=True)
+    delisted_by_version_id = Column(UUID(as_uuid=True), nullable=True)
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -100,6 +105,68 @@ class ImportBatch(Base):
     downloaded_at = Column(DateTime, nullable=True)
     published_at = Column(DateTime, nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
+    delisted_records = Column(Integer, default=0)
+    reactivated_records = Column(Integer, default=0)
+
+
+class ListVersion(Base):
+    """Persistent, content-addressed snapshot of one official source version."""
+
+    __tablename__ = "list_versions"
+    __table_args__ = (
+        UniqueConstraint("source_liste", "file_hash", name="uq_list_versions_source_hash"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_liste = Column(String(50), nullable=False, index=True)
+    technical_version = Column(String(100), nullable=False)
+    import_batch_id = Column(UUID(as_uuid=True), ForeignKey("import_batches.id"), nullable=True)
+    source_url = Column(String(1000), nullable=True)
+    downloaded_at = Column(DateTime, nullable=True)
+    published_at = Column(DateTime, nullable=True)
+    file_hash = Column(String(128), nullable=False)
+    archive_content = Column(LargeBinary, nullable=False)
+    archive_compression = Column(String(20), nullable=False, default="gzip")
+    total_entries = Column(Integer, default=0, nullable=False)
+    active_entries = Column(Integer, default=0, nullable=False)
+    added_entries = Column(Integer, default=0, nullable=False)
+    modified_entries = Column(Integer, default=0, nullable=False)
+    delisted_entries = Column(Integer, default=0, nullable=False)
+    reactivated_entries = Column(Integer, default=0, nullable=False)
+    status = Column(String(30), default="ACTIVE", nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class ListVersionActivation(Base):
+    """Immutable activation trail for imports and approved restorations."""
+
+    __tablename__ = "list_version_activations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_liste = Column(String(50), nullable=False, index=True)
+    version_id = Column(UUID(as_uuid=True), ForeignKey("list_versions.id"), nullable=False, index=True)
+    previous_version_id = Column(UUID(as_uuid=True), ForeignKey("list_versions.id"), nullable=True)
+    activation_type = Column(String(30), nullable=False)
+    reason = Column(Text, nullable=True)
+    activated_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class ListVersionEntry(Base):
+    """Immutable entry snapshot and change classification for a list version."""
+
+    __tablename__ = "list_version_entries"
+    __table_args__ = (
+        UniqueConstraint("list_version_id", "sanction_entry_id", name="uq_list_version_entry"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    list_version_id = Column(UUID(as_uuid=True), ForeignKey("list_versions.id"), nullable=False, index=True)
+    sanction_entry_id = Column(UUID(as_uuid=True), ForeignKey("sanction_entries.id"), nullable=False, index=True)
+    source_record_id = Column(String(255), nullable=False)
+    change_type = Column(String(30), nullable=False)
+    entry_snapshot = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
 
 
 class Alert(Base):

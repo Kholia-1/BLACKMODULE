@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 from typing import Optional
 from urllib.parse import urlencode
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, AuditLog, ImportBatch, User, MatchingSetting
+from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, AuditLog, ImportBatch, ListVersion, ListVersionActivation, ListVersionEntry, User, MatchingSetting
 from app.schemas import ClientCheckRequest
 from app.services.auth_service import authenticate_user, hash_password, verify_password
 from app.services.authorization_service import (
@@ -23,9 +24,10 @@ from app.services.authorization_service import (
     has_permission, permissions_for_role, refresh_session_user, role_label, session_user_payload,
 )
 from app.services.approval_service import (
-    OP_ALERT_TREATMENT, OP_MATCHING_SETTINGS, PENDING, create_approval_request,
-    review_approval_request,
+    OP_ALERT_TREATMENT, OP_LIST_VERSION_RESTORE, OP_MATCHING_SETTINGS, PENDING, create_approval_request,
+    queue_restore_approval, review_approval_request,
 )
+from app.services.list_version_service import get_active_version, is_version_restorable
 from app.services.matching_service import build_full_name, classify_alert, select_matching_candidates
 from app.services.audit_service import write_audit_log
 from app.services.import_service import (
@@ -49,8 +51,9 @@ from app.services.list_update_service import (
     auto_update_un_xml,
     auto_update_uksl_csv,
     get_list_freshness,
+    queue_official_update,
 )
-from app.scheduler import get_scheduler_status
+from app.scheduler import enqueue_manual_update, enqueue_restore_approval, get_scheduler_status
 from app.security import get_csrf_token
 from app.services.performance import log_slow_operation, performance_timer
 from app.services.matching_settings_service import (
@@ -63,6 +66,51 @@ templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["csrf_token"] = get_csrf_token
 templates.env.globals["permissions_for_role"] = permissions_for_role
 templates.env.globals["role_label"] = role_label
+
+LIST_SOURCE_LABELS = {"OFAC_CONSOLIDATED": "OFAC Consolidated", "OFAC_SDN": "OFAC SDN", "FR_GEL": "France Gel", "UN": "ONU", "ONU": "ONU", "EU": "Union européenne", "UE": "Union européenne", "UKSL": "UK Sanctions List"}
+VERSION_STATUS_LABELS = {"ACTIVE": "Active", "ARCHIVED": "Archivée"}
+CHANGE_TYPE_LABELS = {"ADDED": "Ajout", "AJOUT": "Ajout", "MODIFIED": "Modification", "MODIFICATION": "Modification", "DELISTED": "Radiation", "RADIATION": "Radiation", "REACTIVATED": "Réactivation", "REACTIVATION": "Réactivation"}
+
+
+def list_source_label(source_liste: str | None) -> str:
+    return LIST_SOURCE_LABELS.get(source_liste or "", source_liste or "Non disponible")
+
+
+def format_web_datetime(value) -> str:
+    return value.strftime("%d/%m/%Y %H:%M") if value else "Non disponible"
+
+
+def format_file_size(value) -> str:
+    if value is None:
+        return "Non disponible"
+    if value < 1024:
+        return f"{value} o"
+    if value < 1024 * 1024:
+        return f"{value / 1024:.1f} Ko"
+    return f"{value / (1024 * 1024):.2f} Mo"
+
+
+def _queue_web_official_update(request: Request, db: Session, source_key: str):
+    """Return immediately; the existing scheduler performs the long import."""
+    username = current_username(request)
+    try:
+        batch = queue_official_update(db, source_key, username)
+        enqueue_manual_update(source_key, str(batch.id), username)
+        return templates.TemplateResponse(
+            request=request, name="list_updates.html", context={
+                "request": request,
+                "message": "Mise a jour programmee. Consultez l'historique pour son statut.",
+                "success": True, "result": batch,
+            },
+        )
+    except Exception as error:
+        db.rollback()
+        return templates.TemplateResponse(
+            request=request, name="list_updates.html", context={
+                "request": request, "message": f"Impossible de programmer la mise a jour : {error}",
+                "success": False, "result": None,
+            },
+        )
 
 
 def require_login(request: Request) -> bool:
@@ -1535,6 +1583,162 @@ def web_unlock_user(user_id: UUID, request: Request, db: Session = Depends(get_d
     denied_response = require_admin_or_403(
         request, db, f"/web/users/{user_id}/unlock", "Tentative de déverrouillage non autorisée."
     )
+
+
+@router.get("/list-versions")
+def web_list_versions(
+    request: Request,
+    source_liste: str | None = Query(None),
+    etat: str | None = Query(None),
+    restaurable: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_VIEW_LISTS):
+        log_access_denied(db, request, "/web/list-versions", "Tentative d'accès refusée aux versions de listes.")
+        return forbidden_page(request)
+
+    selected_source = source_liste.strip().upper() if source_liste else None
+    selected_status = etat.strip().upper() if etat else None
+    selected_restorable = restaurable.strip().lower() if restaurable else None
+    all_versions = db.query(ListVersion).order_by(ListVersion.created_at.desc()).limit(200).all()
+    all_legacy_batches = db.query(ImportBatch).filter(
+        ImportBatch.status == "SUCCESS",
+        ImportBatch.file_hash.is_not(None),
+    ).order_by(ImportBatch.imported_at.desc()).limit(200).all()
+    version_batch_ids = {version.import_batch_id for version in all_versions if version.import_batch_id}
+    all_legacy_batches = [batch for batch in all_legacy_batches if batch.id not in version_batch_ids]
+    version_rows = []
+    for version in all_versions:
+        is_restorable = is_version_restorable(version)
+        if (selected_source and version.source_liste != selected_source) or (selected_status and selected_status != version.status):
+            continue
+        if (selected_restorable == "yes" and not is_restorable) or (selected_restorable == "no" and is_restorable):
+            continue
+        version_rows.append({"version": version, "source_label": list_source_label(version.source_liste), "status_label": VERSION_STATUS_LABELS.get(version.status, version.status), "restorable": is_restorable})
+    legacy_rows = []
+    if (not selected_status or selected_status == "HISTORIQUE") and selected_restorable != "yes":
+        legacy_rows = [{"batch": batch, "source_label": list_source_label(batch.source_liste)} for batch in all_legacy_batches if not selected_source or batch.source_liste == selected_source]
+    tracked_sources = {version.source_liste for version in all_versions} | {batch.source_liste for batch in all_legacy_batches}
+    summary = {"sources": len(tracked_sources), "active": sum(version.status == "ACTIVE" for version in all_versions), "archived_restorable": sum(version.status == "ARCHIVED" and is_version_restorable(version) for version in all_versions), "not_restorable": sum(not is_version_restorable(version) for version in all_versions) + len(all_legacy_batches)}
+    return templates.TemplateResponse(
+        request=request,
+        name="list_versions.html",
+        context={
+            "request": request,
+            "version_rows": version_rows,
+            "legacy_rows": legacy_rows,
+            "source_options": sorted(tracked_sources, key=list_source_label),
+            "source_labels": LIST_SOURCE_LABELS,
+            "selected_source": selected_source,
+            "selected_status": selected_status,
+            "selected_restorable": selected_restorable,
+            "summary": summary,
+            "can_restore": require_permission(request, PERMISSION_MANAGE_LISTS),
+            "format_datetime": format_web_datetime,
+        },
+    )
+
+
+@router.get("/list-versions/{version_id}")
+def web_list_version_detail(
+    version_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_VIEW_LISTS):
+        log_access_denied(db, request, f"/web/list-versions/{version_id}", "Tentative d'accès refusée à une version de liste.")
+        return forbidden_page(request)
+    version = db.query(ListVersion).filter(ListVersion.id == version_id).first()
+    if not version:
+        raise HTTPException(status_code=404, detail="Version introuvable.")
+    changes = db.query(ListVersionEntry).filter(
+        ListVersionEntry.list_version_id == version.id
+    ).order_by(ListVersionEntry.change_type, ListVersionEntry.created_at).all()
+    activations = db.query(ListVersionActivation).filter(
+        ListVersionActivation.version_id == version.id
+    ).order_by(ListVersionActivation.created_at.desc()).all()
+    restorable = is_version_restorable(version)
+    change_rows = []
+    for change in changes:
+        try:
+            snapshot = json.loads(change.entry_snapshot or "{}")
+        except (TypeError, ValueError):
+            snapshot = {}
+        entity_name = snapshot.get("nom_complet") or " ".join(part for part in (snapshot.get("prenom"), snapshot.get("nom")) if part) or "Non disponible"
+        change_rows.append({"change": change, "label": CHANGE_TYPE_LABELS.get(change.change_type, change.change_type), "entity_name": entity_name})
+    return templates.TemplateResponse(
+        request=request,
+        name="list_version_detail.html",
+        context={
+            "request": request,
+            "version": version,
+            "source_label": list_source_label(version.source_liste),
+            "status_label": VERSION_STATUS_LABELS.get(version.status, version.status),
+            "change_rows": change_rows,
+            # Computing an archive diff can take seconds for a 50k list.
+            # The approval path validates the expected active version instead.
+            "preview": None,
+            "activations": activations,
+            "restorable": restorable,
+            "can_restore": restorable and require_permission(request, PERMISSION_MANAGE_LISTS),
+            "format_datetime": format_web_datetime,
+            "format_file_size": format_file_size,
+        },
+    )
+
+
+@router.post("/list-versions/{version_id}/restore")
+def web_request_list_version_restore(
+    version_id: UUID,
+    request: Request,
+    reason: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_MANAGE_LISTS):
+        log_access_denied(db, request, f"/web/list-versions/{version_id}/restore", "Tentative de restauration non autorisée.")
+        return forbidden_page(request)
+    if not reason.strip():
+        return RedirectResponse(url=f"/web/list-versions/{version_id}?message=Motif obligatoire", status_code=303)
+    version = db.query(ListVersion).filter(ListVersion.id == version_id).first()
+    if not version:
+        raise HTTPException(status_code=404, detail="Version introuvable.")
+    if not is_version_restorable(version):
+        return RedirectResponse(url=f"/web/list-versions/{version_id}?message=Version non restaurable", status_code=303)
+    current_version = get_active_version(db, version.source_liste)
+    if not current_version:
+        return RedirectResponse(url=f"/web/list-versions/{version_id}?message=Aucune version courante", status_code=303)
+    existing = db.query(ApprovalRequest).filter(
+        ApprovalRequest.operation_type == OP_LIST_VERSION_RESTORE,
+        ApprovalRequest.target_entity_id == str(version.id),
+        ApprovalRequest.status == PENDING,
+    ).first()
+    if existing:
+        return RedirectResponse(url=f"/web/list-versions/{version_id}?message=Une demande est déjà en attente", status_code=303)
+    user = get_current_user(request)
+    create_approval_request(
+        db,
+        operation_type=OP_LIST_VERSION_RESTORE,
+        initiator=user,
+        target_entity_type="ListVersion",
+        target_entity_id=str(version.id),
+        old_values={"preview": "Calculé lors de la validation afin d'éviter une requête Web longue."},
+        new_values={
+            "target_version_id": str(version.id),
+            "expected_current_version_id": str(current_version.id),
+            "source_liste": version.source_liste,
+            "reason": reason.strip(),
+        },
+        comment=reason.strip(),
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
+    return RedirectResponse(url="/web/approvals?message=Demande de restauration créée", status_code=303)
     if denied_response:
         return denied_response
     user = db.query(User).filter(User.id == user_id).first()
@@ -1635,10 +1839,7 @@ def web_update_uksl(
         return denied_response
 
     try:
-        result_data = auto_update_uksl_csv(
-            db=db,
-            imported_by=current_username(request)
-        )
+        return _queue_web_official_update(request, db, "UKSL")
 
         batch = None
 
@@ -1696,8 +1897,7 @@ def web_update_ofac_sdn(request: Request, db: Session = Depends(get_db)):
         return denied_response
 
     try:
-        result = auto_update_ofac_sdn(db=db, imported_by=current_username(request))
-        return templates.TemplateResponse(request=request, name="list_updates.html", context={"request": request, "message": "Mise à jour OFAC SDN exécutée avec succès.", "success": True, "result": result})
+        return _queue_web_official_update(request, db, "OFAC_SDN")
     except Exception as e:
         return templates.TemplateResponse(request=request, name="list_updates.html", context={"request": request, "message": f"Erreur pendant la mise à jour OFAC SDN : {str(e)}", "success": False, "result": None})
 
@@ -1709,8 +1909,7 @@ def web_update_ofac_consolidated(request: Request, db: Session = Depends(get_db)
         return denied_response
 
     try:
-        result = auto_update_ofac_consolidated(db=db, imported_by=current_username(request))
-        return templates.TemplateResponse(request=request, name="list_updates.html", context={"request": request, "message": "Mise à jour OFAC Consolidated exécutée avec succès.", "success": True, "result": result})
+        return _queue_web_official_update(request, db, "OFAC_CONSOLIDATED")
     except Exception as e:
         return templates.TemplateResponse(request=request, name="list_updates.html", context={"request": request, "message": f"Erreur pendant la mise à jour OFAC Consolidated : {str(e)}", "success": False, "result": None})
 
@@ -2390,6 +2589,14 @@ def web_review_approval(
     if not approval:
         raise HTTPException(status_code=404, detail="Demande introuvable.")
     try:
+        if approval.operation_type == OP_LIST_VERSION_RESTORE and decision.upper() == "APPROVE":
+            queue_restore_approval(
+                db=db, approval=approval, reviewer=get_current_user(request), comment=comment,
+                ip_address=request.client.host if request.client else None,
+            )
+            db.commit()
+            enqueue_restore_approval(str(approval.id))
+            return RedirectResponse(url="/web/approvals?message=Restauration programmée", status_code=303)
         review_approval_request(
             db=db,
             approval=approval,
@@ -2453,10 +2660,7 @@ def web_update_france_gel(
     username = current_user.get("username") if current_user else "SYSTEM"
 
     try:
-        result = auto_update_france_gel(
-            db=db,
-            imported_by=username
-        )
+        return _queue_web_official_update(request, db, "FR_GEL")
 
         return templates.TemplateResponse(
             request=request,
@@ -2507,10 +2711,7 @@ def web_update_eu(
     username = current_user.get("username") if current_user else "SYSTEM"
 
     try:
-        result = auto_update_eu_xml(
-            db=db,
-            imported_by=username
-        )
+        return _queue_web_official_update(request, db, "UE")
 
         return templates.TemplateResponse(
             request=request,
@@ -2557,10 +2758,7 @@ def web_update_un(
     username = current_user.get("username") if current_user else "SYSTEM"
 
     try:
-        result = auto_update_un_xml(
-            db=db,
-            imported_by=username
-        )
+        return _queue_web_official_update(request, db, "ONU")
 
         return templates.TemplateResponse(
             request=request,

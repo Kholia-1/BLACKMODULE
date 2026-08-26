@@ -62,6 +62,9 @@ def startup():
         for column_def in [
             "lieu_naissance VARCHAR(255)",
             "autres_documents TEXT",
+            "source_record_id VARCHAR(255)",
+            "delisted_at TIMESTAMP",
+            "delisted_by_version_id UUID",
         ]:
             conn.execute(text(f"ALTER TABLE sanction_entries ADD COLUMN IF NOT EXISTS {column_def}"))
 
@@ -74,8 +77,19 @@ def startup():
             "downloaded_at TIMESTAMP",
             "published_at TIMESTAMP",
             "file_size_bytes INTEGER",
+            "delisted_records INTEGER DEFAULT 0",
+            "reactivated_records INTEGER DEFAULT 0",
         ]:
             conn.execute(text(f"ALTER TABLE import_batches ADD COLUMN IF NOT EXISTS {column_def}"))
+
+        conn.execute(text(
+            "ALTER TABLE list_versions ADD COLUMN IF NOT EXISTS "
+            "archive_compression VARCHAR(20) NOT NULL DEFAULT 'none'"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_sanction_source_record "
+            "ON sanction_entries (source_liste, source_record_id)"
+        ))
 
         for column_def in [
             "role_assigned_at TIMESTAMP",

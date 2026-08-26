@@ -31,3 +31,9 @@ SESSION_ACTIVITY_PERSIST_INTERVAL_MINUTES = int(
     os.getenv("SESSION_ACTIVITY_PERSIST_INTERVAL_MINUTES", "5")
 )
 MAX_FAILED_LOGIN_ATTEMPTS = int(os.getenv("MAX_FAILED_LOGIN_ATTEMPTS", "5"))
+
+# A source update is blocked before any mutation when its parsed active volume
+# drops by more than this percentage compared with the current version.
+LIST_MAX_ENTRY_DROP_PERCENT = float(os.getenv("LIST_MAX_ENTRY_DROP_PERCENT", "30"))
+if not 0 <= LIST_MAX_ENTRY_DROP_PERCENT < 100:
+    raise ValueError("LIST_MAX_ENTRY_DROP_PERCENT doit être compris entre 0 et 100.")
