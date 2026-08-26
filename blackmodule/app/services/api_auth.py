@@ -1,10 +1,14 @@
 from fastapi import Depends, HTTPException, Request
 
-from app.services.authorization_service import canonical_role, has_permission
+from app.services.authorization_service import (
+    canonical_role,
+    has_permission,
+    refresh_session_user,
+)
 
 
 def get_session_user(request: Request) -> dict:
-    user = request.session.get("user")
+    user = refresh_session_user(request.session.get("user"))
 
     if not user:
         raise HTTPException(
@@ -12,6 +16,7 @@ def get_session_user(request: Request) -> dict:
             detail="Authentification requise. Veuillez vous connecter."
         )
 
+    request.session["user"] = user
     return user
 
 

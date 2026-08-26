@@ -238,7 +238,7 @@
                 <div class="hero-username">@{{ user.username }}</div>
 
                 <div class="hero-badges">
-                    <span class="badge badge-{{ user.role|lower }}">{{ user.role }}</span>
+                    <span class="badge badge-{{ user.role|lower }}">{{ role_label(user.role) }}</span>
                     <span class="badge badge-{{ 'active' if user.statut == 'ACTIF' else 'inactive' }}">{{ user.statut }}</span>
                 </div>
             </div>

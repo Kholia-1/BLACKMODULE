@@ -1032,7 +1032,8 @@
 
 {% set user = request.session.get("user") %}
 {% set role = user.get("role") if user else "" %}
-{% set permissions = user.get("permissions", []) if user else [] %}
+{% set role_display = role_label(role) if user else "" %}
+{% set permissions = permissions_for_role(role) if user else [] %}
 {% set username = user.get("username") if user else "Utilisateur" %}
 {% set full_name = user.get("full_name") if user else "" %}
 {% set path = request.url.path %}
@@ -1041,7 +1042,6 @@
 {% set listes_paths = ["/web/imports", "/web/list-updates", "/web/scheduler-status", "/web/import-history"] %}
 {% set admin_paths = ["/web/users", "/web/external-api"] %}
 {% set audit_paths = ["/web/audit-logs", "/web/data-quality", "/web/matching-settings"] %}
-{% set notif_bell_roles = ["SUPERVISEUR_CONFORMITE", "ANALYSTE_CONFORMITE"] %}
 
 <div class="top-user-bar">
     <div>
@@ -1051,10 +1051,10 @@
 
     <div style="display: flex; align-items: center; gap: 12px;">
         <span class="role-badge role-{{ role|lower }}">
-            {{ role if role else "NON CONNECTÉ" }}
+            {{ role_display if role_display else role_label(role) }}
         </span>
 
-        {% if user and role in notif_bell_roles %}
+        {% if user and "NOTIFICATIONS_VIEW" in permissions %}
             {% set critical_link = "/web/critical-alerts" if "VIEW_CRITICAL_ALERTS" in permissions else "/web/alerts?niveau_alerte=ALERTE_EXACTE" %}
             {% set item_link_base = "/web/critical-alerts" if "VIEW_CRITICAL_ALERTS" in permissions else "/web/alerts" %}
             <div class="notif-bell" id="notifBell" data-critical-link="{{ critical_link }}" data-item-link-base="{{ item_link_base }}">
@@ -1107,7 +1107,7 @@
         Dashboard
     </a>
 
-    {% if "SCREEN_CLIENT" in permissions %}
+    {% if "SCREEN_CLIENT" in permissions or "SANCTIONS_VIEW" in permissions or "ALERTS_VIEW" in permissions %}
         <div class="nav-group {% if path in filtrage_paths %}active{% endif %}">
             <button type="button" class="nav-group-toggle">
                 Filtrage &amp; Conformité
@@ -1115,17 +1115,23 @@
             </button>
 
             <div class="nav-dropdown">
-                <a href="/web/check-client" class="{% if path == '/web/check-client' %}active{% endif %}">
-                    Vérifier client
-                </a>
+                {% if "SCREEN_CLIENT" in permissions %}
+                    <a href="/web/check-client" class="{% if path == '/web/check-client' %}active{% endif %}">
+                        Vérifier client
+                    </a>
+                {% endif %}
 
-                <a href="/web/sanctions" class="{% if path == '/web/sanctions' %}active{% endif %}">
-                    Sanctions
-                </a>
+                {% if "SANCTIONS_VIEW" in permissions %}
+                    <a href="/web/sanctions" class="{% if path == '/web/sanctions' %}active{% endif %}">
+                        Sanctions
+                    </a>
+                {% endif %}
 
-                <a href="/web/alerts" class="{% if path == '/web/alerts' %}active{% endif %}">
-                    Alertes
-                </a>
+                {% if "ALERTS_VIEW" in permissions %}
+                    <a href="/web/alerts" class="{% if path == '/web/alerts' %}active{% endif %}">
+                        Alertes
+                    </a>
+                {% endif %}
 
                 {% if "VIEW_CRITICAL_ALERTS" in permissions %}
                     <a href="/web/critical-alerts" class="{% if path == '/web/critical-alerts' %}active{% endif %}">
@@ -1135,16 +1141,19 @@
             </div>
         </div>
     {% else %}
-        <a href="/web/sanctions" class="{% if path == '/web/sanctions' %}active{% endif %}">
-            Sanctions
-        </a>
-
-        <a href="/web/alerts" class="{% if path == '/web/alerts' %}active{% endif %}">
-            Alertes
-        </a>
+        {% if "SANCTIONS_VIEW" in permissions %}
+            <a href="/web/sanctions" class="{% if path == '/web/sanctions' %}active{% endif %}">
+                Sanctions
+            </a>
+        {% endif %}
+        {% if "ALERTS_VIEW" in permissions %}
+            <a href="/web/alerts" class="{% if path == '/web/alerts' %}active{% endif %}">
+                Alertes
+            </a>
+        {% endif %}
     {% endif %}
 
-    {% if "LISTS_MANAGE" in permissions or "SANCTIONS_VIEW" in permissions %}
+    {% if "LISTS_MANAGE" in permissions or "LISTS_VIEW" in permissions %}
         <div class="nav-group {% if path in listes_paths %}active{% endif %}">
             <button type="button" class="nav-group-toggle">
                 Listes de sanctions
@@ -1152,20 +1161,24 @@
             </button>
 
             <div class="nav-dropdown">
-                {% if "LISTS_MANAGE" in permissions %}
+                {% if "LISTS_IMPORT" in permissions %}
                     <a href="/web/imports" class="{% if path == '/web/imports' %}active{% endif %}">
-                        Imports
+                        Importer les listes
                     </a>
+                {% endif %}
+                {% if "LISTS_MANAGE" in permissions %}
                     <a href="/web/list-updates" class="{% if path == '/web/list-updates' %}active{% endif %}">
                         Mise à jour des listes
                     </a>
+                {% endif %}
+                {% if "LISTS_VIEW" in permissions %}
                     <a href="/web/scheduler-status" class="{% if path == '/web/scheduler-status' %}active{% endif %}">
                         Scheduler
                     </a>
+                    <a href="/web/import-history" class="{% if path == '/web/import-history' %}active{% endif %}">
+                        Historique des imports
+                    </a>
                 {% endif %}
-                <a href="/web/import-history" class="{% if path == '/web/import-history' %}active{% endif %}">
-                    Historique des imports
-                </a>
             </div>
         </div>
     {% endif %}
@@ -1205,7 +1218,7 @@
                 {% if "MATCHING_SETTINGS_CHANGE" in permissions %}<a href="/web/matching-settings" class="{% if path == '/web/matching-settings' %}active{% endif %}">
                     Paramètres de matching
                 </a>{% endif %}
-                {% if "VIEW_APPROVALS" in permissions %}<a href="/web/approvals" class="{% if path == '/web/approvals' %}active{% endif %}">Validations</a>{% endif %}
+                {% if "VIEW_APPROVALS" in permissions %}<a href="/web/approvals" class="{% if path == '/web/approvals' %}active{% endif %}">Demandes de validation</a>{% endif %}
             </div>
         </div>
     {% endif %}
@@ -1245,7 +1258,7 @@
 })();
 </script>
 
-{% if user and role in notif_bell_roles %}
+{% if user and "NOTIFICATIONS_VIEW" in permissions %}
 <script>
 (function () {
     var POLL_INTERVAL_MS = 30000;
@@ -1339,17 +1352,18 @@
         }
 
         notifList.innerHTML = items.map(function (item) {
-            var levelClass = item.niveau_alerte === 'ALERTE_EXACTE' ? 'exacte' : 'probable';
-            var name = (item.client_prenom || '') + ' ' + (item.client_nom || '');
-            name = name.trim() || (item.client_reference || 'Client');
-            var itemHref = itemLinkBase + '#alert-' + encodeURIComponent(item.id);
+            var technical = item.notification_type === 'TECHNIQUE';
+            var levelClass = technical ? 'probable' : (item.niveau_alerte === 'ALERTE_EXACTE' ? 'exacte' : 'probable');
+            var name = technical ? (item.title || 'Notification technique') : ((item.client_prenom || '') + ' ' + (item.client_nom || '')).trim();
+            name = name || (item.client_reference || 'Client');
+            var itemHref = technical ? '/web/scheduler-status' : itemLinkBase + '#alert-' + encodeURIComponent(item.id);
 
             return '<a class="notif-item" href="' + itemHref + '">' +
                 '<div class="notif-item-top">' +
                     '<span class="notif-item-name">' + escapeHtml(name) + '</span>' +
                     '<span class="notif-item-level ' + levelClass + '">' + escapeHtml(item.niveau_alerte || '') + '</span>' +
                 '</div>' +
-                '<div class="notif-item-meta">' + escapeHtml(item.client_reference || '') + ' · ' + timeAgo(item.created_at) + '</div>' +
+                '<div class="notif-item-meta">' + escapeHtml(technical ? (item.description || '') : (item.client_reference || '')) + ' · ' + timeAgo(item.created_at) + '</div>' +
             '</a>';
         }).join('');
     }

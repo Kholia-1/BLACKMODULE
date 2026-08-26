@@ -1,3 +1,5 @@
+import hashlib
+from datetime import datetime, timezone
 from typing import Callable
 
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
@@ -29,7 +31,7 @@ from app.services.list_update_service import (
     auto_update_uksl_csv,
 )
 from app.services.api_auth import require_permission
-from app.services.authorization_service import PERMISSION_MANAGE_LISTS
+from app.services.authorization_service import PERMISSION_LISTS_IMPORT, PERMISSION_MANAGE_LISTS
 
 
 router = APIRouter(
@@ -91,6 +93,9 @@ async def _execute_import(
 
     try:
         file_content = await file.read()
+        import_batch.downloaded_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        import_batch.file_size_bytes = len(file_content)
+        import_batch.file_hash = hashlib.sha256(file_content).hexdigest()
 
         result = importer(
             db=db,
@@ -136,6 +141,7 @@ async def _execute_import(
             status="FAILED",
             imported_by=imported_by,
             error_message=str(e)[:1000],
+            downloaded_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
 
         db.add(failed_batch)
@@ -164,7 +170,7 @@ async def _execute_import(
 async def upload_afb_ppe_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     _validate_extension(
         file.filename,
@@ -189,7 +195,7 @@ async def upload_afb_ppe_csv(
 async def upload_ofac_sdn_xml(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     _validate_extension(
         file.filename,
@@ -214,7 +220,7 @@ async def upload_ofac_sdn_xml(
 async def upload_ofac_consolidated_xml(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     _validate_extension(
         file.filename,
@@ -239,7 +245,7 @@ async def upload_ofac_consolidated_xml(
 async def upload_un_xml(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     _validate_extension(
         file.filename,
@@ -264,7 +270,7 @@ async def upload_un_xml(
 async def upload_eu_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     _validate_extension(
         file.filename,
@@ -289,7 +295,7 @@ async def upload_eu_csv(
 async def upload_ofsi_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     _validate_extension(
         file.filename,
@@ -314,7 +320,7 @@ async def upload_ofsi_csv(
 async def upload_ofsi_excel(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     _validate_extension(
         file.filename,
@@ -339,7 +345,7 @@ async def upload_ofsi_excel(
 async def upload_france_gel_json(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     _validate_extension(
         file.filename,
@@ -364,7 +370,7 @@ async def upload_france_gel_json(
 async def upload_france_gel_xml(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     _validate_extension(
         file.filename,
@@ -389,7 +395,7 @@ async def upload_france_gel_xml(
 async def upload_uksl_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     imported_by = user.get("username")
 
@@ -523,7 +529,7 @@ def manual_auto_update_ofac_consolidated(
 async def upload_eu_xml(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
+    user: dict = Depends(require_permission(PERMISSION_LISTS_IMPORT)),
 ):
     imported_by = user.get("username")
 
@@ -678,15 +684,23 @@ def api_auto_update_uksl(
     db: Session = Depends(get_db),
     user: dict = Depends(require_permission(PERMISSION_MANAGE_LISTS)),
 ):
-    result = auto_update_uksl_csv(
-        db=db,
-        imported_by=user.get("username")
-    )
-
-    if not result.get("success"):
+    try:
+        import_batch = auto_update_uksl_csv(
+            db=db,
+            imported_by=user.get("username"),
+        )
+        return {
+            "success": True,
+            "message": "Mise a jour UKSL effectuee avec succes.",
+            "batch_id": import_batch.id,
+            "source_liste": "UKSL",
+            "total_records": import_batch.total_records,
+            "inserted_records": import_batch.inserted_records,
+            "updated_records": import_batch.updated_records,
+            "rejected_records": import_batch.rejected_records,
+        }
+    except Exception as error:
         raise HTTPException(
             status_code=400,
-            detail=result.get("message")
+            detail=f"Erreur mise a jour UKSL : {error}",
         )
-
-    return result

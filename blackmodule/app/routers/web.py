@@ -15,11 +15,12 @@ from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, Aud
 from app.schemas import ClientCheckRequest
 from app.services.auth_service import authenticate_user, hash_password, verify_password
 from app.services.authorization_service import (
-    ALL_ROLES, PERMISSION_MANAGE_LISTS, PERMISSION_MANAGE_MATCHING_SETTINGS,
+    ALL_ROLES, PERMISSION_LISTS_IMPORT, PERMISSION_MANAGE_LISTS, PERMISSION_MANAGE_MATCHING_SETTINGS,
     PERMISSION_MANAGE_TECHNICAL_CONFIGURATION, PERMISSION_MANAGE_USERS,
     PERMISSION_REVIEW_FOUR_EYES, PERMISSION_SCREEN_CLIENT, PERMISSION_TREAT_ALERTS,
     PERMISSION_VIEW_ALERTS, PERMISSION_VIEW_APPROVALS, PERMISSION_VIEW_AUDIT, PERMISSION_VIEW_CRITICAL_ALERTS,
-    PERMISSION_VIEW_LISTS, ROLE_ADMIN_TECHNIQUE, has_permission, session_user_payload,
+    PERMISSION_VIEW_LISTS, PERMISSION_LISTS_VIEW, PERMISSION_SANCTIONS_VIEW, ROLE_ADMIN_TECHNIQUE,
+    has_permission, permissions_for_role, refresh_session_user, role_label, session_user_payload,
 )
 from app.services.approval_service import (
     OP_ALERT_TREATMENT, OP_MATCHING_SETTINGS, PENDING, create_approval_request,
@@ -46,7 +47,8 @@ from app.services.list_update_service import (
     auto_update_france_gel,
     auto_update_eu_xml,
     auto_update_un_xml,
-    auto_update_uksl_csv
+    auto_update_uksl_csv,
+    get_list_freshness,
 )
 from app.scheduler import get_scheduler_status
 from app.security import get_csrf_token
@@ -59,14 +61,20 @@ from app.services.matching_settings_service import (
 router = APIRouter(prefix="/web", tags=["Web Interface"])
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["csrf_token"] = get_csrf_token
+templates.env.globals["permissions_for_role"] = permissions_for_role
+templates.env.globals["role_label"] = role_label
 
 
 def require_login(request: Request) -> bool:
-    return bool(request.session.get("user"))
+    return bool(get_current_user(request))
 
 
 def get_current_user(request: Request):
-    return request.session.get("user")
+    stored_user = request.session.get("user")
+    user = refresh_session_user(stored_user)
+    if user and user != stored_user:
+        request.session["user"] = user
+    return user
 
 
 def require_permission(request: Request, permission: str) -> bool:
@@ -106,7 +114,9 @@ def require_admin_or_403(request: Request, db: Session, route: str, description:
 
     if route.startswith("/web/users"):
         permission = PERMISSION_MANAGE_USERS
-    elif route.startswith("/web/import") or route.startswith("/web/list-updates"):
+    elif route.startswith("/web/import"):
+        permission = PERMISSION_LISTS_IMPORT
+    elif route.startswith("/web/list-updates"):
         permission = PERMISSION_MANAGE_LISTS
     else:
         permission = PERMISSION_MANAGE_TECHNICAL_CONFIGURATION
@@ -996,7 +1006,7 @@ async def web_import_uksl_csv(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_permission(request, PERMISSION_MANAGE_LISTS):
+    if not require_permission(request, PERMISSION_LISTS_IMPORT):
         log_access_denied(
             db=db,
             request=request,
@@ -1161,6 +1171,10 @@ def web_sanctions(
     started_at = performance_timer()
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
+
+    if not require_permission(request, PERMISSION_SANCTIONS_VIEW):
+        log_access_denied(db, request, "/web/sanctions", "Tentative d'acces refusee aux sanctions.")
+        return forbidden_page(request)
 
     query = db.query(SanctionEntry)
 
@@ -1709,7 +1723,7 @@ def web_scheduler_status(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_permission(request, PERMISSION_MANAGE_LISTS):
+    if not require_permission(request, PERMISSION_LISTS_VIEW):
         log_access_denied(
             db=db,
             request=request,
@@ -1719,6 +1733,7 @@ def web_scheduler_status(
         return forbidden_page(request)
 
     scheduler_status = get_scheduler_status()
+    list_freshness = get_list_freshness(db)
 
     latest_imports = db.query(ImportBatch).filter(
         ImportBatch.source_liste.in_([
@@ -1727,6 +1742,7 @@ def web_scheduler_status(
             "FR_GEL",
             "UE",
             "ONU",
+            "UKSL",
             "OFSI"
         ])
     ).order_by(
@@ -1791,6 +1807,7 @@ def web_scheduler_status(
         context={
             "request": request,
             "scheduler_status": scheduler_status,
+            "list_freshness": list_freshness,
             "latest_imports": latest_imports,
             "monitored_lists": monitored_lists
         }
@@ -1806,7 +1823,7 @@ async def web_import_eu_xml(
     if not require_login(request):
         return RedirectResponse(url="/web/login", status_code=303)
 
-    if not require_permission(request, PERMISSION_MANAGE_LISTS):
+    if not require_permission(request, PERMISSION_LISTS_IMPORT):
         log_access_denied(
             db=db,
             request=request,
@@ -2331,10 +2348,23 @@ def web_approvals(request: Request, db: Session = Depends(get_db)):
         log_access_denied(db, request, "/web/approvals", "Tentative d'accès refusée aux validations.")
         return forbidden_page(request)
     approvals = db.query(ApprovalRequest).order_by(ApprovalRequest.created_at.desc()).limit(200).all()
+    approval_counts = {
+        "pending": sum(approval.status == PENDING for approval in approvals),
+        "approved": sum(approval.status == "VALIDE" for approval in approvals),
+        "rejected": sum(approval.status == "REJETE" for approval in approvals),
+    }
+    current_user = get_current_user(request)
     return templates.TemplateResponse(
         request=request,
         name="approvals.html",
-        context={"request": request, "approvals": approvals, "pending_status": PENDING},
+        context={
+            "request": request,
+            "approvals": approvals,
+            "approval_counts": approval_counts,
+            "pending_status": PENDING,
+            "can_validate": require_permission(request, PERMISSION_REVIEW_FOUR_EYES),
+            "current_user_id": current_user.get("id"),
+        },
     )
 
 

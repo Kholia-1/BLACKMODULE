@@ -1,29 +1,127 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="UTF-8"><title>BLACKMODULE - Validations</title></head>
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Demandes de validation</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #F8FAFC;
+            margin: 0;
+            color: #1E293B;
+        }
+        .header { background: #0F172A; color: white; padding: 22px 32px; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+        .header p { margin: 6px 0 0; color: #94A3B8; font-size: 13.5px; }
+        .container { padding: 28px 32px; }
+        .page-heading { margin-bottom: 22px; }
+        .page-heading h2 { margin: 0; color: #0F172A; font-size: 22px; font-weight: 700; }
+        .page-heading p { margin: 7px 0 0; color: #64748B; font-size: 13.5px; }
+        .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }
+        .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,0.06); border-left: 3px solid #64748B; }
+        .stat-card.pending { border-left-color: #D97706; }
+        .stat-card.approved { border-left-color: #16A34A; }
+        .stat-card.rejected { border-left-color: #DC2626; }
+        .stat-card-title { color: #64748B; font-size: 13px; margin-bottom: 8px; }
+        .stat-card-value { color: #0F172A; font-size: 26px; font-weight: 700; }
+        .card { background: white; border-radius: 12px; padding: 22px; box-shadow: 0 1px 2px rgba(15,23,42,0.06); }
+        .card h3 { margin: 0; color: #0F172A; font-size: 17px; font-weight: 600; }
+        .card-sub { margin: 7px 0 18px; color: #64748B; font-size: 13px; }
+        .message { margin-bottom: 18px; padding: 11px 14px; border: 1px solid #BFDBFE; border-radius: 8px; background: #EFF6FF; color: #1D4ED8; font-size: 13.5px; }
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; min-width: 1050px; border-collapse: collapse; font-size: 13.5px; }
+        th { text-align: left; background: #F1F5F9; color: #334155; padding: 11px 12px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; white-space: nowrap; }
+        td { padding: 12px; border-bottom: 1px solid #E2E8F0; vertical-align: top; }
+        tr:hover td { background: #F8FAFC; }
+        .nowrap { white-space: nowrap; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+        .badge-type { background: #E2E8F0; color: #334155; }
+        .badge-pending { background: #FEF3C7; color: #92400E; }
+        .badge-approved { background: #DCFCE7; color: #166534; }
+        .badge-rejected { background: #FEE2E2; color: #B91C1C; }
+        .action-form { display: flex; align-items: center; gap: 8px; min-width: 285px; }
+        .action-form input[type="text"] { min-width: 130px; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 8px; font: inherit; font-size: 12.5px; }
+        .btn { border: 1px solid transparent; border-radius: 8px; padding: 8px 11px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+        .btn-approve { background: #16A34A; color: white; border-color: #16A34A; }
+        .btn-reject { background: white; color: #B91C1C; border-color: #FCA5A5; }
+        .empty-state { text-align: center; padding: 48px 20px; color: #64748B; }
+        .empty-state h3 { margin: 0 0 8px; color: #334155; font-size: 17px; }
+        .empty-state p { margin: 0; font-size: 13.5px; }
+        @media (max-width: 800px) {
+            .header, .container { padding: 20px; }
+            .cards { grid-template-columns: 1fr; }
+            .action-form { flex-wrap: wrap; }
+        }
+    </style>
+</head>
 <body>
-{% include "partials/navbar.html" %}
-<main>
-  <h1>Validations à quatre yeux</h1>
-  {% if request.query_params.get("message") %}<p>{{ request.query_params.get("message") }}</p>{% endif %}
-  <table>
-    <thead><tr><th>Type</th><th>Cible</th><th>Initiateur</th><th>Créée le</th><th>Statut</th><th>Relecteur</th><th>Action</th></tr></thead>
-    <tbody>
-    {% for approval in approvals %}
-      <tr>
-        <td>{{ approval.operation_type }}</td><td>{{ approval.target_entity_type }}: {{ approval.target_entity_id }}</td>
-        <td>{{ approval.initiated_by }}</td><td>{{ approval.created_at }}</td><td>{{ approval.status }}</td><td>{{ approval.reviewed_by or "-" }}</td>
-        <td>{% if approval.status == pending_status and "APPROVAL_VALIDATE" in request.session.get("user", {}).get("permissions", []) %}
-          <form method="post" action="/web/approvals/{{ approval.id }}/review">
-            <input name="comment" placeholder="Commentaire">
-            <button name="decision" value="APPROVE" type="submit">Valider</button>
-            <button name="decision" value="REJECT" type="submit">Rejeter</button>
-          </form>
-        {% endif %}</td>
-      </tr>
-    {% else %}<tr><td colspan="7">Aucune demande.</td></tr>{% endfor %}
-    </tbody>
-  </table>
-</main>
+    <div class="header">
+        <h1>BLACKMODULE</h1>
+        <p>Validation à quatre yeux des opérations sensibles</p>
+        {% include "partials/navbar.html" %}
+    </div>
+
+    <main class="container">
+        <div class="page-heading">
+            <h2>Demandes de validation</h2>
+            <p>Suivi des opérations sensibles nécessitant la validation d'un second utilisateur habilité.</p>
+        </div>
+
+        <section class="cards" aria-label="Synthèse des demandes">
+            <div class="stat-card pending"><div class="stat-card-title">En attente</div><div class="stat-card-value">{{ approval_counts.pending }}</div></div>
+            <div class="stat-card approved"><div class="stat-card-title">Validées</div><div class="stat-card-value">{{ approval_counts.approved }}</div></div>
+            <div class="stat-card rejected"><div class="stat-card-title">Rejetées</div><div class="stat-card-value">{{ approval_counts.rejected }}</div></div>
+        </section>
+
+        <section class="card">
+            <h3>Historique des demandes</h3>
+            <p class="card-sub">Les actions de validation restent réservées aux utilisateurs habilités.</p>
+            {% if request.query_params.get("message") %}
+                <div class="message">{{ request.query_params.get("message") }}</div>
+            {% endif %}
+
+            {% if approvals %}
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Type</th><th>Cible</th><th>Initiateur</th><th>Créée le</th><th>Statut</th><th>Validateur</th><th>Action</th></tr></thead>
+                        <tbody>
+                            {% for approval in approvals %}
+                                {% set operation_labels = {"MATCHING_SETTINGS_UPDATE": "Modification des seuils", "ALERT_TREATMENT": "Décision sur alerte"} %}
+                                {% set status_labels = {"EN_ATTENTE_VALIDATION": "En attente", "VALIDE": "Validée", "REJETE": "Rejetée"} %}
+                                {% set status_classes = {"EN_ATTENTE_VALIDATION": "badge-pending", "VALIDE": "badge-approved", "REJETE": "badge-rejected"} %}
+                                <tr>
+                                    <td><span class="badge badge-type">{{ operation_labels.get(approval.operation_type, approval.operation_type) }}</span></td>
+                                    <td>{{ approval.target_entity_type }}<br><span class="nowrap">{{ approval.target_entity_id }}</span></td>
+                                    <td>{{ approval.initiated_by }}</td>
+                                    <td class="nowrap">{{ approval.created_at.strftime('%d/%m/%Y %H:%M') if approval.created_at else "-" }}</td>
+                                    <td><span class="badge {{ status_classes.get(approval.status, 'badge-type') }}">{{ status_labels.get(approval.status, approval.status) }}</span></td>
+                                    <td>{{ approval.reviewed_by or "-" }}</td>
+                                    <td>
+                                        {% if approval.status == pending_status and can_validate and approval.initiator_user_id != current_user_id %}
+                                            <form class="action-form" method="post" action="/web/approvals/{{ approval.id }}/review">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                                                <input type="text" name="comment" placeholder="Commentaire">
+                                                <button class="btn btn-approve" name="decision" value="APPROVE" type="submit">Valider</button>
+                                                <button class="btn btn-reject" name="decision" value="REJECT" type="submit">Rejeter</button>
+                                            </form>
+                                        {% else %}
+                                            <span class="nowrap">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <h3>Aucune demande de validation</h3>
+                    <p>Aucune opération sensible n'est actuellement en attente de validation.</p>
+                </div>
+            {% endif %}
+        </section>
+    </main>
 </body>
 </html>

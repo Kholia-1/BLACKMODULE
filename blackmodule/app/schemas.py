@@ -156,6 +156,11 @@ class ImportBatchResponse(BaseModel):
 
     imported_by: Optional[str] = None
     imported_at: Optional[datetime] = None
+    file_hash: Optional[str] = None
+    source_url: Optional[str] = None
+    downloaded_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None
+    file_size_bytes: Optional[int] = None
 
     class Config:
         from_attributes = True

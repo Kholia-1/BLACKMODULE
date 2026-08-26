@@ -33,6 +33,7 @@ Stack :
 - Protéger les permissions côté backend, pas seulement dans les templates.
 - Respecter le principe du moindre privilège.
 - Respecter le principe des quatre yeux lorsque requis.
+- Une modification RBAC doit préserver la navigation et l'affichage des fonctionnalités accessibles en lecture. Ne masquer que les fonctions réellement interdites. Toujours distinguer permission de consultation et permission d'action.
 
 ## Infrastructure
 

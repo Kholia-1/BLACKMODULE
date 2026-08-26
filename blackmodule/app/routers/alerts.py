@@ -5,12 +5,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Alert
+from app.models import Alert, AuditLog
 from app.schemas import AlertResponse, AlertTreatmentRequest
 from app.services.audit_service import write_audit_log
 from app.services.api_auth import get_session_user, require_permission
 from app.services.approval_service import OP_ALERT_TREATMENT, create_approval_request
-from app.services.authorization_service import PERMISSION_TREAT_ALERTS, PERMISSION_VIEW_ALERTS
+from app.services.authorization_service import (
+    PERMISSION_NOTIFICATIONS_VIEW,
+    PERMISSION_TREAT_ALERTS,
+    PERMISSION_VIEW_ALERTS,
+)
 
 
 router = APIRouter(
@@ -53,7 +57,7 @@ def list_alerts(
 @router.get("/critical-notifications")
 def get_critical_notifications(
     db: Session = Depends(get_db),
-    user: dict = Depends(require_permission(PERMISSION_VIEW_ALERTS))
+    user: dict = Depends(require_permission(PERMISSION_NOTIFICATIONS_VIEW))
 ):
     """
     Fournit le contenu de la cloche de notifications : nombre et liste
@@ -65,24 +69,47 @@ def get_critical_notifications(
         Alert.statut.in_(["GENEREE", "EN_COURS", "ESCALADEE"])
     )
 
-    total = query.count()
-
     recent = query.order_by(Alert.created_at.desc()).limit(8).all()
 
+    technical_notifications = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.action == "LIST_UPDATE_ALERT",
+            AuditLog.entity_type == "ListFreshness",
+        )
+        .order_by(AuditLog.created_at.desc())
+        .limit(8)
+        .all()
+    )
+
+    alert_items = [
+        {
+            "id": str(alert.id),
+            "client_reference": alert.client_reference,
+            "client_nom": alert.client_nom,
+            "client_prenom": alert.client_prenom,
+            "niveau_alerte": alert.niveau_alerte,
+            "statut": alert.statut,
+            "created_at": alert.created_at.isoformat() if alert.created_at else None,
+            "notification_type": "ALERTE",
+        }
+        for alert in recent
+    ]
+    technical_items = [
+        {
+            "id": str(log.id),
+            "title": f"Liste {log.entity_id}",
+            "description": log.description,
+            "niveau_alerte": "TECHNIQUE",
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+            "notification_type": "TECHNIQUE",
+        }
+        for log in technical_notifications
+    ]
+
     return {
-        "total": total,
-        "items": [
-            {
-                "id": str(alert.id),
-                "client_reference": alert.client_reference,
-                "client_nom": alert.client_nom,
-                "client_prenom": alert.client_prenom,
-                "niveau_alerte": alert.niveau_alerte,
-                "statut": alert.statut,
-                "created_at": alert.created_at.isoformat() if alert.created_at else None
-            }
-            for alert in recent
-        ]
+        "total": query.count() + len(technical_items),
+        "items": technical_items + alert_items,
     }
 
 

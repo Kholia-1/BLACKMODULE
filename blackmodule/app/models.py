@@ -95,8 +95,11 @@ class ImportBatch(Base):
 
     imported_by = Column(String(100), nullable=True)
     imported_at = Column(DateTime, server_default=func.now())
-    
     file_hash = Column(String(128), nullable=True)
+    source_url = Column(String(1000), nullable=True)
+    downloaded_at = Column(DateTime, nullable=True)
+    published_at = Column(DateTime, nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
 
 
 class Alert(Base):

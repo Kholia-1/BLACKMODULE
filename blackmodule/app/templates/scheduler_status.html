@@ -183,9 +183,11 @@
                 {{ scheduler_status.jobs|length if scheduler_status.jobs else 0 }}
             </div>
 
-            <a class="btn" href="/web/list-updates">
-                Lancer une mise à jour manuelle
-            </a>
+            {% if "LISTS_MANAGE" in request.session.get("user", {}).get("permissions", []) %}
+                <a class="btn" href="/web/list-updates">
+                    Lancer une mise à jour manuelle
+                </a>
+            {% endif %}
         </div>
 
         <div class="card">
@@ -253,6 +255,41 @@
                         <td>{{ item.frequence }}</td>
                         <td>{{ item.heure }}</td>
                         <td>{{ item.mode }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Fraicheur des listes</h2>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Statut</th>
+                        <th>Derniere mise a jour reussie</th>
+                        <th>Derniere tentative</th>
+                        <th>Seuil</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in list_freshness %}
+                    <tr>
+                        <td><span class="badge badge-info">{{ item.source }}</span></td>
+                        <td>
+                            {% if item.status == "FRAICHE" %}
+                                <span class="badge badge-success">FRAICHE</span>
+                            {% else %}
+                                <span class="badge badge-warning">{{ item.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.last_success.strftime('%Y-%m-%d %H:%M:%S') if item.last_success else "-" }}</td>
+                        <td>{{ item.last_attempt.strftime('%Y-%m-%d %H:%M:%S') if item.last_attempt else "-" }}</td>
+                        <td>{{ item.maximum_age_days }} jours</td>
                     </tr>
                     {% endfor %}
                 </tbody>

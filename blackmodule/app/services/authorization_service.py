@@ -32,6 +32,7 @@ LEGACY_ROLE_MAP = {
 PERMISSION_USERS_MANAGE = "USERS_MANAGE"
 PERMISSION_USERS_VIEW = "USERS_VIEW"
 PERMISSION_SANCTIONS_VIEW = "SANCTIONS_VIEW"
+PERMISSION_LISTS_VIEW = "LISTS_VIEW"
 PERMISSION_LISTS_IMPORT = "LISTS_IMPORT"
 PERMISSION_LISTS_MANAGE = "LISTS_MANAGE"
 PERMISSION_ALERTS_VIEW = "ALERTS_VIEW"
@@ -42,6 +43,7 @@ PERMISSION_MATCHING_SETTINGS_VIEW = "MATCHING_SETTINGS_VIEW"
 PERMISSION_MATCHING_SETTINGS_CHANGE = "MATCHING_SETTINGS_CHANGE"
 PERMISSION_APPROVAL_VALIDATE = "APPROVAL_VALIDATE"
 PERMISSION_AUDIT_VIEW = "AUDIT_VIEW"
+PERMISSION_NOTIFICATIONS_VIEW = "NOTIFICATIONS_VIEW"
 PERMISSION_EXPORT_USERS = "EXPORT_USERS"
 PERMISSION_EXPORT_AUDIT = "EXPORT_AUDIT"
 
@@ -50,7 +52,7 @@ PERMISSION_MANAGE_USERS = PERMISSION_USERS_MANAGE
 PERMISSION_MANAGE_TECHNICAL_CONFIGURATION = "MANAGE_TECHNICAL_CONFIGURATION"
 PERMISSION_VIEW_AUDIT = PERMISSION_AUDIT_VIEW
 PERMISSION_MANAGE_LISTS = PERMISSION_LISTS_MANAGE
-PERMISSION_VIEW_LISTS = PERMISSION_SANCTIONS_VIEW
+PERMISSION_VIEW_LISTS = PERMISSION_LISTS_VIEW
 PERMISSION_SCREEN_CLIENT = "SCREEN_CLIENT"
 PERMISSION_VIEW_ALERTS = PERMISSION_ALERTS_VIEW
 PERMISSION_TREAT_ALERTS = PERMISSION_ALERTS_TREAT
@@ -64,6 +66,15 @@ ROLE_PERMISSIONS = {
     ROLE_ADMIN_TECHNIQUE: {
         PERMISSION_MANAGE_USERS,
         PERMISSION_USERS_VIEW,
+        PERMISSION_SANCTIONS_VIEW,
+        PERMISSION_LISTS_VIEW,
+        # TEMPORAIRE développement/recette : à retirer lorsque
+        # GESTIONNAIRE_LISTES sera opérationnel en production.
+        PERMISSION_LISTS_IMPORT,
+        PERMISSION_MANAGE_LISTS,
+        PERMISSION_VIEW_ALERTS,
+        PERMISSION_VIEW_CRITICAL_ALERTS,
+        PERMISSION_NOTIFICATIONS_VIEW,
         PERMISSION_MANAGE_TECHNICAL_CONFIGURATION,
         PERMISSION_VIEW_AUDIT,
         PERMISSION_VIEW_APPROVALS,
@@ -71,10 +82,12 @@ ROLE_PERMISSIONS = {
         PERMISSION_EXPORT_AUDIT,
     },
     ROLE_SUPERVISEUR_CONFORMITE: {
+        PERMISSION_SANCTIONS_VIEW,
         PERMISSION_VIEW_LISTS,
         PERMISSION_MATCHING_SETTINGS_VIEW,
         PERMISSION_SCREEN_CLIENT,
         PERMISSION_VIEW_ALERTS,
+        PERMISSION_NOTIFICATIONS_VIEW,
         PERMISSION_TREAT_ALERTS,
         PERMISSION_ALERTS_CONFIRM,
         PERMISSION_ALERTS_CLOSE,
@@ -86,18 +99,22 @@ ROLE_PERMISSIONS = {
         PERMISSION_EXPORT_AUDIT,
     },
     ROLE_ANALYSTE_CONFORMITE: {
+        PERMISSION_SANCTIONS_VIEW,
         PERMISSION_VIEW_LISTS,
         PERMISSION_SCREEN_CLIENT,
         PERMISSION_VIEW_ALERTS,
+        PERMISSION_NOTIFICATIONS_VIEW,
         PERMISSION_TREAT_ALERTS,
     },
     ROLE_GESTIONNAIRE_LISTES: {
         PERMISSION_MANAGE_LISTS,
         PERMISSION_LISTS_IMPORT,
         PERMISSION_VIEW_LISTS,
+        PERMISSION_SANCTIONS_VIEW,
     },
     ROLE_CONSULTATION: {
         PERMISSION_VIEW_LISTS,
+        PERMISSION_SANCTIONS_VIEW,
         PERMISSION_VIEW_ALERTS,
     },
     ROLE_AUDITEUR: {
@@ -117,6 +134,40 @@ def permissions_for_role(role: str | None) -> set[str]:
     return set(ROLE_PERMISSIONS.get(canonical_role(role), set()))
 
 
+def refresh_session_user(user: dict | None) -> dict | None:
+    """Refresh a session payload from the central RBAC matrix.
+
+    Browser sessions can survive a deployment. Their embedded permissions
+    must therefore never override the permissions currently assigned to the
+    role in this module.
+    """
+    if not user:
+        return None
+
+    role = canonical_role(user.get("role"))
+    return {
+        **user,
+        "role": role,
+        "role_label": role_label(role),
+        "permissions": sorted(permissions_for_role(role)),
+    }
+
+
+ROLE_LABELS = {
+    ROLE_ADMIN_TECHNIQUE: "Administrateur technique",
+    ROLE_SUPERVISEUR_CONFORMITE: "Superviseur conformité",
+    ROLE_ANALYSTE_CONFORMITE: "Analyste conformité",
+    ROLE_GESTIONNAIRE_LISTES: "Gestionnaire des listes",
+    ROLE_CONSULTATION: "Consultation",
+    ROLE_AUDITEUR: "Auditeur",
+}
+
+
+def role_label(role: str | None) -> str:
+    canonical = canonical_role(role)
+    return ROLE_LABELS.get(canonical, canonical or "Non connecté")
+
+
 def has_permission(user: dict | None, permission: str) -> bool:
     if not user:
         return False
@@ -128,10 +179,9 @@ def has_permission(user: dict | None, permission: str) -> bool:
 
 def session_user_payload(user) -> dict:
     role = canonical_role(user.role)
-    return {
+    return refresh_session_user({
         "id": str(user.id),
         "username": user.username,
         "full_name": user.full_name,
         "role": role,
-        "permissions": sorted(permissions_for_role(role)),
-    }
+    })

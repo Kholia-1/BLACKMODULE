@@ -70,6 +70,14 @@ def startup():
         ))
 
         for column_def in [
+            "source_url VARCHAR(1000)",
+            "downloaded_at TIMESTAMP",
+            "published_at TIMESTAMP",
+            "file_size_bytes INTEGER",
+        ]:
+            conn.execute(text(f"ALTER TABLE import_batches ADD COLUMN IF NOT EXISTS {column_def}"))
+
+        for column_def in [
             "role_assigned_at TIMESTAMP",
             "last_login_at TIMESTAMP",
             "last_activity_at TIMESTAMP",

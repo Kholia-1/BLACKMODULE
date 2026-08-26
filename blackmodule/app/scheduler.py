@@ -7,7 +7,8 @@ from app.services.list_update_service import (
     auto_update_france_gel,
     auto_update_eu_xml,
     auto_update_un_xml,
-    auto_update_uksl_csv
+    auto_update_uksl_csv,
+    emit_list_freshness_alerts,
 )
 
 
@@ -30,6 +31,17 @@ def run_job(job_name: str, update_function, imported_by: str):
     except Exception as e:
         print(f"[BLACKMODULE] Erreur job {job_name} : {e}")
 
+    finally:
+        db.close()
+
+
+def run_freshness_check():
+    db = SessionLocal()
+    try:
+        alerts = emit_list_freshness_alerts(db=db)
+        print(f"[BLACKMODULE] Controle de fraicheur des listes: {len(alerts)} alerte(s).")
+    except Exception as error:
+        print(f"[BLACKMODULE] Erreur controle de fraicheur des listes: {error}")
     finally:
         db.close()
 
@@ -99,6 +111,15 @@ def start_scheduler():
         id="auto_update_uksl_csv",
         replace_existing=True,
         args=["UK Sanctions List", auto_update_uksl_csv, "MONTHLY_SCHEDULER"]
+    )
+
+    scheduler.add_job(
+        run_freshness_check,
+        trigger="cron",
+        hour=4,
+        minute=0,
+        id="list_freshness_check",
+        replace_existing=True,
     )
 
     scheduler.start()

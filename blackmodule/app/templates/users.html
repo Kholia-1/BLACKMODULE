@@ -456,7 +456,7 @@
 
     {% set total_users = users|length %}
     {% set active_users = users|selectattr('statut', 'equalto', 'ACTIF')|list|length %}
-    {% set admin_users = users|selectattr('role', 'equalto', 'ADMIN')|list|length %}
+    {% set admin_users = users|selectattr('role', 'equalto', 'ADMIN_TECHNIQUE')|list|length %}
 
     <div class="stat-group">
         <div class="stat-group-title">Vue d'ensemble</div>
@@ -531,7 +531,7 @@
                             <td>{{ user.email if user.email else "-" }}</td>
 
                             <td>
-                                <span class="badge badge-lecteur">{{ user.role }}</span>
+                                <span class="badge badge-lecteur">{{ role_label(user.role) }}</span>
                             </td>
 
                             <td>
@@ -609,12 +609,12 @@
 
                 <label>Rôle</label>
                 <select name="role" required>
-                    <option value="CONSULTATION">CONSULTATION</option>
-                    <option value="ANALYSTE_CONFORMITE">ANALYSTE_CONFORMITE</option>
-                    <option value="SUPERVISEUR_CONFORMITE">SUPERVISEUR_CONFORMITE</option>
-                    <option value="GESTIONNAIRE_LISTES">GESTIONNAIRE_LISTES</option>
-                    <option value="AUDITEUR">AUDITEUR</option>
-                    <option value="ADMIN_TECHNIQUE">ADMIN_TECHNIQUE</option>
+                    <option value="CONSULTATION">{{ role_label("CONSULTATION") }}</option>
+                    <option value="ANALYSTE_CONFORMITE">{{ role_label("ANALYSTE_CONFORMITE") }}</option>
+                    <option value="SUPERVISEUR_CONFORMITE">{{ role_label("SUPERVISEUR_CONFORMITE") }}</option>
+                    <option value="GESTIONNAIRE_LISTES">{{ role_label("GESTIONNAIRE_LISTES") }}</option>
+                    <option value="AUDITEUR">{{ role_label("AUDITEUR") }}</option>
+                    <option value="ADMIN_TECHNIQUE">{{ role_label("ADMIN_TECHNIQUE") }}</option>
                 </select>
 
                 <button type="submit">Créer l'utilisateur</button>
