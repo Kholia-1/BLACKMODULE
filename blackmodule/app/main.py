@@ -25,6 +25,7 @@ from app.routers import web
 from app.routers import exports
 from app.scheduler import start_scheduler
 from app.routers import external_api
+from app.routers import internal_lists
 
 app = FastAPI(
     title="BLACKMODULE API",
@@ -65,6 +66,27 @@ def startup():
             "source_record_id VARCHAR(255)",
             "delisted_at TIMESTAMP",
             "delisted_by_version_id UUID",
+            "is_internal_list BOOLEAN NOT NULL DEFAULT FALSE",
+            "internal_status VARCHAR(30)",
+            "risk_level VARCHAR(30)",
+            "document_type VARCHAR(100)",
+            "document_number VARCHAR(150)",
+            "source_reference VARCHAR(500)",
+            "compliance_comment TEXT",
+            "created_by VARCHAR(100)",
+            "updated_by VARCHAR(100)",
+            "submitted_by VARCHAR(100)",
+            "submitted_at TIMESTAMP",
+            "validated_by VARCHAR(100)",
+            "validated_at TIMESTAMP",
+            "ppe_type VARCHAR(100)",
+            "ppe_function VARCHAR(255)",
+            "ppe_institution VARCHAR(255)",
+            "ppe_country VARCHAR(100)",
+            "ppe_function_start_date DATE",
+            "ppe_function_end_date DATE",
+            "ppe_status VARCHAR(30)",
+            "ppe_relationship VARCHAR(255)",
         ]:
             conn.execute(text(f"ALTER TABLE sanction_entries ADD COLUMN IF NOT EXISTS {column_def}"))
 
@@ -89,6 +111,10 @@ def startup():
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_sanction_source_record "
             "ON sanction_entries (source_liste, source_record_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_sanction_internal_status "
+            "ON sanction_entries (is_internal_list, internal_status)"
         ))
 
         for column_def in [
@@ -144,6 +170,7 @@ app.include_router(imports.router)
 app.include_router(web.router)
 app.include_router(exports.router)
 app.include_router(external_api.router)
+app.include_router(internal_lists.router)
 
 @app.get("/")
 def home():

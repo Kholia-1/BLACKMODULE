@@ -4,7 +4,10 @@ from uuid import UUID
 
 from app.services.audit_service import write_audit_log
 from app.services.api_auth import get_session_user, require_permission
-from app.services.authorization_service import PERMISSION_MANAGE_LISTS, PERMISSION_SANCTIONS_VIEW
+from app.services.authorization_service import (
+    PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW, PERMISSION_MANAGE_LISTS,
+    PERMISSION_SANCTIONS_VIEW, has_permission,
+)
 from app.database import get_db
 from app.models import SanctionEntry
 from app.schemas import SanctionEntryCreate, SanctionEntryResponse
@@ -21,7 +24,10 @@ def list_sanctions(
     db: Session = Depends(get_db),
     user: dict = Depends(require_permission(PERMISSION_SANCTIONS_VIEW))
 ):
-    sanctions = db.query(SanctionEntry).order_by(SanctionEntry.created_at.desc()).all()
+    query = db.query(SanctionEntry)
+    if not has_permission(user, PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW):
+        query = query.filter(SanctionEntry.is_internal_list.is_(False))
+    sanctions = query.order_by(SanctionEntry.created_at.desc()).all()
     return sanctions
 
 
@@ -90,6 +96,8 @@ def get_sanction(
             status_code=404,
             detail="Entrée de sanction introuvable"
         )
+    if sanction.is_internal_list and not has_permission(user, PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW):
+        raise HTTPException(status_code=403, detail="Accès aux données internes sensibles refusé.")
 
     write_audit_log(
         db=db,

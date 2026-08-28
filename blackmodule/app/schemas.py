@@ -164,3 +164,21 @@ class ImportBatchResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class InternalListEntryRequest(BaseModel):
+    category: str
+    values: dict
+    aliases: list[str] = []
+    comment: Optional[str] = None
+
+
+class InternalListChangeRequest(BaseModel):
+    action: str
+    values: dict = {}
+    aliases: Optional[list[str]] = None
+    comment: Optional[str] = None
+
+
+class InternalListSubmitRequest(BaseModel):
+    comment: Optional[str] = None

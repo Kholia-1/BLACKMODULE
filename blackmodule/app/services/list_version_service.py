@@ -9,7 +9,7 @@ from datetime import date, datetime
 from typing import Iterable
 
 from sqlalchemy import text
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, load_only, selectinload
 
 from app.config import LIST_MAX_ENTRY_DROP_PERCENT
 from app.models import (
@@ -67,6 +67,24 @@ ARCHIVE_PARSERS = {
     "ONU": parse_un_xml,
     "UKSL": parse_uksl_csv,
 }
+
+
+def _official_entry_options():
+    """Avoid loading LOT 2C-only columns in 50k official-list operations."""
+    return (
+        load_only(
+            SanctionEntry.id, SanctionEntry.source_liste, SanctionEntry.source_record_id,
+            SanctionEntry.type_entite, SanctionEntry.nom, SanctionEntry.prenom,
+            SanctionEntry.nom_complet, SanctionEntry.date_naissance,
+            SanctionEntry.lieu_naissance, SanctionEntry.nationalite, SanctionEntry.pays,
+            SanctionEntry.num_passeport, SanctionEntry.autres_documents,
+            SanctionEntry.motif_sanction, SanctionEntry.date_inscription,
+            SanctionEntry.date_suppression, SanctionEntry.statut,
+            SanctionEntry.hash_signature, SanctionEntry.delisted_at,
+            SanctionEntry.delisted_by_version_id,
+        ),
+        selectinload(SanctionEntry.aliases),
+    )
 
 
 def _json_value(value):
@@ -284,7 +302,7 @@ def synchronize_source_version(
 
     valid_items, parsed_count, rejected = _validated_items(entries, source_liste)
     current_entries = db.query(SanctionEntry).options(
-        selectinload(SanctionEntry.aliases)
+        *_official_entry_options()
     ).filter(SanctionEntry.source_liste == source_liste).all()
     previous_active_count = sum(entry.statut == ACTIVE for entry in current_entries)
     accepted_count = len(valid_items)
@@ -427,7 +445,7 @@ def get_version_preview(db: Session, target_version: ListVersion) -> dict:
     """Compute source-scoped impact from the archived source without writing."""
     target = _snapshots_from_archive(target_version)
     current_entries = db.query(SanctionEntry).options(
-        selectinload(SanctionEntry.aliases)
+        *_official_entry_options()
     ).filter(SanctionEntry.source_liste == target_version.source_liste).all()
     current = {entry.source_record_id or entry.hash_signature: entry for entry in current_entries}
     reactivated = sum(key not in current or current[key].statut != ACTIVE for key in target)
@@ -475,7 +493,7 @@ def apply_version_restore(
 
     target = _snapshots_from_archive(target_version)
     source_entries = db.query(SanctionEntry).options(
-        selectinload(SanctionEntry.aliases)
+        *_official_entry_options()
     ).filter(SanctionEntry.source_liste == target_version.source_liste).all()
     current = {entry.source_record_id or entry.hash_signature: entry for entry in source_entries}
     for source_record_id, snapshot in target.items():

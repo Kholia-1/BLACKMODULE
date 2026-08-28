@@ -16,6 +16,19 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_sanction_entries_passport_upper
     ON sanction_entries (upper(num_passeport))
     WHERE num_passeport IS NOT NULL;
 
+-- LOT 2C deterministic duplicate checks for internal records.  These are
+-- deliberately non-unique: existing data is never merged or deleted by an
+-- index migration, and the service reports candidates for human review.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_internal_source_reference_upper
+    ON sanction_entries (source_liste, upper(source_reference))
+    WHERE is_internal_list AND source_reference IS NOT NULL;
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_internal_document_number_upper
+    ON sanction_entries (upper(document_number))
+    WHERE is_internal_list AND document_number IS NOT NULL;
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_internal_name_birth_date
+    ON sanction_entries (upper(nom), date_naissance)
+    WHERE is_internal_list AND date_naissance IS NOT NULL;
+
 -- Supports ILIKE '%token%' used by the sanctions search and matching
 -- candidate preselection.
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_sanction_entries_nom_trgm

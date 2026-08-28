@@ -16,7 +16,9 @@ from sqlalchemy import func
 from app.models import Alert, SanctionEntry, AuditLog, MatchingSetting
 from app.services.audit_service import write_audit_log
 from app.services.api_auth import get_session_user, require_permission
-from app.services.authorization_service import PERMISSION_EXPORT_DATA
+from app.services.authorization_service import (
+    PERMISSION_EXPORT_DATA, PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW, has_permission,
+)
 from app.services.performance import log_slow_operation, performance_timer
 
 
@@ -202,7 +204,10 @@ def export_sanctions_excel(
     user: dict = Depends(get_session_user)
 ):
     started_at = performance_timer()
-    sanctions = db.query(SanctionEntry).options(
+    sanctions_query = db.query(SanctionEntry)
+    if not has_permission(user, PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW):
+        sanctions_query = sanctions_query.filter(SanctionEntry.is_internal_list.is_(False))
+    sanctions = sanctions_query.options(
         selectinload(SanctionEntry.aliases)
     ).order_by(SanctionEntry.created_at.desc()).yield_per(500)
 

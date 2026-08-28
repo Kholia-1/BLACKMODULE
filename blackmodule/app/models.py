@@ -7,6 +7,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Integer,
+    Boolean,
     Numeric,
     ForeignKey,
     Float,
@@ -50,6 +51,29 @@ class SanctionEntry(Base):
     delisted_at = Column(DateTime, nullable=True)
     delisted_by_version_id = Column(UUID(as_uuid=True), nullable=True)
 
+    # LOT 2C: optional fields for internal records; official imports remain unchanged.
+    is_internal_list = Column(Boolean, nullable=False, default=False, server_default="false")
+    internal_status = Column(String(30), nullable=True, index=True)
+    risk_level = Column(String(30), nullable=True)
+    document_type = Column(String(100), nullable=True)
+    document_number = Column(String(150), nullable=True)
+    source_reference = Column(String(500), nullable=True)
+    compliance_comment = Column(Text, nullable=True)
+    created_by = Column(String(100), nullable=True)
+    updated_by = Column(String(100), nullable=True)
+    submitted_by = Column(String(100), nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    validated_by = Column(String(100), nullable=True)
+    validated_at = Column(DateTime, nullable=True)
+    ppe_type = Column(String(100), nullable=True)
+    ppe_function = Column(String(255), nullable=True)
+    ppe_institution = Column(String(255), nullable=True)
+    ppe_country = Column(String(100), nullable=True)
+    ppe_function_start_date = Column(Date, nullable=True)
+    ppe_function_end_date = Column(Date, nullable=True)
+    ppe_status = Column(String(30), nullable=True)
+    ppe_relationship = Column(String(255), nullable=True)
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -57,6 +81,10 @@ class SanctionEntry(Base):
         "SanctionAlias",
         back_populates="sanction_entry",
         cascade="all, delete-orphan"
+    )
+    internal_history = relationship(
+        "InternalListHistory", back_populates="sanction_entry",
+        cascade="all, delete-orphan", order_by="InternalListHistory.created_at",
     )
 
 
@@ -78,6 +106,27 @@ class SanctionAlias(Base):
         "SanctionEntry",
         back_populates="aliases"
     )
+
+
+class InternalListHistory(Base):
+    """Trace métier des changements internes, sans copier les données dans les logs."""
+
+    __tablename__ = "internal_list_history"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    sanction_entry_id = Column(
+        UUID(as_uuid=True), ForeignKey("sanction_entries.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    action = Column(String(50), nullable=False)
+    performed_by = Column(String(100), nullable=True)
+    old_values = Column(Text, nullable=True)
+    new_values = Column(Text, nullable=True)
+    comment = Column(Text, nullable=True)
+    approval_request_id = Column(UUID(as_uuid=True), ForeignKey("approval_requests.id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    sanction_entry = relationship("SanctionEntry", back_populates="internal_history")
 
 
 class ImportBatch(Base):

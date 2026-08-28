@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,13 @@ FAILED = "ECHEC"
 OP_MATCHING_SETTINGS = "MATCHING_SETTINGS_UPDATE"
 OP_ALERT_TREATMENT = "ALERT_TREATMENT"
 OP_LIST_VERSION_RESTORE = "LIST_VERSION_RESTORE"
+OP_INTERNAL_LIST_CHANGE = "INTERNAL_LIST_CHANGE"
+
+
+def _json_default(value):
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    raise TypeError(f"Valeur non sérialisable: {type(value)!r}")
 
 
 def create_approval_request(
@@ -42,8 +49,8 @@ def create_approval_request(
         initiated_by=initiator.get("username"),
         target_entity_type=target_entity_type,
         target_entity_id=target_entity_id,
-        old_values=json.dumps(old_values, ensure_ascii=False, sort_keys=True),
-        new_values=json.dumps(new_values, ensure_ascii=False, sort_keys=True),
+        old_values=json.dumps(old_values, ensure_ascii=False, sort_keys=True, default=_json_default),
+        new_values=json.dumps(new_values, ensure_ascii=False, sort_keys=True, default=_json_default),
         initiator_comment=comment,
     )
     db.add(approval)
@@ -91,6 +98,9 @@ def review_approval_request(
         approval.status = APPROVED
     else:
         approval.status = REJECTED
+        if approval.operation_type == OP_INTERNAL_LIST_CHANGE:
+            from app.services.internal_list_service import apply_rejected_internal_change
+            apply_rejected_internal_change(db, approval, reviewer.get("username"))
 
     write_audit_log(
         db, reviewer.get("username"),
@@ -208,6 +218,12 @@ def _apply_approved_operation(db: Session, approval: ApprovalRequest, reviewer_u
             expected_current_version_id=values["expected_current_version_id"],
             reviewer_username=reviewer_username,
             reason=values.get("reason"),
+        )
+    elif approval.operation_type == OP_INTERNAL_LIST_CHANGE:
+        from app.services.internal_list_service import apply_approved_internal_change
+        apply_approved_internal_change(
+            db, entry_id=approval.target_entity_id, values=values,
+            reviewer_username=reviewer_username, approval_id=approval.id,
         )
     else:
         raise ValueError("Type de demande inconnu.")

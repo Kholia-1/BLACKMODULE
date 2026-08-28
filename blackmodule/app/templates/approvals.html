@@ -46,6 +46,10 @@
         .btn { border: 1px solid transparent; border-radius: 8px; padding: 8px 11px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
         .btn-approve { background: #16A34A; color: white; border-color: #16A34A; }
         .btn-reject { background: white; color: #B91C1C; border-color: #FCA5A5; }
+        .action-links { display: flex; align-items: center; gap: 8px; min-width: 285px; }
+        .detail-link { color: #1D4ED8; font-weight: 600; text-decoration: none; white-space: nowrap; }
+        .detail-link:hover { text-decoration: underline; }
+        .action-separator { color: #CBD5E1; }
         .empty-state { text-align: center; padding: 48px 20px; color: #64748B; }
         .empty-state h3 { margin: 0 0 8px; color: #334155; font-size: 17px; }
         .empty-state p { margin: 0; font-size: 13.5px; }
@@ -85,30 +89,40 @@
             {% if approvals %}
                 <div class="table-wrapper">
                     <table>
-                        <thead><tr><th>Type</th><th>Cible</th><th>Initiateur</th><th>Créée le</th><th>Statut</th><th>Validateur</th><th>Action</th></tr></thead>
+                        <thead><tr><th>Type</th><th>Cible</th><th>Initiateur</th><th>Créée le</th><th>Statut</th><th>Validateur</th><th>Traité le</th><th>Actions</th></tr></thead>
                         <tbody>
                             {% for approval in approvals %}
-                                {% set operation_labels = {"MATCHING_SETTINGS_UPDATE": "Modification des seuils", "ALERT_TREATMENT": "Décision sur alerte", "LIST_VERSION_RESTORE": "Restauration d'une version de liste"} %}
                                 {% set status_labels = {"EN_ATTENTE_VALIDATION": "En attente", "VALIDE": "Validée", "REJETE": "Rejetée", "OBSOLETE": "Obsolète — à revalider"} %}
                                 {% set status_classes = {"EN_ATTENTE_VALIDATION": "badge-pending", "VALIDE": "badge-approved", "REJETE": "badge-rejected", "OBSOLETE": "badge-rejected"} %}
                                 <tr>
-                                    <td><span class="badge badge-type">{{ operation_labels.get(approval.operation_type, approval.operation_type) }}</span></td>
-                                    <td>{{ approval.target_entity_type }}<br><span class="nowrap">{{ approval.target_entity_id }}</span></td>
+                                    <td><span class="badge badge-type">{{ approval_operation_labels.get(approval.id|string, approval.operation_type) }}</span></td>
+                                    <td>{{ approval_target_labels.get(approval.id|string, "Cible associée") }}</td>
                                     <td>{{ approval.initiated_by }}</td>
                                     <td class="nowrap">{{ approval.created_at.strftime('%d/%m/%Y %H:%M') if approval.created_at else "-" }}</td>
                                     <td><span class="badge {{ status_classes.get(approval.status, 'badge-type') }}">{{ status_labels.get(approval.status, approval.status) }}</span></td>
                                     <td>{{ approval.reviewed_by or "-" }}</td>
+                                    <td class="nowrap">{{ approval.reviewed_at.strftime('%d/%m/%Y %H:%M') if approval.reviewed_at else "—" }}</td>
                                     <td>
-                                        {% if approval.status == pending_status and can_validate and approval.initiator_user_id != current_user_id %}
-                                            <form class="action-form" method="post" action="/web/approvals/{{ approval.id }}/review">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-                                                <input type="text" name="comment" placeholder="Commentaire">
-                                                <button class="btn btn-approve" name="decision" value="APPROVE" type="submit">Valider</button>
-                                                <button class="btn btn-reject" name="decision" value="REJECT" type="submit">Rejeter</button>
-                                            </form>
-                                        {% else %}
-                                            <span class="nowrap">-</span>
-                                        {% endif %}
+                                        {% set internal_entry_id = approval_internal_entry_links.get(approval.id|string) %}
+                                        <div class="action-links">
+                                            {% if internal_entry_id %}
+                                                <a class="detail-link" href="/web/internal-lists/{{ internal_entry_id }}?from=approvals">Voir fiche</a>
+                                            {% endif %}
+                                            {% if approval.status == pending_status and can_validate and approval.initiator_user_id != current_user_id %}
+                                                {% if internal_entry_id %}<span class="action-separator">|</span>{% endif %}
+                                                <form class="action-form" method="post" action="/web/approvals/{{ approval.id }}/review">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                                                    <input type="text" name="comment" placeholder="Commentaire">
+                                                    <button class="btn btn-approve" name="decision" value="APPROVE" type="submit">Valider</button>
+                                                    <button class="btn btn-reject" name="decision" value="REJECT" type="submit">Rejeter</button>
+                                                </form>
+                                            {% elif approval.status != pending_status %}
+                                                {% if internal_entry_id %}<span class="action-separator">|</span>{% endif %}
+                                                <span class="nowrap">Traité</span>
+                                            {% elif not internal_entry_id %}
+                                                <span class="nowrap">—</span>
+                                            {% endif %}
+                                        </div>
                                     </td>
                                 </tr>
                             {% endfor %}

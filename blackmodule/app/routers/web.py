@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, AuditLog, ImportBatch, ListVersion, ListVersionActivation, ListVersionEntry, User, MatchingSetting
+from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, AuditLog, ImportBatch, ListVersion, ListVersionActivation, ListVersionEntry, User, MatchingSetting, InternalListHistory
 from app.schemas import ClientCheckRequest
 from app.services.auth_service import authenticate_user, hash_password, verify_password
 from app.services.authorization_service import (
@@ -21,6 +21,9 @@ from app.services.authorization_service import (
     PERMISSION_REVIEW_FOUR_EYES, PERMISSION_SCREEN_CLIENT, PERMISSION_TREAT_ALERTS,
     PERMISSION_VIEW_ALERTS, PERMISSION_VIEW_APPROVALS, PERMISSION_VIEW_AUDIT, PERMISSION_VIEW_CRITICAL_ALERTS,
     PERMISSION_VIEW_LISTS, PERMISSION_LISTS_VIEW, PERMISSION_SANCTIONS_VIEW, ROLE_ADMIN_TECHNIQUE,
+    PERMISSION_INTERNAL_LISTS_VIEW, PERMISSION_INTERNAL_LISTS_CREATE, PERMISSION_INTERNAL_LISTS_EDIT,
+    PERMISSION_INTERNAL_LISTS_SUBMIT, PERMISSION_INTERNAL_LISTS_VALIDATE,
+    PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW,
     has_permission, permissions_for_role, refresh_session_user, role_label, session_user_payload,
 )
 from app.services.approval_service import (
@@ -60,6 +63,11 @@ from app.services.matching_settings_service import (
     get_or_create_matching_settings,
     update_matching_settings
 )
+from app.services.internal_list_service import (
+    ACTIVE as INTERNAL_ACTIVE, DRAFT as INTERNAL_DRAFT, INTERNAL_CATEGORIES,
+    category_label, create_internal_entry, request_entry_change, serialize_internal_entry,
+    submit_internal_entry, OP_INTERNAL_LIST_CHANGE,
+)
 
 router = APIRouter(prefix="/web", tags=["Web Interface"])
 templates = Jinja2Templates(directory="app/templates")
@@ -70,10 +78,11 @@ templates.env.globals["role_label"] = role_label
 LIST_SOURCE_LABELS = {"OFAC_CONSOLIDATED": "OFAC Consolidated", "OFAC_SDN": "OFAC SDN", "FR_GEL": "France Gel", "UN": "ONU", "ONU": "ONU", "EU": "Union européenne", "UE": "Union européenne", "UKSL": "UK Sanctions List"}
 VERSION_STATUS_LABELS = {"ACTIVE": "Active", "ARCHIVED": "Archivée"}
 CHANGE_TYPE_LABELS = {"ADDED": "Ajout", "AJOUT": "Ajout", "MODIFIED": "Modification", "MODIFICATION": "Modification", "DELISTED": "Radiation", "RADIATION": "Radiation", "REACTIVATED": "Réactivation", "REACTIVATION": "Réactivation"}
+INTERNAL_RISK_LABELS = {"ELEVE": "Élevé", "MOYEN": "Moyen", "FAIBLE": "Faible"}
 
 
 def list_source_label(source_liste: str | None) -> str:
-    return LIST_SOURCE_LABELS.get(source_liste or "", source_liste or "Non disponible")
+    return LIST_SOURCE_LABELS.get(source_liste or "", category_label(source_liste or ""))
 
 
 def format_web_datetime(value) -> str:
@@ -88,6 +97,215 @@ def format_file_size(value) -> str:
     if value < 1024 * 1024:
         return f"{value / 1024:.1f} Ko"
     return f"{value / (1024 * 1024):.2f} Mo"
+
+
+def approval_target_labels(db: Session, approvals: list[ApprovalRequest]) -> dict[str, str]:
+    """Return business labels only; technical identifiers stay out of the main table."""
+    internal_ids = [
+        approval.target_entity_id for approval in approvals
+        if approval.target_entity_type == "InternalSanctionEntry"
+    ]
+    internal_entries = {
+        str(entry.id): entry
+        for entry in db.query(SanctionEntry).filter(
+            SanctionEntry.id.in_(internal_ids), SanctionEntry.is_internal_list.is_(True)
+        ).all()
+    } if internal_ids else {}
+    generic_labels = {
+        "Alert": "Alerte", "MatchingSetting": "Paramètres de matching",
+        "ListVersion": "Version de liste", "InternalSanctionEntry": "Fiche interne",
+    }
+    labels = {}
+    for approval in approvals:
+        if approval.target_entity_type == "InternalSanctionEntry":
+            entry = internal_entries.get(str(approval.target_entity_id))
+            if entry:
+                full_name = (entry.nom_complet or " ".join(
+                    part for part in (entry.nom, entry.prenom) if part
+                )).strip()
+                labels[str(approval.id)] = f"{full_name or 'Fiche interne'} \u2014 {category_label(entry.source_liste)}"
+                continue
+        labels[str(approval.id)] = generic_labels.get(
+            approval.target_entity_type, "Cible associée"
+        )
+    return labels
+
+
+def approval_internal_entry_links(db: Session, approvals: list[ApprovalRequest]) -> dict[str, str]:
+    """Expose a detail link only for an existing internal-list target."""
+    internal_ids = [
+        approval.target_entity_id for approval in approvals
+        if approval.target_entity_type == "InternalSanctionEntry"
+    ]
+    existing_ids = {
+        str(entry.id)
+        for entry in db.query(SanctionEntry).filter(
+            SanctionEntry.id.in_(internal_ids), SanctionEntry.is_internal_list.is_(True)
+        ).all()
+    } if internal_ids else set()
+    return {
+        str(approval.id): str(approval.target_entity_id)
+        for approval in approvals
+        if approval.target_entity_type == "InternalSanctionEntry"
+        and str(approval.target_entity_id) in existing_ids
+    }
+
+
+def approval_operation_labels(approvals: list[ApprovalRequest]) -> dict[str, str]:
+    """Present the business operation, including the specific internal transition."""
+    labels = {
+        "MATCHING_SETTINGS_UPDATE": "Modification des seuils",
+        "ALERT_TREATMENT": "Décision sur alerte",
+        "LIST_VERSION_RESTORE": "Restauration d'une version de liste",
+    }
+    internal_actions = {
+        "ACTIVATE": "Cr\u00e9ation", "UPDATE": "Modification", "SUSPEND": "Suspension",
+        "REACTIVATE": "R\u00e9activation", "RADIATE": "Radiation",
+    }
+    rendered = {}
+    for approval in approvals:
+        if approval.operation_type == OP_INTERNAL_LIST_CHANGE:
+            try:
+                action = json.loads(approval.new_values or "{}").get("action")
+            except (TypeError, json.JSONDecodeError):
+                action = None
+            rendered[str(approval.id)] = internal_actions.get(action, "Modification")
+        else:
+            rendered[str(approval.id)] = labels.get(approval.operation_type, approval.operation_type)
+    return rendered
+
+
+_INTERNAL_HISTORY_FIELDS = {
+    "nom": "Nom", "prenom": "Prénom", "nom_complet": "Nom complet", "aliases": "Alias",
+    "type_entite": "Type de personne", "date_naissance": "Date de naissance",
+    "lieu_naissance": "Lieu de naissance", "nationalite": "Nationalité", "pays": "Pays",
+    "document_type": "Type de pièce", "document_number": "Numéro de pièce", "num_passeport": "Passeport",
+    "autres_documents": "Autres documents", "source_reference": "Référence source",
+    "risk_level": "Niveau de risque", "motif_sanction": "Motif d'inscription",
+    "compliance_comment": "Commentaire conformité", "date_inscription": "Date d'inscription",
+    "date_suppression": "Date de fin", "ppe_type": "Type PPE", "ppe_function": "Fonction PPE",
+    "ppe_institution": "Institution PPE", "ppe_country": "Pays d'exercice PPE",
+    "ppe_function_start_date": "Début de fonction PPE", "ppe_function_end_date": "Fin de fonction PPE",
+    "ppe_status": "Statut PPE", "ppe_relationship": "Proche / associé",
+}
+_INTERNAL_HISTORY_VALUES = {
+    "PERSONNE_PHYSIQUE": "Personne physique", "PERSONNE_MORALE": "Personne morale",
+    "BROUILLON": "Brouillon", "EN_ATTENTE_VALIDATION": "En attente de validation",
+    "ACTIF": "Actif", "SUSPENDUE": "Suspendue", "RADIEE": "Radiée",
+    "FAIBLE": "Faible", "MOYEN": "Moyen", "ELEVE": "Élevé",
+    "ACTUELLE": "Actuelle", "ANCIENNE": "Ancienne",
+    "ACTIVATE": "Activation", "UPDATE": "Modification", "SUSPEND": "Suspension",
+    "REACTIVATE": "Réactivation", "RADIATE": "Radiation",
+}
+_INTERNAL_HISTORY_ACTIONS = {
+    "CREATION": "Création", "MODIFICATION_BROUILLON": "Modification du brouillon",
+    "SOUMISSION": "Demande de validation", "REJET": "Demande rejetée",
+    "VALIDATION_ACTIVATE": "Activation validée", "VALIDATION_UPDATE": "Modification validée",
+    "VALIDATION_SUSPEND": "Suspension validée", "VALIDATION_REACTIVATE": "Réactivation validée",
+    "VALIDATION_RADIATE": "Radiation validée",
+}
+
+
+def _history_json(value):
+    if isinstance(value, dict):
+        return value
+    try:
+        return json.loads(value) if value else {}
+    except (TypeError, json.JSONDecodeError):
+        return {}
+
+
+def _history_value(value):
+    if value in (None, "", [], {}):
+        return "Non renseigné"
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value) or "Non renseigné"
+    if isinstance(value, datetime):
+        return value.strftime("%d/%m/%Y %H:%M")
+    if isinstance(value, str):
+        if value.strip().casefold() in {"none", "null"}:
+            return "Non renseigné"
+        try:
+            parsed = datetime.fromisoformat(value)
+            return parsed.strftime("%d/%m/%Y %H:%M" if "T" in value or " " in value else "%d/%m/%Y")
+        except ValueError:
+            pass
+    return _INTERNAL_HISTORY_VALUES.get(str(value), str(value))
+
+
+def _history_comparable(value):
+    if value in (None, "", [], {}):
+        return None
+    if isinstance(value, str) and value.strip().casefold() in {"none", "null"}:
+        return None
+    return value
+
+
+def _present_internal_history(history: list[dict]) -> list[dict]:
+    """Presentation-only view of persisted history JSON for the sensitive web page."""
+    presented = []
+    for item in history:
+        old, new = _history_json(item.get("old_values")), _history_json(item.get("new_values"))
+        action = item.get("action", "")
+        proposed = new.get("values") if isinstance(new.get("values"), dict) else None
+        if proposed is not None:
+            compared = {key: proposed[key] for key in proposed if key in _INTERNAL_HISTORY_FIELDS}
+            if "aliases" in new:
+                compared["aliases"] = new["aliases"]
+            new = {**old, **compared}
+            fields = compared.keys()
+        else:
+            fields = _INTERNAL_HISTORY_FIELDS.keys()
+        changes = [
+            {"field": _INTERNAL_HISTORY_FIELDS[key], "old": _history_value(old.get(key)), "new": _history_value(new.get(key))}
+            for key in fields
+            if action == "CREATION" and _history_comparable(new.get(key)) is not None
+            or action != "CREATION" and _history_comparable(old.get(key)) != _history_comparable(new.get(key))
+        ]
+        summary = None
+        if action == "CREATION":
+            details = "; ".join(f"{change['field']} : {change['new']}" for change in changes[:6])
+            summary = f"Fiche créée en brouillon{f' — {details}' if details else '.'}"
+            changes = []
+        summary = summary or {
+            "CREATION": "Fiche créée en brouillon.",
+            "REJET": "Demande rejetée : les valeurs en vigueur restent inchangées.",
+            "VALIDATION_ACTIVATE": "Fiche activée après validation par un second utilisateur habilité.",
+            "VALIDATION_SUSPEND": "Fiche suspendue après validation.",
+            "VALIDATION_REACTIVATE": "Fiche réactivée après validation.",
+            "VALIDATION_RADIATE": "Fiche radiée après validation.",
+        }.get(action)
+        if not changes and action == "SOUMISSION":
+            requested = _INTERNAL_HISTORY_VALUES.get(str(_history_json(item.get("new_values")).get("action", "")), "Validation demandée")
+            summary = f"{requested} demandée."
+        presented.append({
+            **item, "action_label": _INTERNAL_HISTORY_ACTIONS.get(action, action.replace("_", " ").title()),
+            "created_at_display": _history_value(item.get("created_at")),
+            "changes": changes, "summary": summary or "Aucune donnée métier modifiée.",
+        })
+    return presented
+
+
+def _format_trace_datetime(value) -> str:
+    return value.strftime("%d/%m/%Y %H:%M") if isinstance(value, datetime) else "\u2014"
+
+
+def _internal_traceability(entry: dict) -> list[dict]:
+    """Presentation-only traceability from persisted entry fields and history."""
+    rejection = next(
+        (item for item in reversed(entry.get("history", [])) if item.get("action") == "REJET"),
+        None,
+    )
+    return [
+        {"action": "Cr\u00e9ation", "user": entry.get("created_by") or "\u2014", "when": _format_trace_datetime(entry.get("created_at"))},
+        {"action": "Soumission", "user": entry.get("submitted_by") or "\u2014", "when": _format_trace_datetime(entry.get("submitted_at"))},
+        {"action": "Validation", "user": entry.get("validated_by") or "\u2014", "when": _format_trace_datetime(entry.get("validated_at"))},
+        {"action": "Derni\u00e8re modification", "user": entry.get("updated_by") or "\u2014", "when": _format_trace_datetime(entry.get("updated_at"))},
+        {
+            "action": "Rejet", "user": (rejection or {}).get("performed_by") or "\u2014",
+            "when": _format_trace_datetime((rejection or {}).get("created_at")),
+        },
+    ]
 
 
 def _queue_web_official_update(request: Request, db: Session, source_key: str):
@@ -1207,6 +1425,303 @@ async def web_import_france_gel_xml(request: Request, imported_by: str = Form(..
 SANCTIONS_PAGE_SIZE = 50
 
 
+@router.get("/internal-lists")
+def web_internal_lists(
+    request: Request, category: str | None = Query(None), status: str | None = Query(None),
+    q: str | None = Query(None), db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_INTERNAL_LISTS_VIEW):
+        log_access_denied(db, request, "/web/internal-lists", "Accès refusé aux listes internes.")
+        return forbidden_page(request)
+    query = db.query(SanctionEntry).filter(SanctionEntry.is_internal_list.is_(True))
+    current = get_current_user(request)
+    can_view_sensitive = has_permission(current, PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW)
+    if category:
+        query = query.filter(SanctionEntry.source_liste == category.upper())
+    if status:
+        query = query.filter(SanctionEntry.internal_status == status.upper())
+    if q:
+        value = f"%{q.strip()}%"
+        searchable = [SanctionEntry.nom.ilike(value), SanctionEntry.nom_complet.ilike(value)]
+        if can_view_sensitive:
+            searchable.append(SanctionEntry.source_reference.ilike(value))
+        query = query.filter(or_(*searchable))
+    records = query.options(selectinload(SanctionEntry.aliases)).order_by(SanctionEntry.updated_at.desc()).all()
+    entries = [serialize_internal_entry(entry, include_sensitive=can_view_sensitive) for entry in records]
+    all_entries = db.query(SanctionEntry).filter(SanctionEntry.is_internal_list.is_(True)).all()
+    return templates.TemplateResponse(request=request, name="internal_lists.html", context={
+        "request": request, "entries": entries, "categories": INTERNAL_CATEGORIES,
+        "selected_category": category or "", "selected_status": status or "", "q": q or "",
+        "summary": {"total": len(all_entries), "active": sum(e.internal_status == INTERNAL_ACTIVE for e in all_entries),
+                    "pending": sum(e.internal_status == "EN_ATTENTE_VALIDATION" for e in all_entries),
+                    "suspended": sum(e.internal_status == "SUSPENDUE" for e in all_entries),
+                    "delisted": sum(e.internal_status == "RADIEE" for e in all_entries)},
+        "can_create": has_permission(current, PERMISSION_INTERNAL_LISTS_CREATE),
+        "can_edit": has_permission(current, PERMISSION_INTERNAL_LISTS_EDIT),
+        "can_submit": has_permission(current, PERMISSION_INTERNAL_LISTS_SUBMIT),
+        "can_view_sensitive": can_view_sensitive,
+        "risk_labels": INTERNAL_RISK_LABELS,
+    })
+
+
+@router.get("/internal-lists/new")
+def web_new_internal_list(request: Request, db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_INTERNAL_LISTS_CREATE):
+        log_access_denied(db, request, "/web/internal-lists/new", "Création interne refusée.")
+        return forbidden_page(request)
+    current = get_current_user(request)
+    return templates.TemplateResponse(request=request, name="internal_list_form.html", context={
+        "request": request,
+        "categories": INTERNAL_CATEGORIES,
+        "can_view_sensitive": has_permission(current, PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW),
+    })
+
+
+@router.get("/internal-lists/import")
+def web_import_internal_lists(request: Request, db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_INTERNAL_LISTS_CREATE):
+        log_access_denied(db, request, "/web/internal-lists/import", "Import interne refusé.")
+        return forbidden_page(request)
+    return templates.TemplateResponse(request=request, name="internal_list_import.html", context={
+        "request": request,
+        "categories": INTERNAL_CATEGORIES,
+    })
+
+
+@router.post("/internal-lists")
+def web_create_internal_list(
+    request: Request, category: str = Form(...), nom: str = Form(...), prenom: str | None = Form(None),
+    aliases: str | None = Form(None), type_entite: str | None = Form(None),
+    date_naissance: str | None = Form(None), lieu_naissance: str | None = Form(None),
+    nationalite: str | None = Form(None), pays: str | None = Form(None),
+    document_type: str | None = Form(None), document_number: str | None = Form(None),
+    num_passeport: str | None = Form(None), reference: str | None = Form(None),
+    risk_level: str | None = Form(None), motif: str | None = Form(None),
+    compliance_comment: str | None = Form(None), date_inscription: str | None = Form(None),
+    date_suppression: str | None = Form(None), ppe_type: str | None = Form(None),
+    ppe_function: str | None = Form(None), ppe_institution: str | None = Form(None),
+    ppe_country: str | None = Form(None), ppe_function_start_date: str | None = Form(None),
+    ppe_function_end_date: str | None = Form(None), ppe_status: str | None = Form(None),
+    ppe_relationship: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_INTERNAL_LISTS_CREATE):
+        log_access_denied(db, request, "/web/internal-lists", "Création interne refusée.")
+        return forbidden_page(request)
+    try:
+        entry = create_internal_entry(
+            db, category=category, actor=current_username(request),
+            aliases=[item.strip() for item in (aliases or "").replace("\n", ",").split(",") if item.strip()],
+            values={
+                "nom": nom, "prenom": prenom, "type_entite": type_entite,
+                "date_naissance": date_naissance, "lieu_naissance": lieu_naissance,
+                "nationalite": nationalite, "pays": pays,
+                "document_type": document_type, "document_number": document_number,
+                "num_passeport": num_passeport, "source_reference": reference,
+                "risk_level": risk_level, "motif_sanction": motif,
+                "compliance_comment": compliance_comment, "date_inscription": date_inscription,
+                "date_suppression": date_suppression, "ppe_type": ppe_type,
+                "ppe_function": ppe_function, "ppe_institution": ppe_institution,
+                "ppe_country": ppe_country, "ppe_function_start_date": ppe_function_start_date,
+                "ppe_function_end_date": ppe_function_end_date, "ppe_status": ppe_status,
+                "ppe_relationship": ppe_relationship,
+            },
+        )
+        db.commit()
+        return RedirectResponse(url=f"/web/internal-lists/{entry.id}?message=Fiche+brouillon+créée", status_code=303)
+    except ValueError as exc:
+        db.rollback()
+        return RedirectResponse(url=f"/web/internal-lists/new?message={str(exc)}", status_code=303)
+
+
+@router.get("/internal-lists/{entry_id}/edit")
+def web_edit_internal_list(entry_id: UUID, request: Request, db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_INTERNAL_LISTS_EDIT):
+        log_access_denied(db, request, f"/web/internal-lists/{entry_id}/edit", "Modification interne refusée.")
+        return forbidden_page(request)
+    entry = db.query(SanctionEntry).options(selectinload(SanctionEntry.aliases)).filter(
+        SanctionEntry.id == entry_id, SanctionEntry.is_internal_list.is_(True)
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Fiche interne introuvable.")
+    if entry.internal_status not in {INTERNAL_DRAFT, INTERNAL_ACTIVE}:
+        raise HTTPException(status_code=409, detail="Cette fiche ne peut pas être modifiée dans son statut actuel.")
+    return templates.TemplateResponse(request=request, name="internal_list_form.html", context={
+        "request": request, "categories": INTERNAL_CATEGORIES,
+        "entry": serialize_internal_entry(entry, include_sensitive=True),
+        "is_edit": True, "form_action": f"/web/internal-lists/{entry.id}/edit",
+        "page_title": "Modifier la fiche interne",
+        "page_subtitle": "Les modifications d'une fiche active sont soumises à validation.",
+        "submit_label": "Enregistrer les modifications",
+        "can_view_sensitive": True,
+    })
+
+
+@router.post("/internal-lists/{entry_id}/edit")
+def web_update_internal_list(
+    entry_id: UUID, request: Request, nom: str = Form(...), prenom: str | None = Form(None),
+    aliases: str | None = Form(None), type_entite: str | None = Form(None),
+    date_naissance: str | None = Form(None), lieu_naissance: str | None = Form(None),
+    nationalite: str | None = Form(None), pays: str | None = Form(None),
+    document_type: str | None = Form(None), document_number: str | None = Form(None),
+    num_passeport: str | None = Form(None), reference: str | None = Form(None),
+    risk_level: str | None = Form(None), motif: str | None = Form(None),
+    compliance_comment: str | None = Form(None), date_inscription: str | None = Form(None),
+    date_suppression: str | None = Form(None), ppe_type: str | None = Form(None),
+    ppe_function: str | None = Form(None), ppe_institution: str | None = Form(None),
+    ppe_country: str | None = Form(None), ppe_function_start_date: str | None = Form(None),
+    ppe_function_end_date: str | None = Form(None), ppe_status: str | None = Form(None),
+    ppe_relationship: str | None = Form(None), db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_INTERNAL_LISTS_EDIT):
+        log_access_denied(db, request, f"/web/internal-lists/{entry_id}/edit", "Modification interne refusée.")
+        return forbidden_page(request)
+    entry = db.query(SanctionEntry).options(selectinload(SanctionEntry.aliases)).filter(
+        SanctionEntry.id == entry_id, SanctionEntry.is_internal_list.is_(True)
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Fiche interne introuvable.")
+    if entry.internal_status not in {INTERNAL_DRAFT, INTERNAL_ACTIVE}:
+        raise HTTPException(status_code=409, detail="Cette fiche ne peut pas être modifiée dans son statut actuel.")
+    values = {
+        "nom": nom, "prenom": prenom, "type_entite": type_entite,
+        "date_naissance": date_naissance, "lieu_naissance": lieu_naissance,
+        "nationalite": nationalite, "pays": pays,
+        "document_type": document_type, "document_number": document_number,
+        "num_passeport": num_passeport, "source_reference": reference,
+        "risk_level": risk_level, "motif_sanction": motif,
+        "compliance_comment": compliance_comment, "date_inscription": date_inscription,
+        "date_suppression": date_suppression, "ppe_type": ppe_type,
+        "ppe_function": ppe_function, "ppe_institution": ppe_institution,
+        "ppe_country": ppe_country, "ppe_function_start_date": ppe_function_start_date,
+        "ppe_function_end_date": ppe_function_end_date, "ppe_status": ppe_status,
+        "ppe_relationship": ppe_relationship,
+    }
+    try:
+        request_entry_change(
+            db, entry=entry, actor=get_current_user(request), action="UPDATE", values=values,
+            aliases=[item.strip() for item in (aliases or "").replace("\n", ",").split(",") if item.strip()],
+            comment=None, ip_address=request.client.host if request.client else None,
+        )
+        db.commit()
+        message = "Modifications enregistrées" if entry.internal_status == INTERNAL_DRAFT else "Modifications soumises à validation"
+        return RedirectResponse(url=f"/web/internal-lists/{entry.id}?message={message.replace(' ', '+')}", status_code=303)
+    except ValueError as exc:
+        db.rollback()
+        return RedirectResponse(url=f"/web/internal-lists/{entry_id}/edit?message={str(exc)}", status_code=303)
+
+
+@router.get("/internal-lists/{entry_id}")
+def web_internal_list_detail(entry_id: UUID, request: Request, db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_INTERNAL_LISTS_VIEW):
+        log_access_denied(db, request, f"/web/internal-lists/{entry_id}", "Consultation interne refusée.")
+        return forbidden_page(request)
+    current = get_current_user(request)
+    can_view_sensitive = has_permission(current, PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW)
+    options = [selectinload(SanctionEntry.aliases)]
+    if can_view_sensitive:
+        options.append(selectinload(SanctionEntry.internal_history))
+    entry = db.query(SanctionEntry).options(*options).filter(
+        SanctionEntry.id == entry_id, SanctionEntry.is_internal_list.is_(True)
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Fiche interne introuvable.")
+    write_audit_log(db, current_username(request), "VIEW_INTERNAL_LIST_DETAIL", "InternalSanctionEntry", str(entry.id),
+                    f"Consultation fiche interne; rôle={current.get('role')}; catégorie={entry.source_liste}.",
+                    request.client.host if request.client else None)
+    db.commit()
+    detail_entry = serialize_internal_entry(entry, include_sensitive=can_view_sensitive)
+    if can_view_sensitive:
+        detail_entry["history"] = _present_internal_history(detail_entry["history"])
+        detail_entry["traceability"] = _internal_traceability(detail_entry)
+    can_edit = has_permission(current, PERMISSION_INTERNAL_LISTS_EDIT)
+    can_submit = has_permission(current, PERMISSION_INTERNAL_LISTS_SUBMIT)
+    pending_action = None
+    if can_edit or can_submit:
+        pending_approval = db.query(ApprovalRequest).filter(
+            ApprovalRequest.operation_type == OP_INTERNAL_LIST_CHANGE,
+            ApprovalRequest.target_entity_id == str(entry.id),
+            ApprovalRequest.status == PENDING,
+        ).order_by(ApprovalRequest.created_at.desc()).first()
+        if pending_approval:
+            try:
+                pending_action = json.loads(pending_approval.new_values or "{}").get("action")
+            except (TypeError, json.JSONDecodeError):
+                pending_action = "PENDING"
+    return templates.TemplateResponse(request=request, name="internal_list_detail.html", context={
+        "request": request,
+        "entry": detail_entry,
+        "category_label": category_label(entry.source_liste),
+        "can_edit": can_edit,
+        "can_submit": can_submit,
+        "can_view_sensitive": can_view_sensitive,
+        "pending_action": pending_action,
+        "risk_labels": INTERNAL_RISK_LABELS,
+    })
+
+
+@router.post("/internal-lists/{entry_id}/submit")
+def web_submit_internal_list(entry_id: UUID, request: Request, comment: str | None = Form(None), db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_INTERNAL_LISTS_SUBMIT):
+        return forbidden_page(request)
+    entry = db.query(SanctionEntry).filter(SanctionEntry.id == entry_id, SanctionEntry.is_internal_list.is_(True)).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Fiche interne introuvable.")
+    try:
+        submit_internal_entry(db, entry=entry, actor=get_current_user(request), comment=comment,
+                              ip_address=request.client.host if request.client else None)
+        db.commit()
+        return RedirectResponse(
+            url=f"/web/internal-lists/{entry_id}?{urlencode({'message': 'Demande de soumission envoyée pour validation', 'success': '1'})}",
+            status_code=303,
+        )
+    except ValueError as exc:
+        db.rollback()
+        return RedirectResponse(url=f"/web/internal-lists/{entry_id}?message={str(exc)}", status_code=303)
+
+
+@router.post("/internal-lists/{entry_id}/lifecycle")
+def web_internal_list_lifecycle(entry_id: UUID, request: Request, action: str = Form(...), comment: str | None = Form(None), db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_INTERNAL_LISTS_EDIT):
+        return forbidden_page(request)
+    entry = db.query(SanctionEntry).filter(SanctionEntry.id == entry_id, SanctionEntry.is_internal_list.is_(True)).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Fiche interne introuvable.")
+    try:
+        request_entry_change(db, entry=entry, actor=get_current_user(request), action=action.upper(), values={}, aliases=None,
+                             comment=comment, ip_address=request.client.host if request.client else None)
+        db.commit()
+        action_labels = {
+            "SUSPEND": "suspension", "REACTIVATE": "réactivation", "RADIATE": "radiation",
+        }
+        action_label = action_labels.get(action.upper(), "transition")
+        return RedirectResponse(
+            url=f"/web/internal-lists/{entry_id}?{urlencode({'message': f'Demande de {action_label} envoyée pour validation', 'success': '1'})}",
+            status_code=303,
+        )
+    except ValueError as exc:
+        db.rollback()
+        return RedirectResponse(url=f"/web/internal-lists/{entry_id}?message={str(exc)}", status_code=303)
+
+
 @router.get("/sanctions")
 def web_sanctions(
     request: Request,
@@ -1225,6 +1740,8 @@ def web_sanctions(
         return forbidden_page(request)
 
     query = db.query(SanctionEntry)
+    if not require_permission(request, PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW):
+        query = query.filter(SanctionEntry.is_internal_list.is_(False))
 
     if q:
         search_value = f"%{q.strip()}%"
@@ -2560,6 +3077,9 @@ def web_approvals(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "approvals": approvals,
             "approval_counts": approval_counts,
+            "approval_target_labels": approval_target_labels(db, approvals),
+            "approval_internal_entry_links": approval_internal_entry_links(db, approvals),
+            "approval_operation_labels": approval_operation_labels(approvals),
             "pending_status": PENDING,
             "can_validate": require_permission(request, PERMISSION_REVIEW_FOUR_EYES),
             "current_user_id": current_user.get("id"),
@@ -2588,6 +3108,9 @@ def web_review_approval(
     )
     if not approval:
         raise HTTPException(status_code=404, detail="Demande introuvable.")
+    if approval.operation_type == "INTERNAL_LIST_CHANGE" and not require_permission(request, PERMISSION_INTERNAL_LISTS_VALIDATE):
+        log_access_denied(db, request, f"/web/approvals/{approval_id}/review", "Validation interne non autorisée.")
+        return forbidden_page(request)
     try:
         if approval.operation_type == OP_LIST_VERSION_RESTORE and decision.upper() == "APPROVE":
             queue_restore_approval(

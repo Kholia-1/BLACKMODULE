@@ -37,3 +37,11 @@ MAX_FAILED_LOGIN_ATTEMPTS = int(os.getenv("MAX_FAILED_LOGIN_ATTEMPTS", "5"))
 LIST_MAX_ENTRY_DROP_PERCENT = float(os.getenv("LIST_MAX_ENTRY_DROP_PERCENT", "30"))
 if not 0 <= LIST_MAX_ENTRY_DROP_PERCENT < 100:
     raise ValueError("LIST_MAX_ENTRY_DROP_PERCENT doit être compris entre 0 et 100.")
+
+# CSV/XLSX internal-list uploads are parsed in memory. Keep a central ceiling
+# to prevent an authenticated upload from exhausting the application process.
+INTERNAL_LIST_IMPORT_MAX_BYTES = int(
+    os.getenv("INTERNAL_LIST_IMPORT_MAX_BYTES", str(25 * 1024 * 1024))
+)
+if INTERNAL_LIST_IMPORT_MAX_BYTES <= 0:
+    raise ValueError("INTERNAL_LIST_IMPORT_MAX_BYTES doit être strictement positif.")
