@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SanctionEntryCreate(BaseModel):
@@ -45,6 +45,7 @@ class ClientCheckRequest(BaseModel):
     date_naissance: Optional[date] = None
     nationalite: Optional[str] = None
     num_passeport: Optional[str] = None
+    document_number: Optional[str] = None
 
 
 class MatchResult(BaseModel):
@@ -55,6 +56,8 @@ class MatchResult(BaseModel):
     matching_type: str
     niveau_alerte: str
     action_recommandee: str
+    explanation: list[str] = Field(default_factory=list)
+    name_score: float = 0.0
 
 
 class ClientCheckResponse(BaseModel):

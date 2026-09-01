@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>BLACKMODULE - Fiche sanction officielle</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        *{box-sizing:border-box} body{margin:0;background:#f8fafc;color:#1e293b;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+        .header{padding:18px 32px;background:#0f172a;color:#fff}.header h1{margin:0;font-size:22px}.header p{margin:5px 0;color:#94a3b8;font-size:13px}
+        .container{max-width:1080px;margin:auto;padding:22px 28px 40px}.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;box-shadow:0 1px 2px #0f172a0d;margin-bottom:14px}
+        .record-header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.record-header h2{margin:5px 0;font-size:24px}.muted{color:#64748b;font-size:13px}.meta{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+        .badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;background:#e2e8f0;color:#334155}.status-ACTIF,.status-ACTIVE{background:#dcfce7;color:#166534}.status-SUPPRIME,.status-RADIEE{background:#fee2e2;color:#991b1b}.alias{background:#f3e8ff;color:#6b21a8;margin:2px}
+        .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 24px}.field{min-width:0}.wide{grid-column:1/-1}.label{display:block;font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase}.value{margin-top:5px;line-height:1.45;word-break:break-word}.section-title{margin:0 0 16px;font-size:16px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;text-decoration:none;font-weight:700}.btn:hover{background:#f8fafc}
+        code{font-size:12px;overflow-wrap:anywhere}.source-link{color:#b91c1c}@media(max-width:700px){.header,.container{padding:16px}.record-header{display:block}.meta{justify-content:flex-start;margin-top:10px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Fiche sanction officielle - consultation seule</p>
+    {% include "partials/navbar.html" %}
+</div>
+<main class="container">
+    <section class="card record-header">
+        <div>
+            <a class="muted" href="/web/sanctions">&larr; Retour aux sanctions</a>
+            <h2>{{ sanction.nom_complet or sanction.nom }}</h2>
+            <div class="muted">Référence officielle : {{ sanction.source_record_id or sanction.source_reference or 'Non disponible' }}</div>
+        </div>
+        <div class="meta">
+            <span class="badge">{{ source_label }}</span>
+            <span class="badge">{{ sanction.type_entite or 'Type non renseigné' }}</span>
+            <span class="badge status-{{ sanction.statut }}">{{ sanction.statut or 'Statut non renseigné' }}</span>
+        </div>
+    </section>
+
+    <section class="card">
+        <h3 class="section-title">Identité</h3>
+        <div class="grid">
+            <div class="field"><span class="label">Nom complet</span><div class="value">{{ sanction.nom_complet or sanction.nom or '—' }}</div></div>
+            <div class="field"><span class="label">Type de personne</span><div class="value">{{ sanction.type_entite or '—' }}</div></div>
+            <div class="field"><span class="label">Date de naissance</span><div class="value">{{ sanction.date_naissance.strftime('%d/%m/%Y') if sanction.date_naissance else '—' }}</div></div>
+            <div class="field"><span class="label">Lieu de naissance</span><div class="value">{{ sanction.lieu_naissance or '—' }}</div></div>
+            <div class="field"><span class="label">Nationalité</span><div class="value">{{ sanction.nationalite or '—' }}</div></div>
+            <div class="field"><span class="label">Pays</span><div class="value">{{ sanction.pays or '—' }}</div></div>
+            <div class="field wide"><span class="label">Alias</span><div class="value">{% for alias in sanction.aliases %}<span class="badge alias">{{ alias.alias }}</span>{% else %}—{% endfor %}</div></div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h3 class="section-title">Identification et régime</h3>
+        <div class="grid">
+            <div class="field"><span class="label">Passeport</span><div class="value">{{ sanction.num_passeport or '—' }}</div></div>
+            <div class="field"><span class="label">Numéro de pièce</span><div class="value">{{ sanction.document_number or '—' }}</div></div>
+            <div class="field wide"><span class="label">Autres documents / identifiants</span><div class="value">{{ sanction.autres_documents or '—' }}</div></div>
+            <div class="field wide"><span class="label">Motifs et régimes</span><div class="value">{{ sanction.motif_sanction or '—' }}</div></div>
+            <div class="field"><span class="label">Date d'inscription</span><div class="value">{{ sanction.date_inscription.strftime('%d/%m/%Y') if sanction.date_inscription else '—' }}</div></div>
+            <div class="field"><span class="label">Date de radiation</span><div class="value">{{ sanction.date_suppression.strftime('%d/%m/%Y') if sanction.date_suppression else '—' }}</div></div>
+        </div>
+    </section>
+
+    {% if active_version or latest_import %}
+    <section class="card">
+        <h3 class="section-title">Traçabilité de la liste</h3>
+        <div class="grid">
+            {% if active_version %}
+            <div class="field"><span class="label">Version active</span><div class="value">{{ active_version.technical_version }}</div></div>
+            <div class="field"><span class="label">Version publiée le</span><div class="value">{{ format_datetime(active_version.published_at) }}</div></div>
+            <div class="field wide"><span class="label">Hash SHA-256 de version</span><div class="value"><code>{{ active_version.file_hash }}</code></div></div>
+            {% endif %}
+            {% if latest_import %}
+            <div class="field"><span class="label">Dernier import de la source</span><div class="value">{{ format_datetime(latest_import.imported_at) }}</div></div>
+            <div class="field"><span class="label">Statut import</span><div class="value">{{ latest_import.status or '—' }}</div></div>
+            {% if latest_import.source_url %}<div class="field wide"><span class="label">URL d'origine</span><div class="value"><a class="source-link" href="{{ latest_import.source_url }}" target="_blank" rel="noopener noreferrer">{{ latest_import.source_url }}</a></div></div>{% endif %}
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+</main>
+</body>
+</html>

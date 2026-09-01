@@ -31,6 +31,8 @@ from app.services.parsers.un_parser import parse_un_xml
 
 ACTIVE = "ACTIVE"
 ARCHIVED = "ARCHIVED"
+ENTRY_ACTIVE = "ACTIF"
+LEGACY_ENTRY_ACTIVE = "ACTIVE"
 DELISTED = "RADIEE"
 
 CHANGE_ADDED = "AJOUT"
@@ -41,6 +43,10 @@ CHANGE_UNCHANGED = "INCHANGE"
 
 ACTIVATION_IMPORT = "IMPORT"
 ACTIVATION_RESTORE = "RESTAURATION"
+
+
+def _entry_is_active(entry: SanctionEntry) -> bool:
+    return entry.statut in {ENTRY_ACTIVE, LEGACY_ENTRY_ACTIVE}
 
 
 class SuspiciousListDropError(ValueError):
@@ -150,7 +156,7 @@ def _item_snapshot(item: dict, source_liste: str, source_record_id: str) -> dict
         "motif_sanction": item.get("motif_sanction"),
         "date_inscription": _json_value(item.get("date_inscription")),
         "date_suppression": _json_value(item.get("date_suppression")),
-        "statut": ACTIVE,
+        "statut": ENTRY_ACTIVE,
         "hash_signature": item.get("hash_signature"),
         "aliases": aliases,
     }
@@ -177,7 +183,7 @@ def _apply_item(entry: SanctionEntry, snapshot: dict) -> bool:
             value = date.fromisoformat(value) if value else None
         setattr(entry, field, value)
     entry.source_record_id = snapshot["source_record_id"]
-    entry.statut = ACTIVE
+    entry.statut = ENTRY_ACTIVE
     entry.delisted_at = None
     entry.delisted_by_version_id = None
 
@@ -304,7 +310,7 @@ def synchronize_source_version(
     current_entries = db.query(SanctionEntry).options(
         *_official_entry_options()
     ).filter(SanctionEntry.source_liste == source_liste).all()
-    previous_active_count = sum(entry.statut == ACTIVE for entry in current_entries)
+    previous_active_count = sum(_entry_is_active(entry) for entry in current_entries)
     accepted_count = len(valid_items)
     minimum_allowed = previous_active_count * (1 - LIST_MAX_ENTRY_DROP_PERCENT / 100)
     if previous_active_count and accepted_count < minimum_allowed:
@@ -448,8 +454,8 @@ def get_version_preview(db: Session, target_version: ListVersion) -> dict:
         *_official_entry_options()
     ).filter(SanctionEntry.source_liste == target_version.source_liste).all()
     current = {entry.source_record_id or entry.hash_signature: entry for entry in current_entries}
-    reactivated = sum(key not in current or current[key].statut != ACTIVE for key in target)
-    delisted = sum(key not in target and entry.statut == ACTIVE for key, entry in current.items())
+    reactivated = sum(key not in current or not _entry_is_active(current[key]) for key in target)
+    delisted = sum(key not in target and _entry_is_active(entry) for key, entry in current.items())
     modified = sum(
         key in current and _snapshot_differs(_entry_snapshot(current[key]), snapshot)
         for key, snapshot in target.items()
@@ -505,7 +511,7 @@ def apply_version_restore(
             db.add(entry)
             current[source_record_id] = entry
     for source_record_id, entry in current.items():
-        if source_record_id not in target and entry.statut == ACTIVE:
+        if source_record_id not in target and _entry_is_active(entry):
             entry.statut = DELISTED
             entry.delisted_at = datetime.utcnow()
             entry.delisted_by_version_id = target_version.id

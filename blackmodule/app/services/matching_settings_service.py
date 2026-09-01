@@ -4,6 +4,17 @@ from sqlalchemy.orm import Session
 from app.models import MatchingSetting
 
 
+def validate_matching_thresholds(
+    exact_threshold: float,
+    probable_threshold: float,
+    possible_threshold: float,
+) -> None:
+    if not 0 <= possible_threshold <= probable_threshold <= exact_threshold <= 100:
+        raise ValueError(
+            "Les seuils doivent respecter 0 <= possible <= probable <= exact <= 100."
+        )
+
+
 def get_or_create_matching_settings(db: Session) -> MatchingSetting:
     settings = db.query(MatchingSetting).first()
 
@@ -33,6 +44,8 @@ def update_matching_settings(
     updated_by: str,
     commit: bool = True,
 ) -> MatchingSetting:
+
+    validate_matching_thresholds(exact_threshold, probable_threshold, possible_threshold)
 
     settings = get_or_create_matching_settings(db)
 

@@ -31,7 +31,9 @@ from app.services.approval_service import (
     queue_restore_approval, review_approval_request,
 )
 from app.services.list_version_service import get_active_version, is_version_restorable
-from app.services.matching_service import build_full_name, classify_alert, select_matching_candidates
+from app.services.matching_service import (
+    build_full_name, classify_alert, evaluate_candidate, select_matching_candidates,
+)
 from app.services.audit_service import write_audit_log
 from app.services.import_service import (
     import_afb_ppe_csv,
@@ -361,6 +363,29 @@ def forbidden_page(request: Request):
     )
 
 
+def not_found_page(
+    request: Request,
+    *,
+    title: str,
+    message: str,
+    return_url: str,
+    return_label: str,
+):
+    """Return a user-facing web 404 instead of an API-style JSON response."""
+    return templates.TemplateResponse(
+        request=request,
+        name="404.html",
+        context={
+            "request": request,
+            "title": title,
+            "message": message,
+            "return_url": return_url,
+            "return_label": return_label,
+        },
+        status_code=404,
+    )
+
+
 def log_access_denied(db: Session, request: Request, route: str, description: str):
     write_audit_log(
         db=db,
@@ -636,12 +661,11 @@ def check_client_submit(
     if not client_reference or not client_reference.strip():
         client_reference = f"WEB-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
 
-    document_reference = None
-
-    if num_passeport and num_passeport.strip():
-        document_reference = num_passeport.strip()
-    elif num_piece and num_piece.strip():
-        document_reference = num_piece.strip()
+    passport_reference = num_passeport
+    document_reference = num_piece
+    if not passport_reference and (type_piece or "").strip().upper() == "PASSEPORT":
+        passport_reference = num_piece
+        document_reference = None
 
     client = ClientCheckRequest(
         client_reference=client_reference,
@@ -649,13 +673,14 @@ def check_client_submit(
         prenom=prenom,
         date_naissance=parsed_date,
         nationalite=nationalite,
-        num_passeport=document_reference,
+        num_passeport=passport_reference,
+        document_number=document_reference,
     )
 
     client_full_name = build_full_name(client.prenom, client.nom)
 
     candidates = select_matching_candidates(
-        db, client_full_name, client.num_passeport
+        db, client_full_name, client.num_passeport, client.document_number
     )
 
     matches = []
@@ -676,26 +701,22 @@ def check_client_submit(
         ).all())
 
     for sanction, listed_name, name_score in candidates:
-        final_score = name_score
-        matching_type = "FUZZY_NAME"
-
-        # Matching document exact : passeport, CNI ou autre pièce
-        if client.num_passeport and sanction.num_passeport:
-            if client.num_passeport.strip().upper() == sanction.num_passeport.strip().upper():
-                final_score = 100.0
-                matching_type = "EXACT_DOCUMENT"
-
-        # Matching nom + date de naissance
-        if client.date_naissance and sanction.date_naissance:
-            if client.date_naissance == sanction.date_naissance and name_score >= 80:
-                final_score = max(final_score, 95.0)
-                matching_type = "NAME_AND_BIRTHDATE"
+        evaluation = evaluate_candidate(
+            sanction, client_full_name, listed_name, name_score,
+            date_naissance=client.date_naissance,
+            nationalite=client.nationalite,
+            passport_number=client.num_passeport,
+            document_number=client.document_number,
+        )
+        final_score = evaluation.score
+        matching_type = evaluation.matching_type
 
         niveau_alerte, action_recommandee = classify_alert(
             final_score,
             exact_threshold=settings.exact_threshold,
             probable_threshold=settings.probable_threshold,
             possible_threshold=settings.possible_threshold,
+            matching_type=matching_type,
         )
 
         # On garde les résultats visibles si le score atteint le seuil possible
@@ -717,6 +738,8 @@ def check_client_submit(
                 "matching_type": matching_type,
                 "niveau_alerte": niveau_alerte,
                 "action_recommandee": action_recommandee,
+                "explanation": list(evaluation.explanation),
+                "name_score": evaluation.name_score,
             })
 
             # Prévention des alertes doublons
@@ -1640,6 +1663,9 @@ def web_internal_list_detail(entry_id: UUID, request: Request, db: Session = Dep
     ).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Fiche interne introuvable.")
+    return_context = request.query_params.get("from")
+    if return_context not in {"sanctions", "internal-lists"}:
+        return_context = "internal-lists"
     write_audit_log(db, current_username(request), "VIEW_INTERNAL_LIST_DETAIL", "InternalSanctionEntry", str(entry.id),
                     f"Consultation fiche interne; rôle={current.get('role')}; catégorie={entry.source_liste}.",
                     request.client.host if request.client else None)
@@ -1670,6 +1696,7 @@ def web_internal_list_detail(entry_id: UUID, request: Request, db: Session = Dep
         "can_submit": can_submit,
         "can_view_sensitive": can_view_sensitive,
         "pending_action": pending_action,
+        "return_context": return_context,
         "risk_labels": INTERNAL_RISK_LABELS,
     })
 
@@ -1790,6 +1817,80 @@ def web_sanctions(
             "total_pages": total_pages,
             "total_count": total_count,
             "page_size": SANCTIONS_PAGE_SIZE,
+        },
+    )
+
+
+@router.get("/sanctions/{sanction_id}")
+def web_sanction_detail(
+    sanction_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Render a read-only detail page for an official sanction entry."""
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+
+    if not require_permission(request, PERMISSION_SANCTIONS_VIEW):
+        log_access_denied(
+            db, request, f"/web/sanctions/{sanction_id}",
+            "Tentative d'acces refusee au detail d'une sanction officielle.",
+        )
+        return forbidden_page(request)
+
+    try:
+        parsed_sanction_id = UUID(sanction_id)
+    except ValueError:
+        return not_found_page(
+            request,
+            title="Fiche de sanction introuvable",
+            message="Cette fiche n'existe pas, a été retirée ou n'est plus disponible.",
+            return_url="/web/sanctions",
+            return_label="Retour aux sanctions",
+        )
+
+    sanction = db.query(SanctionEntry).options(
+        selectinload(SanctionEntry.aliases)
+    ).filter(
+        SanctionEntry.id == parsed_sanction_id,
+        SanctionEntry.is_internal_list.is_(False),
+    ).first()
+    if not sanction:
+        return not_found_page(
+            request=request,
+            title="Fiche de sanction introuvable",
+            message="Cette fiche n'existe pas, a été retirée ou n'est plus disponible.",
+            return_url="/web/sanctions",
+            return_label="Retour aux sanctions",
+        )
+
+    active_version = get_active_version(db, sanction.source_liste)
+    latest_import = db.query(ImportBatch).filter(
+        ImportBatch.source_liste == sanction.source_liste
+    ).order_by(ImportBatch.imported_at.desc()).first()
+
+    write_audit_log(
+        db=db,
+        user_identifier=current_username(request),
+        action="VIEW_SANCTION_DETAIL",
+        entity_type="SanctionEntry",
+        entity_id=str(sanction.id),
+        description="Consultation détaillée d'une entrée de sanction officielle.",
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="sanction_detail.html",
+        context={
+            "request": request,
+            "sanction": sanction,
+            "source_label": list_source_label(sanction.source_liste),
+            "active_version": active_version,
+            "latest_import": latest_import,
+            "format_datetime": format_web_datetime,
+            "format_file_size": format_file_size,
         },
     )
 
@@ -2905,7 +3006,7 @@ def web_matching_settings_submit(
         context={
             "request": request,
             "settings": settings,
-            "message": "Paramètres de matching mis à jour avec succès.",
+            "message": "Demande de modification des seuils envoyée pour validation.",
             "success": True,
             "history_logs": history_logs
         }
@@ -3052,7 +3153,10 @@ def web_matching_settings_reset(
     db.commit()
 
     return RedirectResponse(
-        url="/web/matching-settings?message=Seuils restaurés aux valeurs par défaut&success=True",
+        url=(
+            "/web/matching-settings?message=Demande de réinitialisation envoyée "
+            "pour validation&success=True"
+        ),
         status_code=303
     )
 

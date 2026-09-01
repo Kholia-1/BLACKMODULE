@@ -758,6 +758,13 @@
 
                             <div class="match-name">{{ match.sanction_nom_complet or match.listed_name or "-" }}</div>
                             <div class="match-type">Type de correspondance : {{ match.matching_type }}</div>
+                            {% if match.explanation %}
+                                <div class="match-motif">
+                                    <strong>Explication du score :</strong>
+                                    {{ match.explanation|join(" · ") }}
+                                    (nom : {{ "%.2f"|format(match.name_score) }}/100)
+                                </div>
+                            {% endif %}
 
                             <div class="match-grid">
                                 <div>

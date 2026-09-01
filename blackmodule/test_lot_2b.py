@@ -26,7 +26,7 @@ from app.services.approval_service import (
 from app.services.list_version_service import (
     ACTIVATION_RESTORE,
     ARCHIVE_PARSERS,
-    ACTIVE,
+    ACTIVE, ENTRY_ACTIVE,
     ARCHIVED,
     CHANGE_ADDED,
     CHANGE_DELISTED,
@@ -223,7 +223,7 @@ class Lot2BVersioningTests(unittest.TestCase):
         self.first_two_versions()
         _, result = self.sync([item("A", "ALPHA MODIFIED"), item("B", "BETA")], "3" * 64)
         entry = self.db.query(SanctionEntry).filter_by(source_record_id="B").one()
-        self.assertEqual(entry.statut, ACTIVE)
+        self.assertEqual(entry.statut, ENTRY_ACTIVE)
         self.assertEqual(result["reactivated_records"], 1)
 
     def test_09_reactivation_does_not_duplicate_entry(self):
@@ -260,7 +260,7 @@ class Lot2BVersioningTests(unittest.TestCase):
     def test_14_restore_reactivates_delisted_record(self):
         first, current = self.first_two_versions()
         apply_version_restore(self.db, target_version_id=str(first.id), expected_current_version_id=str(current.id), reviewer_username="reviewer")
-        self.assertEqual(self.db.query(SanctionEntry).filter_by(source_record_id="B").one().statut, ACTIVE)
+        self.assertEqual(self.db.query(SanctionEntry).filter_by(source_record_id="B").one().statut, ENTRY_ACTIVE)
 
     def test_15_restore_restores_prior_values(self):
         first, current = self.first_two_versions()
@@ -271,7 +271,7 @@ class Lot2BVersioningTests(unittest.TestCase):
         first, current = self.first_two_versions()
         self.sync([item("X", "OTHER")], "4" * 64, source="OTHER_SOURCE")
         apply_version_restore(self.db, target_version_id=str(first.id), expected_current_version_id=str(current.id), reviewer_username="reviewer")
-        self.assertEqual(self.db.query(SanctionEntry).filter_by(source_record_id="X").one().statut, ACTIVE)
+        self.assertEqual(self.db.query(SanctionEntry).filter_by(source_record_id="X").one().statut, ENTRY_ACTIVE)
 
     def test_17_restore_request_uses_existing_approval_workflow(self):
         first, current = self.first_two_versions()
@@ -301,7 +301,7 @@ class Lot2BVersioningTests(unittest.TestCase):
         )
         review_approval_request(self.db, approval=approval, reviewer={"id": "reviewer", "username": "reviewer"}, approved=True, comment="ok", ip_address=None)
         self.assertEqual(approval.status, "VALIDE")
-        self.assertEqual(self.db.query(SanctionEntry).filter_by(source_record_id="B").one().statut, ACTIVE)
+        self.assertEqual(self.db.query(SanctionEntry).filter_by(source_record_id="B").one().statut, ENTRY_ACTIVE)
 
     def test_20_migration_statements_are_idempotent(self):
         main_source = Path(__file__).with_name("app").joinpath("main.py").read_text(encoding="utf-8")
@@ -311,10 +311,10 @@ class Lot2BVersioningTests(unittest.TestCase):
 
     def test_21_partial_file_cannot_radiate_everything(self):
         self.sync([item(str(index), f"NAME {index}") for index in range(20)], "1" * 64)
-        before = self.db.query(SanctionEntry).filter_by(statut=ACTIVE).count()
+        before = self.db.query(SanctionEntry).filter_by(statut=ENTRY_ACTIVE).count()
         with self.assertRaises(SuspiciousListDropError):
             self.sync([], "2" * 64)
-        self.assertEqual(self.db.query(SanctionEntry).filter_by(statut=ACTIVE).count(), before)
+        self.assertEqual(self.db.query(SanctionEntry).filter_by(statut=ENTRY_ACTIVE).count(), before)
         self.assertEqual(self.db.query(ListVersion).count(), 1)
 
     def test_22_massive_drop_is_blocked_before_mutation(self):
@@ -322,7 +322,7 @@ class Lot2BVersioningTests(unittest.TestCase):
         self.sync([item(str(index), f"NAME {index}") for index in range(100)], "1" * 64)
         with self.assertRaisesRegex(SuspiciousListDropError, "A_VERIFIER"):
             self.sync([item(str(index), f"NAME {index}") for index in range(10)], "2" * 64)
-        self.assertEqual(self.db.query(SanctionEntry).filter_by(statut=ACTIVE).count(), 100)
+        self.assertEqual(self.db.query(SanctionEntry).filter_by(statut=ENTRY_ACTIVE).count(), 100)
 
     def test_23_restore_request_becomes_obsolete_after_scheduler_update(self):
         first, _ = self.sync([item("A", "V11"), item("B", "BETA")], "1" * 64)
@@ -416,7 +416,7 @@ class Lot2BVersioningTests(unittest.TestCase):
         self.sync([item("X", "OTHER")], "2" * 64, source="OTHER_SOURCE")
         self.sync([item("A", "ALPHA")], "3" * 64)
         other = self.db.query(SanctionEntry).filter_by(source_liste="OTHER_SOURCE").one()
-        self.assertEqual(other.statut, ACTIVE)
+        self.assertEqual(other.statut, ENTRY_ACTIVE)
 
     def test_30_fifty_thousand_entries_remains_bounded(self):
         count = 50_000

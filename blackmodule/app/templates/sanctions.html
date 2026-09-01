@@ -249,6 +249,16 @@
             margin-bottom: 5px;
         }
 
+        .sanction-link {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .sanction-link:hover {
+            color: #B91C1C;
+            text-decoration: underline;
+        }
+
         .pagination {
             display: flex;
             align-items: center;
@@ -395,7 +405,10 @@
                     <tbody>
                         {% for sanction in sanctions %}
                         <tr>
-                            <td title="{{ sanction.nom_complet if sanction.nom_complet else '' }}">{{ sanction.nom_complet if sanction.nom_complet else "-" }}</td>
+                            <td title="{{ sanction.nom_complet if sanction.nom_complet else '' }}">
+                                {% set detail_path = '/web/internal-lists/' ~ sanction.id ~ '?from=sanctions' if sanction.is_internal_list else '/web/sanctions/' ~ sanction.id %}
+                                <a class="sanction-link" href="{{ detail_path }}">{{ sanction.nom_complet if sanction.nom_complet else "-" }}</a>
+                            </td>
                             <td>{{ sanction.nom if sanction.nom else "-" }}</td>
                             <td>{{ sanction.prenom if sanction.prenom else "-" }}</td>
 

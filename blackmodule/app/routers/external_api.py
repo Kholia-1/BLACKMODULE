@@ -11,6 +11,7 @@ from app.services.audit_service import write_audit_log
 from app.services.matching_service import (
     build_full_name,
     classify_alert,
+    evaluate_candidate,
     select_matching_candidates,
 )
 from app.services.matching_settings_service import get_or_create_matching_settings
@@ -82,6 +83,7 @@ class ExternalClientCheckRequest(BaseModel):
     date_naissance: Optional[str] = None
     nationalite: Optional[str] = None
     num_passeport: Optional[str] = None
+    document_number: Optional[str] = None
 
 
 @router.get("/status")
@@ -233,7 +235,7 @@ def external_check_client(
     settings = get_or_create_matching_settings(db)
 
     candidates = select_matching_candidates(
-        db, client_full_name, payload.num_passeport
+        db, client_full_name, payload.num_passeport, payload.document_number
     )
 
     matches = []
@@ -254,24 +256,22 @@ def external_check_client(
         ).all())
 
     for sanction, listed_name, name_score in candidates:
-        final_score = name_score
-        matching_type = "FUZZY_NAME"
-
-        if payload.num_passeport and sanction.num_passeport:
-            if payload.num_passeport.strip().upper() == sanction.num_passeport.strip().upper():
-                final_score = 100.0
-                matching_type = "EXACT_PASSPORT"
-
-        if parsed_date and sanction.date_naissance:
-            if parsed_date == sanction.date_naissance and name_score >= 80:
-                final_score = max(final_score, 95.0)
-                matching_type = "NAME_AND_BIRTHDATE"
+        evaluation = evaluate_candidate(
+            sanction, client_full_name, listed_name, name_score,
+            date_naissance=parsed_date,
+            nationalite=payload.nationalite,
+            passport_number=payload.num_passeport,
+            document_number=payload.document_number,
+        )
+        final_score = evaluation.score
+        matching_type = evaluation.matching_type
 
         niveau_alerte, action_recommandee = classify_alert(
             final_score,
             exact_threshold=settings.exact_threshold,
             probable_threshold=settings.probable_threshold,
-            possible_threshold=settings.possible_threshold
+            possible_threshold=settings.possible_threshold,
+            matching_type=matching_type,
         )
 
         if final_score >= settings.possible_threshold:
@@ -282,7 +282,9 @@ def external_check_client(
                 "score": final_score,
                 "matching_type": matching_type,
                 "niveau_alerte": niveau_alerte,
-                "action_recommandee": action_recommandee
+                "action_recommandee": action_recommandee,
+                "explanation": list(evaluation.explanation),
+                "name_score": evaluation.name_score,
             })
 
             if (sanction.id, matching_type) not in active_alert_keys:
@@ -293,6 +295,7 @@ def external_check_client(
                     client_date_naissance=parsed_date,
                     client_nationalite=payload.nationalite.upper() if payload.nationalite else None,
                     client_num_passeport=payload.num_passeport.upper() if payload.num_passeport else None,
+                    client_num_piece=payload.document_number.upper() if payload.document_number else None,
                     sanction_entry_id=sanction.id,
                     source_liste=sanction.source_liste,
                     matching_score=final_score,
@@ -349,7 +352,8 @@ def external_check_client(
             "prenom": payload.prenom.upper() if payload.prenom else None,
             "date_naissance": parsed_date.isoformat() if parsed_date else None,
             "nationalite": payload.nationalite.upper() if payload.nationalite else None,
-            "num_passeport": payload.num_passeport.upper() if payload.num_passeport else None
+            "num_passeport": payload.num_passeport.upper() if payload.num_passeport else None,
+            "document_number": payload.document_number.upper() if payload.document_number else None,
         },
         "screening_result": {
             "status": global_status,

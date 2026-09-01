@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.database import get_db
-from app.models import ApprovalRequest, ImportBatch, ListVersion, ListVersionActivation, ListVersionEntry, SanctionEntry
+from app.models import ApprovalRequest, AuditLog, ImportBatch, ListVersion, ListVersionActivation, ListVersionEntry, SanctionAlias, SanctionEntry
 from app.routers import alerts, imports, web
 from app.services.authorization_service import (
     ROLE_ADMIN_TECHNIQUE,
@@ -70,12 +70,13 @@ class _Db:
             ListVersionEntry: list(changes), ListVersionActivation: list(activations),
             SanctionEntry: list(entries),
         }
+        self.added = []
 
     def query(self, *_args):
         return _Query(self.items_by_model.get(_args[0], ()) if _args else ())
 
     def add(self, _item):
-        pass
+        self.added.append(_item)
 
     def commit(self):
         pass
@@ -323,7 +324,7 @@ class Lot1AWebIntegrationTests(unittest.TestCase):
         self.assertIn(f'href="{detail_path}"', response.text)
         detail = client.get(detail_path)
         self.assertEqual(detail.status_code, 200)
-        self.assertIn("Retour aux demandes de validation", detail.text)
+        self.assertIn("Retour aux listes internes", detail.text)
         self.assertNotIn(f"<td>{entry.id}</td>", response.text)
         self.assertNotIn(">Valider<", response.text)
         self.assertNotIn(">Rejeter<", response.text)
@@ -357,6 +358,107 @@ class Lot1AWebIntegrationTests(unittest.TestCase):
         self.assertEqual(technical_admin.post(
             f"/web/approvals/{approval.id}/review", data={"decision": "APPROVE"},
         ).status_code, 403)
+
+    def test_12_official_sanction_detail_is_read_only_audited_and_rbac_protected(self):
+        entry = SanctionEntry(
+            id=uuid4(), source_liste="OFAC_SDN", source_record_id="OFAC-12345",
+            type_entite="PERSONNE_PHYSIQUE", nom="AWAN", prenom="PAUL MALONG",
+            nom_complet="PAUL MALONG AWAN", statut="ACTIVE", num_passeport="S00004370",
+            autres_documents="NATIONAL ID : SS-42", motif_sanction="SDGT",
+        )
+        entry.aliases = [SanctionAlias(alias="PAUL AWAN MALONG")]
+        app = _integration_app(entries=[entry])
+        db = app.dependency_overrides[get_db]()
+        client = TestClient(app)
+        self.assertEqual(client.get(f"/_test/login/{ROLE_ADMIN_TECHNIQUE}").status_code, 200)
+
+        listing = client.get("/web/sanctions")
+        self.assertEqual(listing.status_code, 200)
+        self.assertIn(f'href="/web/sanctions/{entry.id}"', listing.text)
+
+        response = client.get(f"/web/sanctions/{entry.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Fiche sanction officielle", response.text)
+        self.assertIn("PAUL MALONG AWAN", response.text)
+        self.assertIn("S00004370", response.text)
+        self.assertIn("PAUL AWAN MALONG", response.text)
+        self.assertIn("Retour aux sanctions", response.text)
+        self.assertTrue(any(
+            isinstance(item, AuditLog)
+            and item.action == "VIEW_SANCTION_DETAIL"
+            and item.entity_id == str(entry.id)
+            for item in db.added
+        ))
+
+        forbidden = TestClient(_integration_app(entries=[entry]))
+        self.assertEqual(forbidden.get(f"/_test/login/{ROLE_AUDITEUR}").status_code, 200)
+        self.assertEqual(forbidden.get(f"/web/sanctions/{entry.id}").status_code, 403)
+
+    def test_13_sanctions_list_routes_internal_records_and_renders_a_web_404(self):
+        official = SanctionEntry(
+            id=uuid4(), source_liste="OFAC_SDN", type_entite="PERSONNE_PHYSIQUE",
+            nom="OFAC", nom_complet="OFAC TEST", statut="ACTIVE",
+        )
+        anif = SanctionEntry(
+            id=uuid4(), source_liste="ANIF", type_entite="PERSONNE_PHYSIQUE",
+            nom="ANIF", nom_complet="ALPHA TESTANIF", statut="ACTIF", is_internal_list=True,
+            internal_status="ACTIF",
+        )
+        ppe = SanctionEntry(
+            id=uuid4(), source_liste="PPE_INTERNE", type_entite="PERSONNE_PHYSIQUE",
+            nom="PPE", nom_complet="BETA TESTPPE", statut="ACTIF", is_internal_list=True,
+            internal_status="ACTIF",
+        )
+        client = TestClient(_integration_app(entries=[official, anif, ppe]))
+        self.assertEqual(client.get(f"/_test/login/{ROLE_SUPERVISEUR_CONFORMITE}").status_code, 200)
+
+        listing = client.get("/web/sanctions")
+        self.assertEqual(listing.status_code, 200)
+        self.assertIn(f'href="/web/sanctions/{official.id}"', listing.text)
+        self.assertIn(f'href="/web/internal-lists/{anif.id}?from=sanctions"', listing.text)
+        self.assertIn(f'href="/web/internal-lists/{ppe.id}?from=sanctions"', listing.text)
+
+        self.assertEqual(client.get(f"/web/sanctions/{official.id}").status_code, 200)
+        self.assertEqual(client.get(f"/web/internal-lists/{anif.id}").status_code, 200)
+        self.assertEqual(client.get(f"/web/internal-lists/{ppe.id}").status_code, 200)
+
+        missing = TestClient(_integration_app())
+        self.assertEqual(missing.get(f"/_test/login/{ROLE_ADMIN_TECHNIQUE}").status_code, 200)
+        response = missing.get(f"/web/sanctions/{uuid4()}")
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("Fiche de sanction introuvable", response.text)
+        self.assertIn("Retour aux sanctions", response.text)
+        self.assertNotIn('{"detail"', response.text)
+
+        malformed = missing.get("/web/sanctions/identifiant-invalide")
+        self.assertEqual(malformed.status_code, 404)
+        self.assertIn("Fiche de sanction introuvable", malformed.text)
+        self.assertNotIn('{"detail"', malformed.text)
+
+    def test_14_internal_detail_uses_only_controlled_return_contexts(self):
+        entry = SanctionEntry(
+            id=uuid4(), source_liste="ANIF", type_entite="PERSONNE_PHYSIQUE",
+            nom="ALPHA", nom_complet="ALPHA TESTANIF", statut="ACTIF",
+            is_internal_list=True, internal_status="ACTIF",
+        )
+        client = TestClient(_integration_app(entries=[entry]))
+        self.assertEqual(client.get(f"/_test/login/{ROLE_SUPERVISEUR_CONFORMITE}").status_code, 200)
+
+        from_sanctions = client.get(f"/web/internal-lists/{entry.id}?from=sanctions")
+        self.assertEqual(from_sanctions.status_code, 200)
+        self.assertIn('href="/web/sanctions"', from_sanctions.text)
+        self.assertIn("Retour aux sanctions", from_sanctions.text)
+
+        from_internal_lists = client.get(f"/web/internal-lists/{entry.id}?from=internal-lists")
+        self.assertEqual(from_internal_lists.status_code, 200)
+        self.assertIn('href="/web/internal-lists"', from_internal_lists.text)
+        self.assertIn("Retour aux listes internes", from_internal_lists.text)
+
+        invalid = client.get(f"/web/internal-lists/{entry.id}?from=https://untrusted.example")
+        self.assertEqual(invalid.status_code, 200)
+        self.assertIn('href="/web/internal-lists"', invalid.text)
+        self.assertIn("Retour aux listes internes", invalid.text)
+        self.assertNotIn("untrusted.example", invalid.text)
 
 
 if __name__ == "__main__":
