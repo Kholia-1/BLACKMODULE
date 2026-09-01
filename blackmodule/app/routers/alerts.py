@@ -1,4 +1,3 @@
-from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -9,7 +8,8 @@ from app.models import Alert, AuditLog
 from app.schemas import AlertResponse, AlertTreatmentRequest
 from app.services.audit_service import write_audit_log
 from app.services.api_auth import get_session_user, require_permission
-from app.services.approval_service import OP_ALERT_TREATMENT, create_approval_request
+from app.services.alert_analysis_service import build_alert_analysis
+from app.services.alert_decision_service import AlertDecisionConflict, request_alert_decision
 from app.services.authorization_service import (
     PERMISSION_NOTIFICATIONS_VIEW,
     PERMISSION_TREAT_ALERTS,
@@ -170,7 +170,7 @@ def treat_alert(
             detail=f"Statut invalide. Valeurs autorisées : {allowed_statuses}"
         )
 
-    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    alert = db.query(Alert).filter(Alert.id == alert_id).with_for_update().first()
 
     if not alert:
         raise HTTPException(
@@ -178,47 +178,39 @@ def treat_alert(
             detail="Alerte introuvable"
         )
 
-    if new_status in {"FAUX_POSITIF", "CONFIRMEE", "CLOTUREE"}:
-        create_approval_request(
-            db=db,
-            operation_type=OP_ALERT_TREATMENT,
-            initiator=user,
-            target_entity_type="Alert",
-            target_entity_id=str(alert.id),
-            old_values={"statut": alert.statut},
-            new_values={"statut": new_status, "treatment_comment": treatment.treatment_comment},
-            comment=treatment.treatment_comment,
+    try:
+        request_alert_decision(
+            db, alert=alert, new_status=new_status,
+            reason=treatment.treatment_comment, actor=user,
             ip_address=request.client.host if request.client else None,
         )
         db.commit()
-        return alert
+        db.refresh(alert)
+    except AlertDecisionConflict as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # 1. Mise à jour de l'alerte
-    treated_by = user.get("username")
-    alert.statut = new_status
-    alert.treated_by = treated_by
-    alert.treatment_comment = treatment.treatment_comment
-    alert.treated_at = datetime.utcnow()
-
-    # 2. Écriture dans le journal d'audit
-    write_audit_log(
-        db=db,
-        user_identifier=treated_by,
-        action="TRAITEMENT_ALERTE",
-        entity_type="Alert",
-        entity_id=str(alert.id),
-        description=(
-            f"Alerte traitée avec le statut {new_status}. "
-            f"Commentaire : {treatment.treatment_comment}"
-        ),
-        ip_address=None
-    )
-
-    # 3. Sauvegarde dans PostgreSQL
-    db.commit()
-
-    # 4. Rechargement de l'alerte après sauvegarde
-    db.refresh(alert)
-
-    # 5. Retour de l'alerte mise à jour dans Swagger/API
     return alert
+
+
+@router.get("/{alert_id}/analysis")
+def get_alert_analysis(
+    alert_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_permission(PERMISSION_VIEW_ALERTS)),
+):
+    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alerte introuvable")
+    analysis = build_alert_analysis(db, alert)
+    write_audit_log(
+        db, user.get("username"), "VIEW_ALERT_ANALYSIS", "Alert", str(alert.id),
+        "Consultation de l'analyse consolidée; chaque source reste indépendante.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return analysis

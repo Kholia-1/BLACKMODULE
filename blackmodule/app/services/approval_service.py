@@ -8,7 +8,7 @@ from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
-from app.models import ApprovalRequest, Alert
+from app.models import ApprovalRequest
 from app.services.audit_service import write_audit_log
 from app.services.matching_settings_service import update_matching_settings
 
@@ -86,10 +86,15 @@ def review_approval_request(
             _apply_approved_operation(db, approval, reviewer.get("username"))
         except Exception as exc:
             from app.services.list_version_service import ObsoleteRestoreRequest
+            from app.services.alert_decision_service import (
+                ObsoleteAlertDecision, mark_alert_decision_obsolete,
+            )
 
-            if not isinstance(exc, ObsoleteRestoreRequest):
+            if not isinstance(exc, (ObsoleteRestoreRequest, ObsoleteAlertDecision)):
                 raise
             approval.status = OBSOLETE
+            if isinstance(exc, ObsoleteAlertDecision):
+                mark_alert_decision_obsolete(db, approval, reviewer.get("username"))
             write_audit_log(
                 db, reviewer.get("username"), "FOUR_EYES_OBSOLETE", "ApprovalRequest",
                 str(approval.id), str(exc), ip_address,
@@ -101,6 +106,12 @@ def review_approval_request(
         if approval.operation_type == OP_INTERNAL_LIST_CHANGE:
             from app.services.internal_list_service import apply_rejected_internal_change
             apply_rejected_internal_change(db, approval, reviewer.get("username"))
+        elif approval.operation_type == OP_ALERT_TREATMENT:
+            from app.services.alert_decision_service import reject_alert_decision
+            reject_alert_decision(
+                db, approval=approval, reviewer_username=reviewer.get("username"),
+                reviewer_comment=comment,
+            )
 
     write_audit_log(
         db, reviewer.get("username"),
@@ -196,16 +207,9 @@ def _apply_approved_operation(db: Session, approval: ApprovalRequest, reviewer_u
             approval.target_entity_id, "Seuils appliqués après validation à quatre yeux.", None,
         )
     elif approval.operation_type == OP_ALERT_TREATMENT:
-        alert = db.query(Alert).filter(Alert.id == approval.target_entity_id).first()
-        if not alert:
-            raise ValueError("Alerte cible introuvable.")
-        alert.statut = values["statut"]
-        alert.treated_by = reviewer_username
-        alert.treatment_comment = values.get("treatment_comment")
-        alert.treated_at = datetime.utcnow()
-        write_audit_log(
-            db, reviewer_username, "TRAITEMENT_ALERTE", "Alert", str(alert.id),
-            f"Décision {alert.statut} appliquée après validation à quatre yeux.", None,
+        from app.services.alert_decision_service import apply_approved_alert_decision
+        apply_approved_alert_decision(
+            db, approval=approval, reviewer_username=reviewer_username,
         )
     elif approval.operation_type == OP_LIST_VERSION_RESTORE:
         # Import lazily to keep the generic four-eyes service independent of

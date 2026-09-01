@@ -441,6 +441,24 @@
             margin-top: 2px;
         }
 
+        .analysis-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+            font-size: 12.5px;
+        }
+
+        .analysis-table th, .analysis-table td {
+            padding: 9px 10px;
+            border-bottom: 1px solid #E2E8F0;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .analysis-table th { background: #F8FAFC; color: #64748B; }
+        .analysis-note { margin: 8px 0 0; color: #64748B; font-size: 12.5px; }
+        .flash-message { margin-bottom: 18px; }
+
         .badge {
             display: inline-block;
             padding: 3px 10px;
@@ -683,6 +701,10 @@
 {% set nat_match = sanction_entry and alert.client_nationalite and sanction_entry.nationalite and (alert.client_nationalite | upper | trim) == (sanction_entry.nationalite | upper | trim) %}
 
 <div class="container">
+
+    {% if request.query_params.get('message') %}
+        <div class="history-note flash-message" role="alert">{{ request.query_params.get('message') }}</div>
+    {% endif %}
 
     <div class="breadcrumb">
         <a href="/web/alerts">Alertes</a> / Traitement de l'alerte
@@ -941,6 +963,33 @@
                     </div>
                 </div>
 
+                {% if alert_analysis.classification == "MULTI_SOURCE_PROBABLE" %}
+                    <hr class="divider">
+                    <div class="section-head">
+                        <div>
+                            <span class="eyebrow">Analyse réversible</span>
+                            <h2>Correspondance multi-source probable</h2>
+                        </div>
+                    </div>
+                    <p class="analysis-note">
+                        {{ alert_analysis.rationale | join(" · ") }}. Les entrées ne sont pas fusionnées : chaque source et chaque score restent indépendants.
+                    </p>
+                    <table class="analysis-table">
+                        <thead><tr><th>Source</th><th>Personne</th><th>Score</th><th>Type</th><th>Statut</th></tr></thead>
+                        <tbody>
+                            {% for item in alert_analysis.sources %}
+                                <tr>
+                                    <td>{{ item.source or "—" }}</td>
+                                    <td>{{ item.sanction_name or "—" }}</td>
+                                    <td>{{ "%.2f"|format(item.score) if item.score is not none else "—" }}</td>
+                                    <td>{{ item.matching_type or "—" }}</td>
+                                    <td>{{ item.statut or "—" }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+
             </div>
 
         </div>
@@ -969,6 +1018,33 @@
                     </div>
                 {% endif %}
 
+                {% if decision_history %}
+                    <table class="analysis-table" aria-label="Historique des décisions">
+                        <thead><tr><th>Ancien</th><th>Demandé</th><th>État</th><th>Qui / quand</th><th>Motif</th></tr></thead>
+                        <tbody>
+                            {% for item in decision_history %}
+                                <tr>
+                                    <td>{{ item.old_status or "—" }}</td>
+                                    <td>{{ item.requested_status }}</td>
+                                    <td>{{ item.decision_status }}</td>
+                                    <td>
+                                        {{ item.initiated_by }}<br>
+                                        {{ item.initiated_at.strftime('%d/%m/%Y %H:%M') if item.initiated_at else "—" }}
+                                        {% if item.reviewed_by %}<br>Validation : {{ item.reviewed_by }}{% endif %}
+                                    </td>
+                                    <td>{{ item.reason or "—" }}{% if item.reviewer_comment %}<br>Réponse : {{ item.reviewer_comment }}{% endif %}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+
+                {% if pending_decision %}
+                    <div class="history-note" style="margin-top:16px">
+                        Une décision {{ pending_decision.requested_status }} est déjà en attente de validation. Aucun autre traitement n'est possible avant sa décision.
+                    </div>
+                    <a class="back" href="/web/alerts">&larr; Retour aux alertes</a>
+                {% else %}
                 <form method="post" action="/web/alerts/{{ alert.id }}/treat" id="treatForm">
 
                     <label>Nouveau statut</label>
@@ -1044,6 +1120,7 @@
                         <a class="back" href="/web/alerts">&larr; Retour aux alertes</a>
                     </div>
                 </form>
+                {% endif %}
             </div>
 
         </div>

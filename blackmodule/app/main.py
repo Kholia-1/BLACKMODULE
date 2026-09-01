@@ -116,6 +116,10 @@ def startup():
             "CREATE INDEX IF NOT EXISTS ix_sanction_internal_status "
             "ON sanction_entries (is_internal_list, internal_status)"
         ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_alerts_client_reference_created_at "
+            "ON alerts (client_reference, created_at)"
+        ))
 
         for column_def in [
             "role_assigned_at TIMESTAMP",

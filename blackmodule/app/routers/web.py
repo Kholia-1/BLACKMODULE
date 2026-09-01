@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, AuditLog, ImportBatch, ListVersion, ListVersionActivation, ListVersionEntry, User, MatchingSetting, InternalListHistory
+from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, AlertDecisionHistory, AuditLog, ImportBatch, ListVersion, ListVersionActivation, ListVersionEntry, User, MatchingSetting, InternalListHistory
 from app.schemas import ClientCheckRequest
 from app.services.auth_service import authenticate_user, hash_password, verify_password
 from app.services.authorization_service import (
@@ -35,6 +35,10 @@ from app.services.matching_service import (
     build_full_name, classify_alert, evaluate_candidate, select_matching_candidates,
 )
 from app.services.audit_service import write_audit_log
+from app.services.alert_analysis_service import build_alert_analysis
+from app.services.alert_decision_service import (
+    AlertDecisionConflict, PENDING_DECISION, request_alert_decision,
+)
 from app.services.import_service import (
     import_afb_ppe_csv,
     import_ofac_sdn_xml,
@@ -113,6 +117,17 @@ def approval_target_labels(db: Session, approvals: list[ApprovalRequest]) -> dic
             SanctionEntry.id.in_(internal_ids), SanctionEntry.is_internal_list.is_(True)
         ).all()
     } if internal_ids else {}
+    alert_ids = []
+    for approval in approvals:
+        if approval.target_entity_type == "Alert":
+            try:
+                alert_ids.append(UUID(str(approval.target_entity_id)))
+            except (TypeError, ValueError, AttributeError):
+                continue
+    alert_targets = {
+        str(alert.id): alert
+        for alert in db.query(Alert).filter(Alert.id.in_(alert_ids)).all()
+    } if alert_ids else {}
     generic_labels = {
         "Alert": "Alerte", "MatchingSetting": "Paramètres de matching",
         "ListVersion": "Version de liste", "InternalSanctionEntry": "Fiche interne",
@@ -127,10 +142,36 @@ def approval_target_labels(db: Session, approvals: list[ApprovalRequest]) -> dic
                 )).strip()
                 labels[str(approval.id)] = f"{full_name or 'Fiche interne'} \u2014 {category_label(entry.source_liste)}"
                 continue
+        if approval.target_entity_type == "Alert":
+            alert = alert_targets.get(str(approval.target_entity_id))
+            if alert:
+                reference = alert.client_reference or "Sans référence"
+                source = alert.source_liste or "Source inconnue"
+                labels[str(approval.id)] = f"Alerte {reference} — {source}"
+                continue
         labels[str(approval.id)] = generic_labels.get(
             approval.target_entity_type, "Cible associée"
         )
     return labels
+
+
+def approval_alert_links(db: Session, approvals: list[ApprovalRequest]) -> dict[str, str]:
+    alert_ids = []
+    for approval in approvals:
+        if approval.target_entity_type == "Alert":
+            try:
+                alert_ids.append(UUID(str(approval.target_entity_id)))
+            except (TypeError, ValueError, AttributeError):
+                continue
+    existing_ids = {
+        str(alert.id) for alert in db.query(Alert).filter(Alert.id.in_(alert_ids)).all()
+    } if alert_ids else set()
+    return {
+        str(approval.id): str(approval.target_entity_id)
+        for approval in approvals
+        if approval.target_entity_type == "Alert"
+        and str(approval.target_entity_id) in existing_ids
+    }
 
 
 def approval_internal_entry_links(db: Session, approvals: list[ApprovalRequest]) -> dict[str, str]:
@@ -1018,6 +1059,19 @@ def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends
         Alert.client_reference == alert.client_reference,
         Alert.id != alert.id
     ).count() if alert.client_reference else 0
+    alert_analysis = build_alert_analysis(db, alert)
+    decision_history = db.query(AlertDecisionHistory).filter(
+        AlertDecisionHistory.alert_id == alert.id,
+    ).order_by(AlertDecisionHistory.initiated_at.desc()).all()
+    pending_decision = next(
+        (item for item in decision_history if item.decision_status == PENDING_DECISION), None,
+    )
+    write_audit_log(
+        db, current_username(request), "VIEW_ALERT_ANALYSIS", "Alert", str(alert.id),
+        "Consultation de l'analyse consolidée; chaque source reste indépendante.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
 
     return templates.TemplateResponse(
         request=request,
@@ -1029,6 +1083,9 @@ def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends
             "client_age": calculate_age(alert.client_date_naissance),
             "sanction_age": calculate_age(sanction_entry.date_naissance) if sanction_entry else None,
             "previous_alerts_count": previous_alerts_count,
+            "alert_analysis": alert_analysis,
+            "decision_history": decision_history,
+            "pending_decision": pending_decision,
         },
     )
 
@@ -1061,53 +1118,32 @@ def web_treat_alert_submit(
     if new_status not in allowed_statuses:
         raise HTTPException(status_code=400, detail="Statut invalide")
 
-    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    alert = db.query(Alert).filter(Alert.id == alert_id).with_for_update().first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alerte introuvable")
 
-    username = current_username(request, fallback=treated_by)
-    if new_status in {"FAUX_POSITIF", "CONFIRMEE", "CLOTUREE"}:
-        create_approval_request(
-            db=db,
-            operation_type=OP_ALERT_TREATMENT,
-            initiator=get_current_user(request),
-            target_entity_type="Alert",
-            target_entity_id=str(alert.id),
-            old_values={"statut": alert.statut},
-            new_values={"statut": new_status, "treatment_comment": treatment_comment},
-            comment=treatment_comment,
+    try:
+        outcome, _ = request_alert_decision(
+            db, alert=alert, new_status=new_status, reason=treatment_comment,
+            actor=get_current_user(request),
             ip_address=request.client.host if request.client else None,
         )
         db.commit()
-        redirect_base = return_to if return_to and return_to.startswith("/web/") else "/web/alerts"
+    except (AlertDecisionConflict, ValueError) as exc:
+        db.rollback()
         return RedirectResponse(
-            url=f"{redirect_base}?message=Décision soumise à validation par un second utilisateur",
+            url=f"/web/alerts/{alert_id}/treat?{urlencode({'message': str(exc)})}",
             status_code=303,
         )
-
-    alert.statut = new_status
-    alert.treated_by = username
-    alert.treatment_comment = treatment_comment
-    alert.treated_at = datetime.utcnow()
-
-    write_audit_log(
-        db=db,
-        user_identifier=username,
-        action="WEB_TRAITEMENT_ALERTE",
-        entity_type="Alert",
-        entity_id=str(alert.id),
-        description=(
-            f"Alerte traitée depuis l'interface web avec le statut {new_status}. "
-            f"Commentaire : {treatment_comment}"
-        ),
-        ip_address=request.client.host if request.client else None,
-    )
-    db.commit()
 
     redirect_base = return_to if return_to and return_to.startswith("/web/") else "/web/alerts"
 
     return RedirectResponse(
-        url=f"{redirect_base}?message=Alerte traitée avec succès : {new_status}",
+        url=(
+            f"{redirect_base}?message=Décision soumise à validation par un second utilisateur"
+            if outcome == PENDING_DECISION
+            else f"{redirect_base}?message=Alerte traitée avec succès : {new_status}"
+        ),
         status_code=303,
     )
 
@@ -3183,6 +3219,7 @@ def web_approvals(request: Request, db: Session = Depends(get_db)):
             "approval_counts": approval_counts,
             "approval_target_labels": approval_target_labels(db, approvals),
             "approval_internal_entry_links": approval_internal_entry_links(db, approvals),
+            "approval_alert_links": approval_alert_links(db, approvals),
             "approval_operation_labels": approval_operation_labels(approvals),
             "pending_status": PENDING,
             "can_validate": require_permission(request, PERMISSION_REVIEW_FOUR_EYES),

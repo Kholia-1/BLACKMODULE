@@ -255,6 +255,29 @@ class Alert(Base):
     treatment_comment = Column(Text, nullable=True)
 
 
+class AlertDecisionHistory(Base):
+    """Traçabilité métier d'une décision sans modifier l'alerte historique."""
+
+    __tablename__ = "alert_decision_history"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    alert_id = Column(UUID(as_uuid=True), ForeignKey("alerts.id"), nullable=False, index=True)
+    approval_request_id = Column(
+        UUID(as_uuid=True), ForeignKey("approval_requests.id"), nullable=True,
+        unique=True, index=True,
+    )
+    old_status = Column(String(50), nullable=True)
+    requested_status = Column(String(50), nullable=False)
+    decision_status = Column(String(30), nullable=False)
+    initiated_by = Column(String(100), nullable=False)
+    initiated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    reason = Column(Text, nullable=True)
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    reviewer_comment = Column(Text, nullable=True)
+    applied_at = Column(DateTime, nullable=True)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

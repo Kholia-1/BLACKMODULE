@@ -104,12 +104,17 @@
                                     <td class="nowrap">{{ approval.reviewed_at.strftime('%d/%m/%Y %H:%M') if approval.reviewed_at else "—" }}</td>
                                     <td>
                                         {% set internal_entry_id = approval_internal_entry_links.get(approval.id|string) %}
+                                        {% set alert_id = approval_alert_links.get(approval.id|string) %}
                                         <div class="action-links">
                                             {% if internal_entry_id %}
                                                 <a class="detail-link" href="/web/internal-lists/{{ internal_entry_id }}?from=approvals">Voir fiche</a>
                                             {% endif %}
-                                            {% if approval.status == pending_status and can_validate and approval.initiator_user_id != current_user_id %}
+                                            {% if alert_id and can_validate %}
                                                 {% if internal_entry_id %}<span class="action-separator">|</span>{% endif %}
+                                                <a class="detail-link" href="/web/alerts/{{ alert_id }}/treat">Voir alerte</a>
+                                            {% endif %}
+                                            {% if approval.status == pending_status and can_validate and approval.initiator_user_id != current_user_id %}
+                                                {% if internal_entry_id or (alert_id and can_validate) %}<span class="action-separator">|</span>{% endif %}
                                                 <form class="action-form" method="post" action="/web/approvals/{{ approval.id }}/review">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                                                     <input type="text" name="comment" placeholder="Commentaire">
@@ -117,7 +122,7 @@
                                                     <button class="btn btn-reject" name="decision" value="REJECT" type="submit">Rejeter</button>
                                                 </form>
                                             {% elif approval.status != pending_status %}
-                                                {% if internal_entry_id %}<span class="action-separator">|</span>{% endif %}
+                                                {% if internal_entry_id or (alert_id and can_validate) %}<span class="action-separator">|</span>{% endif %}
                                                 <span class="nowrap">Traité</span>
                                             {% elif not internal_entry_id %}
                                                 <span class="nowrap">—</span>
