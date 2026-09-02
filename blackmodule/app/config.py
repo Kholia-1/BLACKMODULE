@@ -45,3 +45,16 @@ INTERNAL_LIST_IMPORT_MAX_BYTES = int(
 )
 if INTERNAL_LIST_IMPORT_MAX_BYTES <= 0:
     raise ValueError("INTERNAL_LIST_IMPORT_MAX_BYTES doit être strictement positif.")
+
+# SLA de traitement des alertes, centralisés et surchargeables par environnement.
+ALERT_SLA_HOURS = {
+    "ALERTE_EXACTE": float(os.getenv("ALERT_SLA_EXACT_HOURS", "4")),
+    "ALERTE_PROBABLE": float(os.getenv("ALERT_SLA_PROBABLE_HOURS", "24")),
+    "ALERTE_POSSIBLE": float(os.getenv("ALERT_SLA_POSSIBLE_HOURS", "72")),
+}
+if any(hours <= 0 for hours in ALERT_SLA_HOURS.values()):
+    raise ValueError("Les SLA d'alertes doivent être strictement positifs.")
+
+ALERT_SLA_NEAR_RATIO = float(os.getenv("ALERT_SLA_NEAR_RATIO", "0.8"))
+if not 0 < ALERT_SLA_NEAR_RATIO < 1:
+    raise ValueError("ALERT_SLA_NEAR_RATIO doit être compris entre 0 et 1.")

@@ -378,6 +378,17 @@
             font-weight: 600;
         }
 
+        .sla-ok { background: #DCFCE7; color: #166534; }
+        .sla-near { background: #FEF3C7; color: #92400E; }
+        .sla-breached { background: #FEE2E2; color: #991B1B; }
+        .sla-done { background: #E2E8F0; color: #475569; }
+        .assignment-stack { display: grid; gap: 6px; min-width: 150px; }
+        .assignment-stack form { display: flex; gap: 5px; align-items: center; }
+        .assignment-stack select, .assignment-stack input { min-width: 0; max-width: 150px; }
+        .btn-compact { border: 0; border-radius: 7px; padding: 7px 9px; cursor: pointer; font-weight: 700; }
+        .btn-assign { background: #E2E8F0; color: #334155; }
+        .btn-escalate { background: #FEF3C7; color: #92400E; }
+
         @media (max-width: 900px) {
             .container {
                 padding: 20px;
@@ -428,10 +439,12 @@
             <div class="summary-chip exacte"><strong>{{ counts_by_niveau.ALERTE_EXACTE }}</strong> exactes</div>
             <div class="summary-chip probable"><strong>{{ counts_by_niveau.ALERTE_PROBABLE }}</strong> probables</div>
             <div class="summary-chip possible"><strong>{{ counts_by_niveau.ALERTE_POSSIBLE }}</strong> possibles</div>
+            <div class="summary-chip"><strong>{{ sla_near_count }}</strong> proches du SLA</div>
+            <div class="summary-chip exacte"><strong>{{ sla_breached_count }}</strong> hors SLA</div>
         </div>
 
         <div class="filter-bar">
-    <a href="/web/alerts" class="{% if not current_status and not niveau_alerte and not source_liste and not client_reference and not date_from and not date_to %}active{% endif %}">
+    <a href="/web/alerts" class="{% if not current_status and not niveau_alerte and not source_liste and not client_reference and not date_from and not date_to and not analyste and not sla_status and not escaladee %}active{% endif %}">
         Toutes
     </a>
     <a href="/web/alerts?statut=GENEREE" class="{% if current_status == 'GENEREE' %}active{% endif %}">Générées</a>
@@ -469,19 +482,46 @@
         <label>Source</label>
         <select name="source_liste" onchange="this.form.submit()">
             <option value="">Toutes les sources</option>
-            <option value="AFB_PPE" {% if source_liste == "AFB_PPE" %}selected{% endif %}>AFB_PPE</option>
-            <option value="OFAC_SDN" {% if source_liste == "OFAC_SDN" %}selected{% endif %}>OFAC_SDN</option>
-            <option value="OFAC_CONSOLIDATED" {% if source_liste == "OFAC_CONSOLIDATED" %}selected{% endif %}>OFAC_CONSOLIDATED</option>
-            <option value="ONU" {% if source_liste == "ONU" %}selected{% endif %}>ONU</option>
-            <option value="UE" {% if source_liste == "UE" %}selected{% endif %}>UE</option>
-            <option value="OFSI" {% if source_liste == "OFSI" %}selected{% endif %}>OFSI</option>
-            <option value="FR_GEL" {% if source_liste == "FR_GEL" %}selected{% endif %}>FR_GEL</option>
+            {% for item in alert_sources %}
+                <option value="{{ item }}" {% if source_liste == item %}selected{% endif %}>{{ item }}</option>
+            {% endfor %}
         </select>
     </div>
 
     <div class="filter-field">
         <label>Référence client</label>
         <input type="text" name="client_reference" placeholder="Rechercher..." value="{{ client_reference or '' }}">
+    </div>
+
+    <div class="filter-field">
+        <label>Analyste</label>
+        <select name="analyste" onchange="this.form.submit()">
+            <option value="">Tous</option>
+            <option value="MOI" {% if analyste == "MOI" %}selected{% endif %}>Mes alertes</option>
+            <option value="NON_ASSIGNEE" {% if analyste == "NON_ASSIGNEE" %}selected{% endif %}>Non assignées</option>
+            {% for item in analysts %}
+                <option value="{{ item.id }}" {% if analyste == item.id|string %}selected{% endif %}>{{ item.full_name or item.username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-field">
+        <label>SLA</label>
+        <select name="sla_status" onchange="this.form.submit()">
+            <option value="">Tous</option>
+            <option value="DANS_SLA" {% if sla_status == "DANS_SLA" %}selected{% endif %}>Dans le SLA</option>
+            <option value="PROCHE_SLA" {% if sla_status == "PROCHE_SLA" %}selected{% endif %}>Proche du SLA</option>
+            <option value="HORS_SLA" {% if sla_status == "HORS_SLA" %}selected{% endif %}>Hors SLA</option>
+        </select>
+    </div>
+
+    <div class="filter-field">
+        <label>Escalade</label>
+        <select name="escaladee" onchange="this.form.submit()">
+            <option value="">Toutes</option>
+            <option value="1" {% if escaladee == "1" %}selected{% endif %}>Signalées au superviseur</option>
+            <option value="0" {% if escaladee == "0" %}selected{% endif %}>Non signalées</option>
+        </select>
     </div>
 
     <div class="filter-field">
@@ -515,6 +555,8 @@
                         <th><a href="{{ sort_links.source }}">Source <span class="sort-arrow">{{ sort_arrows.source }}</span></a></th>
                         <th>Type matching</th>
                         <th><a href="{{ sort_links.date }}">Date <span class="sort-arrow">{{ sort_arrows.date }}</span></a></th>
+                        <th>Assignation</th>
+                        <th>Ancienneté / SLA</th>
                         <th>Action</th>
                         <th>Action rapide</th>
                     </tr>
@@ -561,6 +603,47 @@
                         <td>{{ alert.source_liste }}</td>
                         <td>{{ alert.matching_type }}</td>
                         <td>{{ alert.created_at }}</td>
+                        <td>
+                            <div class="assignment-stack">
+                                <strong>{{ alert.assigned_to or "Non assignée" }}</strong>
+                                {% if alert.supervisor_escalated_at %}<span class="badge sla-near">Superviseur alerté</span>{% endif %}
+                                {% if not alert.assigned_to_user_id and "ALERTS_ASSIGN" in permissions and alert.statut not in ["FAUX_POSITIF", "CLOTUREE"] %}
+                                    <form method="post" action="/web/alerts/{{ alert.id }}/assign">
+                                        <input type="hidden" name="return_to" value="/web/alerts">
+                                        <button class="btn-compact btn-assign" type="submit">Prendre</button>
+                                    </form>
+                                {% elif "ALERTS_REASSIGN" in permissions and alert.statut not in ["FAUX_POSITIF", "CLOTUREE"] %}
+                                    <form method="post" action="/web/alerts/{{ alert.id }}/reassign">
+                                        <select name="assignee_user_id" aria-label="Nouvel analyste" required>
+                                            {% for item in analysts %}
+                                                <option value="{{ item.id }}">{{ item.full_name or item.username }}{% if item.full_name and item.username %} ({{ item.username }}){% endif %} — {{ role_label(item.role) }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <input type="hidden" name="return_to" value="/web/alerts">
+                                        <button class="btn-compact btn-assign" type="submit">Réassigner</button>
+                                    </form>
+                                {% endif %}
+                                {% if "ALERTS_ESCALATE" in permissions and not alert.supervisor_escalated_at and alert.statut not in ["FAUX_POSITIF", "CLOTUREE"] %}
+                                    <form method="post" action="/web/alerts/{{ alert.id }}/escalate">
+                                        <input type="text" name="reason" placeholder="Motif" required minlength="3">
+                                        <input type="hidden" name="return_to" value="/web/alerts">
+                                        <button class="btn-compact btn-escalate" type="submit">Escalader</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div>{{ alert.age_label }}</div>
+                            {% if alert.sla_status == "HORS_SLA" %}
+                                <span class="badge sla-breached">Hors SLA</span>
+                            {% elif alert.sla_status == "PROCHE_SLA" %}
+                                <span class="badge sla-near">Proche SLA</span>
+                            {% elif alert.sla_status == "TRAITEE" %}
+                                <span class="badge sla-done">Traitée</span>
+                            {% else %}
+                                <span class="badge sla-ok">Dans SLA</span>
+                            {% endif %}
+                        </td>
                        <td>
                             {% if "ALERTS_TREAT" in permissions %}
                                 <a class="btn" href="/web/alerts/{{ alert.id }}/treat">Traiter</a>

@@ -57,6 +57,11 @@ def startup():
             "client_type_piece VARCHAR(50)",
             "client_num_piece VARCHAR(100)",
             "client_num_passeport VARCHAR(100)",
+            "assigned_to_user_id UUID",
+            "assigned_to VARCHAR(100)",
+            "assigned_at TIMESTAMP",
+            "supervisor_escalated_at TIMESTAMP",
+            "supervisor_escalated_by VARCHAR(100)",
         ]:
             conn.execute(text(f"ALTER TABLE alerts ADD COLUMN IF NOT EXISTS {column_def}"))
 
@@ -120,6 +125,33 @@ def startup():
             "CREATE INDEX IF NOT EXISTS ix_alerts_client_reference_created_at "
             "ON alerts (client_reference, created_at)"
         ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_alerts_queue "
+            "ON alerts (statut, niveau_alerte, created_at)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_alerts_assigned_to_user_id "
+            "ON alerts (assigned_to_user_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_alert_assignment_history_alert_created "
+            "ON alert_assignment_history (alert_id, created_at)"
+        ))
+        conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conrelid = 'alerts'::regclass
+                      AND contype = 'f'
+                      AND pg_get_constraintdef(oid) LIKE 'FOREIGN KEY (assigned_to_user_id)%'
+                ) THEN
+                    ALTER TABLE alerts
+                    ADD CONSTRAINT fk_alerts_assigned_to_user_id
+                    FOREIGN KEY (assigned_to_user_id) REFERENCES users(id) ON DELETE SET NULL;
+                END IF;
+            END $$
+        """))
 
         for column_def in [
             "role_assigned_at TIMESTAMP",

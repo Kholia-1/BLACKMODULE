@@ -691,6 +691,7 @@
 </div>
 
 {% set user = request.session.get("user") %}
+{% set permissions = user.get("permissions", []) if user else [] %}
 {% set current_display_name = (user.full_name if user and user.full_name else (user.username if user else "")) %}
 {% set level_class = "card-exacte" if alert.niveau_alerte == "ALERTE_EXACTE" else ("card-probable" if alert.niveau_alerte == "ALERTE_PROBABLE" else "card-possible") %}
 {% set score_class = "exacte" if alert.niveau_alerte == "ALERTE_EXACTE" else ("probable" if alert.niveau_alerte == "ALERTE_PROBABLE" else "possible") %}
@@ -995,6 +996,58 @@
         </div>
 
         <div class="col col-action">
+
+            <div class="card">
+                <div class="section-head">
+                    <div>
+                        <span class="eyebrow">File de traitement</span>
+                        <h2>Prise en charge et SLA</h2>
+                    </div>
+                </div>
+                <div class="info-grid">
+                    <div class="field"><div class="label">Analyste</div><div class="value">{{ alert.assigned_to or "Non assignée" }}</div></div>
+                    <div class="field"><div class="label">Ancienneté</div><div class="value">{{ alert.age_label }} · {{ alert.sla_status }}</div></div>
+                    <div class="field"><div class="label">Échéance SLA</div><div class="value">{{ alert.sla_deadline.strftime('%d/%m/%Y %H:%M') if alert.sla_deadline else "—" }}</div></div>
+                    <div class="field"><div class="label">Escalade superviseur</div><div class="value">{{ alert.supervisor_escalated_at.strftime('%d/%m/%Y %H:%M') if alert.supervisor_escalated_at else "—" }}</div></div>
+                </div>
+
+                {% if not alert.assigned_to_user_id and "ALERTS_ASSIGN" in permissions %}
+                    <form method="post" action="/web/alerts/{{ alert.id }}/assign" class="form-actions">
+                        <input type="hidden" name="return_to" value="/web/alerts">
+                        <button type="submit">Prendre en charge</button>
+                    </form>
+                {% elif "ALERTS_REASSIGN" in permissions %}
+                    <form method="post" action="/web/alerts/{{ alert.id }}/reassign" class="form-actions">
+                        <select name="assignee_user_id" required>
+                            {% for item in analysts %}
+                                <option value="{{ item.id }}">{{ item.full_name or item.username }}{% if item.full_name and item.username %} ({{ item.username }}){% endif %} — {{ role_label(item.role) }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" name="reason" placeholder="Motif de réassignation">
+                        <input type="hidden" name="return_to" value="/web/alerts">
+                        <button type="submit">Réassigner</button>
+                    </form>
+                {% endif %}
+
+                {% if "ALERTS_ESCALATE" in permissions and not alert.supervisor_escalated_at %}
+                    <form method="post" action="/web/alerts/{{ alert.id }}/escalate" class="form-actions">
+                        <input type="text" name="reason" placeholder="Motif d'escalade" required minlength="3">
+                        <input type="hidden" name="return_to" value="/web/alerts">
+                        <button type="submit">Signaler au superviseur</button>
+                    </form>
+                {% endif %}
+
+                {% if assignment_history %}
+                    <table class="analysis-table" aria-label="Historique des assignations">
+                        <thead><tr><th>Action</th><th>De</th><th>Vers</th><th>Par</th><th>Date</th></tr></thead>
+                        <tbody>{% for item in assignment_history %}<tr>
+                            <td>{{ item.action }}</td><td>{{ item.from_username or "—" }}</td>
+                            <td>{{ item.to_username or "—" }}</td><td>{{ item.changed_by_username }}</td>
+                            <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') if item.created_at else "—" }}</td>
+                        </tr>{% endfor %}</tbody>
+                    </table>
+                {% endif %}
+            </div>
 
             <div class="card">
                 <div class="section-head">

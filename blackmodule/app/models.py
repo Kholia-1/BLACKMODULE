@@ -13,6 +13,7 @@ from sqlalchemy import (
     Float,
     LargeBinary,
     UniqueConstraint,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -220,6 +221,9 @@ class ListVersionEntry(Base):
 
 class Alert(Base):
     __tablename__ = "alerts"
+    __table_args__ = (
+        Index("ix_alerts_queue", "statut", "niveau_alerte", "created_at"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -254,6 +258,14 @@ class Alert(Base):
     treated_by = Column(String(100), nullable=True)
     treatment_comment = Column(Text, nullable=True)
 
+    assigned_to_user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
+    assigned_to = Column(String(100), nullable=True)
+    assigned_at = Column(DateTime, nullable=True)
+    supervisor_escalated_at = Column(DateTime, nullable=True)
+    supervisor_escalated_by = Column(String(100), nullable=True)
+
 
 class AlertDecisionHistory(Base):
     """Traçabilité métier d'une décision sans modifier l'alerte historique."""
@@ -276,6 +288,27 @@ class AlertDecisionHistory(Base):
     reviewed_at = Column(DateTime, nullable=True)
     reviewer_comment = Column(Text, nullable=True)
     applied_at = Column(DateTime, nullable=True)
+
+
+class AlertAssignmentHistory(Base):
+    """Historique immuable des prises en charge et escalades d'alertes."""
+
+    __tablename__ = "alert_assignment_history"
+    __table_args__ = (
+        Index("ix_alert_assignment_history_alert_created", "alert_id", "created_at"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    alert_id = Column(UUID(as_uuid=True), ForeignKey("alerts.id"), nullable=False)
+    action = Column(String(40), nullable=False)
+    from_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    from_username = Column(String(100), nullable=True)
+    to_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    to_username = Column(String(100), nullable=True)
+    changed_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    changed_by_username = Column(String(100), nullable=False)
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class AuditLog(Base):

@@ -24,6 +24,7 @@ from app.services.authorization_service import (
     PERMISSION_INTERNAL_LISTS_VIEW, PERMISSION_INTERNAL_LISTS_CREATE, PERMISSION_INTERNAL_LISTS_EDIT,
     PERMISSION_INTERNAL_LISTS_SUBMIT, PERMISSION_INTERNAL_LISTS_VALIDATE,
     PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW,
+    PERMISSION_ALERTS_ASSIGN, PERMISSION_ALERTS_REASSIGN, PERMISSION_ALERTS_ESCALATE,
     has_permission, permissions_for_role, refresh_session_user, role_label, session_user_payload,
 )
 from app.services.approval_service import (
@@ -38,6 +39,11 @@ from app.services.audit_service import write_audit_log
 from app.services.alert_analysis_service import build_alert_analysis
 from app.services.alert_decision_service import (
     AlertDecisionConflict, PENDING_DECISION, request_alert_decision,
+)
+from app.services.alert_queue_service import (
+    AlertAssignmentConflict, annotate_alerts, assign_alert, assignment_history,
+    eligible_assignees, escalate_to_supervisor, filter_by_sla, queue_ordering,
+    reassign_alert,
 )
 from app.services.import_service import (
     import_afb_ppe_csv,
@@ -903,6 +909,9 @@ def web_alerts(
     client_reference: str | None = Query(None),
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
+    analyste: str | None = Query(None),
+    sla_status: str | None = Query(None),
+    escaladee: str | None = Query(None),
     message: str | None = Query(None),
     sort_by: str | None = Query(None),
     sort_dir: str | None = Query(None),
@@ -923,6 +932,9 @@ def web_alerts(
     current_client_reference = None
     current_date_from = None
     current_date_to = None
+    current_analyste = analyste.strip() if analyste else None
+    current_sla_status = sla_status.strip().upper() if sla_status else None
+    current_escaladee = escaladee if escaladee in {"0", "1"} else None
 
     if statut:
         current_status = statut.strip().upper()
@@ -965,12 +977,35 @@ def web_alerts(
         "source": Alert.source_liste,
         "date": Alert.created_at,
     }
-    current_sort_by = sort_by if sort_by in sort_columns else "date"
-    current_sort_dir = "asc" if sort_dir == "asc" else "desc"
-    sort_column = sort_columns[current_sort_by]
-    query = query.order_by(sort_column.asc() if current_sort_dir == "asc" else sort_column.desc())
+    if current_analyste:
+        if current_analyste.upper() == "NON_ASSIGNEE":
+            query = query.filter(Alert.assigned_to_user_id.is_(None))
+        elif current_analyste.upper() == "MOI":
+            try:
+                query = query.filter(
+                    Alert.assigned_to_user_id == UUID(str(get_current_user(request).get("id")))
+                )
+            except (TypeError, ValueError, AttributeError):
+                query = query.filter(False)
+        else:
+            try:
+                query = query.filter(Alert.assigned_to_user_id == UUID(current_analyste))
+            except ValueError:
+                query = query.filter(False)
+    if current_escaladee == "1":
+        query = query.filter(Alert.supervisor_escalated_at.is_not(None))
+    elif current_escaladee == "0":
+        query = query.filter(Alert.supervisor_escalated_at.is_(None))
 
-    alerts = query.all()
+    current_sort_by = sort_by if sort_by in sort_columns else None
+    current_sort_dir = "asc" if sort_dir == "asc" else "desc"
+    if current_sort_by:
+        sort_column = sort_columns[current_sort_by]
+        query = query.order_by(sort_column.asc() if current_sort_dir == "asc" else sort_column.desc())
+    else:
+        query = query.order_by(*queue_ordering())
+
+    alerts = filter_by_sla(annotate_alerts(query.all()), current_sla_status)
 
     counts_by_niveau = {"ALERTE_EXACTE": 0, "ALERTE_PROBABLE": 0, "ALERTE_POSSIBLE": 0}
     for alert in alerts:
@@ -984,6 +1019,9 @@ def web_alerts(
         "client_reference": current_client_reference,
         "date_from": current_date_from,
         "date_to": current_date_to,
+        "analyste": current_analyste,
+        "sla_status": current_sla_status,
+        "escaladee": current_escaladee,
     }
 
     def sort_url(field: str) -> str:
@@ -1011,13 +1049,118 @@ def web_alerts(
             "client_reference": current_client_reference,
             "date_from": current_date_from,
             "date_to": current_date_to,
+            "analyste": current_analyste,
+            "sla_status": current_sla_status,
+            "escaladee": current_escaladee,
             "message": message,
             "total_count": len(alerts),
             "counts_by_niveau": counts_by_niveau,
+            "sla_near_count": sum(alert.sla_status == "PROCHE_SLA" for alert in alerts),
+            "sla_breached_count": sum(alert.sla_status == "HORS_SLA" for alert in alerts),
+            "analysts": eligible_assignees(db),
+            "alert_sources": [
+                row[0] for row in db.query(Alert.source_liste)
+                .filter(Alert.source_liste.is_not(None))
+                .group_by(Alert.source_liste)
+                .order_by(Alert.source_liste)
+                .all()
+                if row[0]
+            ],
             "sort_links": sort_links,
             "sort_arrows": sort_arrows,
         }
     )
+
+
+def _alert_queue_return(return_to: str | None, message: str) -> RedirectResponse:
+    destination = return_to if return_to in {"/web/alerts", "/web/critical-alerts"} else "/web/alerts"
+    return RedirectResponse(
+        url=f"{destination}?{urlencode({'message': message})}", status_code=303,
+    )
+
+
+@router.post("/alerts/{alert_id}/assign")
+def web_assign_alert(
+    alert_id: UUID,
+    request: Request,
+    assignee_user_id: str | None = Form(None),
+    reason: str | None = Form(None),
+    return_to: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_ALERTS_ASSIGN):
+        log_access_denied(db, request, f"/web/alerts/{alert_id}/assign", "Assignation d'alerte refusee.")
+        return forbidden_page(request)
+
+    actor = get_current_user(request)
+    target_id = assignee_user_id or actor.get("id")
+    if str(target_id) != str(actor.get("id")) and not has_permission(actor, PERMISSION_ALERTS_REASSIGN):
+        log_access_denied(db, request, f"/web/alerts/{alert_id}/assign", "Assignation a un tiers refusee.")
+        return forbidden_page(request)
+    try:
+        assign_alert(
+            db, alert_id=alert_id, assignee_user_id=target_id, actor=actor,
+            reason=reason, ip_address=request.client.host if request.client else None,
+        )
+        db.commit()
+        return _alert_queue_return(return_to, "Alerte prise en charge.")
+    except (AlertAssignmentConflict, ValueError, LookupError) as exc:
+        db.rollback()
+        return _alert_queue_return(return_to, str(exc))
+
+
+@router.post("/alerts/{alert_id}/reassign")
+def web_reassign_alert(
+    alert_id: UUID,
+    request: Request,
+    assignee_user_id: str = Form(...),
+    reason: str | None = Form(None),
+    return_to: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_ALERTS_REASSIGN):
+        log_access_denied(db, request, f"/web/alerts/{alert_id}/reassign", "Reassignation d'alerte refusee.")
+        return forbidden_page(request)
+    try:
+        reassign_alert(
+            db, alert_id=alert_id, assignee_user_id=assignee_user_id,
+            actor=get_current_user(request), reason=reason,
+            ip_address=request.client.host if request.client else None,
+        )
+        db.commit()
+        return _alert_queue_return(return_to, "Alerte reassignee avec succes.")
+    except (AlertAssignmentConflict, ValueError, LookupError) as exc:
+        db.rollback()
+        return _alert_queue_return(return_to, str(exc))
+
+
+@router.post("/alerts/{alert_id}/escalate")
+def web_escalate_alert(
+    alert_id: UUID,
+    request: Request,
+    reason: str = Form(...),
+    return_to: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_ALERTS_ESCALATE):
+        log_access_denied(db, request, f"/web/alerts/{alert_id}/escalate", "Escalade d'alerte refusee.")
+        return forbidden_page(request)
+    try:
+        escalate_to_supervisor(
+            db, alert_id=alert_id, actor=get_current_user(request), reason=reason,
+            ip_address=request.client.host if request.client else None,
+        )
+        db.commit()
+        return _alert_queue_return(return_to, "Alerte signalee au superviseur.")
+    except (AlertAssignmentConflict, ValueError, LookupError) as exc:
+        db.rollback()
+        return _alert_queue_return(return_to, str(exc))
 
 
 @router.get("/alerts/{alert_id}/treat")
@@ -1037,6 +1180,7 @@ def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alerte introuvable")
+    annotate_alerts([alert])
 
     sanction_entry = None
     if alert.sanction_entry_id:
@@ -1086,6 +1230,8 @@ def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends
             "alert_analysis": alert_analysis,
             "decision_history": decision_history,
             "pending_decision": pending_decision,
+            "assignment_history": assignment_history(db, alert.id),
+            "analysts": eligible_assignees(db),
         },
     )
 

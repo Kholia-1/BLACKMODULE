@@ -97,6 +97,15 @@ class AlertResponse(BaseModel):
     treated_at: Optional[datetime] = None
     treated_by: Optional[str] = None
     treatment_comment: Optional[str] = None
+    assigned_to_user_id: Optional[UUID] = None
+    assigned_to: Optional[str] = None
+    assigned_at: Optional[datetime] = None
+    supervisor_escalated_at: Optional[datetime] = None
+    supervisor_escalated_by: Optional[str] = None
+    age_hours: Optional[float] = None
+    age_label: Optional[str] = None
+    sla_deadline: Optional[datetime] = None
+    sla_status: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -105,6 +114,15 @@ class AlertTreatmentRequest(BaseModel):
     statut: str
     treated_by: str
     treatment_comment: Optional[str] = None
+
+
+class AlertAssignmentRequest(BaseModel):
+    assignee_user_id: Optional[UUID] = None
+    reason: Optional[str] = None
+
+
+class AlertEscalationRequest(BaseModel):
+    reason: str = Field(min_length=3, max_length=1000)
 
 class AuditLogResponse(BaseModel):
     id: UUID
