@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BLACKMODULE - Supervision opérationnelle</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #F8FAFC; color: #0F172A; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Arial, sans-serif; }
+        .header { background: #0F172A; color: white; padding: 22px 32px; }
+        .header h1 { margin: 0; font-size: 22px; }
+        .header p { margin: 6px 0 0; color: #94A3B8; font-size: 13.5px; }
+        .container { padding: 26px 32px; max-width: 1680px; margin: 0 auto; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+        .kpi { display: block; background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; color: inherit; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+        .kpi:hover { border-color: #FCA5A5; }
+        .kpi-label { color: #64748B; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .35px; }
+        .kpi-value { display: block; margin-top: 8px; font-size: 27px; font-weight: 750; }
+        .danger .kpi-value { color: #B91C1C; }
+        .warning .kpi-value { color: #B45309; }
+        .card { background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 18px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+        .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+        .card h2 { margin: 0; font-size: 17px; }
+        .muted { color: #64748B; font-size: 13px; }
+        .message { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; border-radius: 9px; padding: 11px 13px; margin-bottom: 16px; }
+        .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; padding: 13px; background: #F8FAFC; border-radius: 10px; }
+        .field { display: grid; gap: 5px; min-width: 170px; }
+        .field label { color: #64748B; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        select, button, .btn { border: 1px solid #CBD5E1; border-radius: 8px; padding: 8px 10px; background: white; color: #334155; font: inherit; font-size: 13px; }
+        button, .btn { cursor: pointer; font-weight: 700; text-decoration: none; }
+        .btn-primary { background: #DC2626; border-color: #DC2626; color: white; }
+        .btn-soft { background: #F1F5F9; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { padding: 10px; text-align: left; background: #F1F5F9; color: #475569; font-size: 11px; text-transform: uppercase; white-space: nowrap; }
+        td { padding: 11px 10px; border-bottom: 1px solid #E2E8F0; vertical-align: top; }
+        tbody tr:hover td { background: #F8FAFC; }
+        .badge { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 750; white-space: nowrap; }
+        .badge-danger { background: #FEE2E2; color: #991B1B; }
+        .badge-warning { background: #FEF3C7; color: #92400E; }
+        .badge-info { background: #DBEAFE; color: #1E40AF; }
+        .badge-neutral { background: #E2E8F0; color: #475569; }
+        .workload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+        .workload { padding: 13px; border: 1px solid #E2E8F0; border-radius: 10px; }
+        .workload strong { display: block; margin-bottom: 7px; }
+        .workload-stats { display: flex; gap: 10px; flex-wrap: wrap; color: #64748B; font-size: 12px; }
+        .assignment-form { display: flex; gap: 6px; min-width: 255px; }
+        .assignment-form select { min-width: 150px; max-width: 190px; }
+        .critical-row td:first-child { border-left: 3px solid #DC2626; }
+        .history-detail { color: #334155; }
+        @media (max-width: 1000px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } .container { padding: 18px; } }
+        @media (max-width: 600px) { .kpi-grid { grid-template-columns: 1fr; } .header { padding: 18px; } .field { width: 100%; } }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>BLACKMODULE</h1>
+    <p>Supervision opérationnelle des alertes</p>
+    {% include "partials/navbar.html" %}
+</div>
+
+<main class="container">
+    {% if message %}<div class="message">{{ message }}</div>{% endif %}
+
+    <div class="kpi-grid">
+        <a class="kpi" href="/web/alert-supervision"><span class="kpi-label">Alertes actives</span><span class="kpi-value">{{ metrics.active }}</span></a>
+        <a class="kpi danger" href="/web/alert-supervision?focus=CRITICAL_UNASSIGNED"><span class="kpi-label">Critiques non assignées</span><span class="kpi-value">{{ metrics.critical_unassigned }}</span></a>
+        <a class="kpi danger" href="/web/alert-supervision?focus=OUT_SLA"><span class="kpi-label">Hors SLA</span><span class="kpi-value">{{ metrics.out_sla }}</span></a>
+        <a class="kpi warning" href="/web/alert-supervision?focus=ESCALATED"><span class="kpi-label">Escaladées</span><span class="kpi-value">{{ metrics.escalated }}</span></a>
+        <a class="kpi warning" href="/web/alert-supervision?focus=INACTIVE"><span class="kpi-label">Sans activité ≥ {{ inactivity_hours|int }} h</span><span class="kpi-value">{{ metrics.inactive }}</span></a>
+    </div>
+
+    <section class="card">
+        <div class="card-head">
+            <div><h2>File prioritaire superviseur</h2><div class="muted">Criticité, SLA, escalade puis ancienneté.</div></div>
+            <span class="badge badge-neutral">{{ alerts|length }} résultat{{ "s" if alerts|length != 1 else "" }}</span>
+        </div>
+        <form class="filters" method="get" action="/web/alert-supervision">
+            <div class="field"><label>Vue rapide</label><select name="focus" onchange="this.form.submit()">
+                <option value="ALL" {% if focus == "ALL" %}selected{% endif %}>Toutes les priorités</option>
+                <option value="CRITICAL_UNASSIGNED" {% if focus == "CRITICAL_UNASSIGNED" %}selected{% endif %}>Critiques non assignées</option>
+                <option value="OUT_SLA" {% if focus == "OUT_SLA" %}selected{% endif %}>Hors SLA</option>
+                <option value="ESCALATED" {% if focus == "ESCALATED" %}selected{% endif %}>Escaladées</option>
+                <option value="INACTIVE" {% if focus == "INACTIVE" %}selected{% endif %}>Sans activité récente</option>
+            </select></div>
+            <div class="field"><label>Analyste</label><select name="analyste" onchange="this.form.submit()">
+                <option value="">Tous</option><option value="NON_ASSIGNEE" {% if analyste == "NON_ASSIGNEE" %}selected{% endif %}>Non assignées</option>
+                {% for item in analysts %}<option value="{{ item.id }}" {% if analyste == item.id|string %}selected{% endif %}>{{ item.full_name or item.username }} ({{ item.username }}) — {{ role_label(item.role) }}</option>{% endfor %}
+            </select></div>
+            <div class="field"><label>Statut</label><select name="statut" onchange="this.form.submit()">
+                <option value="">Tous</option>
+                {% for value in ["GENEREE", "EN_COURS", "ESCALADEE", "CONFIRMEE"] %}<option value="{{ value }}" {% if statut == value %}selected{% endif %}>{{ value }}</option>{% endfor %}
+            </select></div>
+            <div class="field"><label>Source</label><select name="source" onchange="this.form.submit()">
+                <option value="">Toutes</option>{% for item in sources %}<option value="{{ item }}" {% if source == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+            </select></div>
+            <a class="btn btn-soft" href="/web/alert-supervision">Réinitialiser</a>
+        </form>
+
+        <div class="table-wrap">
+            <table aria-label="File prioritaire superviseur">
+                <thead><tr><th>Priorité</th><th>Alerte</th><th>Criticité</th><th>Ancienneté / SLA</th><th>Analyste</th><th>Dernière activité</th><th>Action</th></tr></thead>
+                <tbody>
+                {% for alert in alerts %}
+                    <tr class="{% if alert.operational_priority_rank == 0 %}critical-row{% endif %}">
+                        <td><span class="badge {% if alert.operational_priority_rank <= 1 %}badge-danger{% elif alert.operational_priority_rank <= 3 %}badge-warning{% else %}badge-neutral{% endif %}">{{ alert.operational_priority }}</span></td>
+                        <td><strong>{{ alert.client_reference or "Sans référence" }}</strong><div class="muted">{{ alert.client_prenom or "" }} {{ alert.client_nom or "" }} · {{ alert.source_liste or "—" }}</div></td>
+                        <td>{{ alert.niveau_alerte or "—" }}<div class="muted">{{ alert.statut }}</div></td>
+                        <td>{{ alert.age_label }}<div><span class="badge {% if alert.sla_status == 'HORS_SLA' %}badge-danger{% elif alert.sla_status == 'PROCHE_SLA' %}badge-warning{% else %}badge-info{% endif %}">{{ alert.sla_status }}</span></div></td>
+                        <td>
+                            <strong>{{ alert.assigned_to or "Non assignée" }}</strong>
+                            {% if not alert.assigned_to_user_id %}
+                                <form class="assignment-form" method="post" action="/web/alerts/{{ alert.id }}/assign">
+                                    <select name="assignee_user_id" required>{% for item in analysts %}<option value="{{ item.id }}">{{ item.full_name or item.username }} ({{ item.username }}) — {{ role_label(item.role) }}</option>{% endfor %}</select>
+                                    <input type="hidden" name="return_to" value="/web/alert-supervision"><button class="btn-primary" type="submit">Assigner</button>
+                                </form>
+                            {% else %}
+                                <form class="assignment-form" method="post" action="/web/alerts/{{ alert.id }}/reassign">
+                                    <select name="assignee_user_id" required>{% for item in analysts %}<option value="{{ item.id }}">{{ item.full_name or item.username }} ({{ item.username }}) — {{ role_label(item.role) }}</option>{% endfor %}</select>
+                                    <input type="hidden" name="return_to" value="/web/alert-supervision"><button type="submit">Réassigner</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                        <td>{{ alert.last_activity_at.strftime('%d/%m/%Y %H:%M') if alert.last_activity_at else "—" }}{% if alert.is_inactive %}<div><span class="badge badge-warning">Sans activité récente</span></div>{% endif %}</td>
+                        <td><a class="btn btn-soft" href="/web/alerts/{{ alert.id }}/treat">Voir / traiter</a></td>
+                    </tr>
+                {% else %}<tr><td colspan="7">Aucune alerte ne correspond aux filtres.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-head"><div><h2>Charge par analyste</h2><div class="muted">Alertes actives actuellement assignées.</div></div></div>
+        <div class="workload-grid">
+            {% for item in workloads %}<div class="workload"><strong>{{ item.user.full_name or item.user.username }} <span class="muted">({{ item.user.username }})</span></strong><div class="workload-stats"><span>Total : {{ item.total }}</span><span>Critiques : {{ item.critical }}</span><span>Hors SLA : {{ item.out_sla }}</span><span>Inactives : {{ item.inactive }}</span></div></div>{% else %}<div class="muted">Aucun analyste actif habilité.</div>{% endfor %}
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-head"><div><h2>Historique opérationnel</h2><div class="muted">Assignations, réassignations, escalades et décisions récentes.</div></div></div>
+        <div class="table-wrap"><table aria-label="Historique opérationnel"><thead><tr><th>Date</th><th>Alerte</th><th>Événement</th><th>Utilisateur</th><th>Détail</th></tr></thead><tbody>
+            {% for item in history %}<tr><td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') if item.created_at else "—" }}</td><td><a href="/web/alerts/{{ item.alert_id }}/treat">{{ item.alert_reference }}</a></td><td>{{ item.event_type }}</td><td>{{ item.actor or "—" }}</td><td class="history-detail">{{ item.description }}</td></tr>{% else %}<tr><td colspan="5">Aucun événement opérationnel.</td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+</main>
+</body>
+</html>

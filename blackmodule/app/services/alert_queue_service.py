@@ -5,16 +5,14 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import case
+from sqlalchemy import case, func
 from sqlalchemy.orm import Query, Session
 
-from app.config import ALERT_SLA_HOURS, ALERT_SLA_NEAR_RATIO
-from app.models import Alert, AlertAssignmentHistory, User
+from app.config import ALERT_INACTIVITY_HOURS, ALERT_SLA_HOURS, ALERT_SLA_NEAR_RATIO
+from app.models import Alert, AlertAssignmentHistory, AlertDecisionHistory, User
 from app.services.audit_service import write_audit_log
 from app.services.authorization_service import (
     ROLE_ANALYSTE_CONFORMITE,
-    ROLE_SUPERVISEUR_CONFORMITE,
-    canonical_role,
 )
 
 
@@ -28,7 +26,11 @@ SLA_BREACHED = "HORS_SLA"
 SLA_COMPLETED = "TRAITEE"
 
 TERMINAL_ALERT_STATUSES = {"FAUX_POSITIF", "CLOTUREE"}
-ASSIGNABLE_ROLES = {ROLE_ANALYSTE_CONFORMITE, ROLE_SUPERVISEUR_CONFORMITE}
+# A supervisor coordinates assignments but is never an analyst assignee.
+ASSIGNABLE_ROLES = {ROLE_ANALYSTE_CONFORMITE}
+SUPERVISION_FOCUSES = {
+    "ALL", "CRITICAL_UNASSIGNED", "OUT_SLA", "ESCALATED", "INACTIVE",
+}
 
 
 class AlertAssignmentConflict(ValueError):
@@ -85,6 +87,234 @@ def annotate_alerts(alerts: list[Alert], *, now: datetime | None = None) -> list
         for key, value in calculate_alert_sla(alert, now=now).items():
             setattr(alert, key, value)
     return alerts
+
+
+def _latest_datetime(*values: datetime | None) -> datetime | None:
+    available = [_naive_utc(value) for value in values if value is not None]
+    return max(available) if available else None
+
+
+def annotate_operational_activity(
+    db: Session,
+    alerts: list[Alert],
+    *,
+    now: datetime | None = None,
+) -> list[Alert]:
+    """Add last-activity and inactivity information without one query per alert."""
+    if not alerts:
+        return alerts
+
+    alert_ids = [alert.id for alert in alerts]
+    assignment_dates = {
+        alert_id: created_at
+        for alert_id, created_at in db.query(
+            AlertAssignmentHistory.alert_id,
+            func.max(AlertAssignmentHistory.created_at),
+        ).filter(
+            AlertAssignmentHistory.alert_id.in_(alert_ids),
+        ).group_by(AlertAssignmentHistory.alert_id).all()
+    }
+    decision_dates = {
+        alert_id: _latest_datetime(initiated_at, reviewed_at, applied_at)
+        for alert_id, initiated_at, reviewed_at, applied_at in db.query(
+            AlertDecisionHistory.alert_id,
+            func.max(AlertDecisionHistory.initiated_at),
+            func.max(AlertDecisionHistory.reviewed_at),
+            func.max(AlertDecisionHistory.applied_at),
+        ).filter(
+            AlertDecisionHistory.alert_id.in_(alert_ids),
+        ).group_by(AlertDecisionHistory.alert_id).all()
+    }
+
+    current_time = _naive_utc(now or datetime.utcnow())
+    for alert in alerts:
+        last_activity = _latest_datetime(
+            alert.created_at,
+            alert.assigned_at,
+            alert.supervisor_escalated_at,
+            alert.treated_at,
+            assignment_dates.get(alert.id),
+            decision_dates.get(alert.id),
+        ) or current_time
+        inactivity_hours = max(
+            0.0, (current_time - last_activity).total_seconds() / 3600,
+        )
+        alert.last_activity_at = last_activity
+        alert.inactivity_hours = round(inactivity_hours, 2)
+        alert.is_inactive = inactivity_hours >= ALERT_INACTIVITY_HOURS
+    return alerts
+
+
+def _supervision_priority(alert: Alert) -> tuple[int, int, float, str]:
+    criticality_rank = {
+        "ALERTE_EXACTE": 0,
+        "ALERTE_PROBABLE": 1,
+        "ALERTE_POSSIBLE": 2,
+    }.get((alert.niveau_alerte or "").upper(), 3)
+    if alert.niveau_alerte == "ALERTE_EXACTE" and not alert.assigned_to_user_id:
+        priority_rank, label = 0, "Critique non assignée"
+    elif getattr(alert, "sla_status", None) == SLA_BREACHED:
+        priority_rank, label = 1, "Hors SLA"
+    elif alert.supervisor_escalated_at:
+        priority_rank, label = 2, "Escaladée"
+    elif getattr(alert, "sla_status", None) == SLA_NEAR:
+        priority_rank, label = 3, "Proche SLA"
+    elif alert.niveau_alerte == "ALERTE_EXACTE":
+        priority_rank, label = 4, "Critique"
+    else:
+        priority_rank, label = 5, "Standard"
+    alert.operational_priority = label
+    alert.operational_priority_rank = priority_rank
+    return priority_rank, criticality_rank, -getattr(alert, "age_hours", 0.0), str(alert.id)
+
+
+def analyst_workloads(alerts: list[Alert], analysts: list[User]) -> list[dict]:
+    analysts = [
+        analyst for analyst in analysts
+        if analyst.role == ROLE_ANALYSTE_CONFORMITE
+    ]
+    workloads = []
+    for analyst in analysts:
+        owned = [item for item in alerts if item.assigned_to_user_id == analyst.id]
+        workloads.append({
+            "user": analyst,
+            "total": len(owned),
+            "critical": sum(item.niveau_alerte == "ALERTE_EXACTE" for item in owned),
+            "out_sla": sum(getattr(item, "sla_status", None) == SLA_BREACHED for item in owned),
+            "inactive": sum(bool(getattr(item, "is_inactive", False)) for item in owned),
+        })
+    return sorted(
+        workloads,
+        key=lambda item: (-item["out_sla"], -item["critical"], -item["total"], item["user"].username),
+    )
+
+
+def recent_operational_history(db: Session, *, limit: int = 20) -> list[dict]:
+    assignment_rows = (
+        db.query(AlertAssignmentHistory)
+        .order_by(AlertAssignmentHistory.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    decision_rows = (
+        db.query(AlertDecisionHistory)
+        .order_by(AlertDecisionHistory.initiated_at.desc())
+        .limit(limit)
+        .all()
+    )
+    events = []
+    for item in assignment_rows:
+        if item.action == ASSIGNMENT:
+            description = f"Assignée à {item.to_username or '—'}"
+        elif item.action == REASSIGNMENT:
+            description = f"Réassignée de {item.from_username or '—'} à {item.to_username or '—'}"
+        else:
+            description = "Escaladée vers le superviseur"
+        events.append({
+            "alert_id": item.alert_id,
+            "event_type": item.action,
+            "description": description,
+            "actor": item.changed_by_username,
+            "created_at": item.created_at,
+        })
+    for item in decision_rows:
+        events.append({
+            "alert_id": item.alert_id,
+            "event_type": "DECISION",
+            "description": (
+                f"Décision {item.old_status or '—'} → {item.requested_status} "
+                f"({item.decision_status})"
+            ),
+            "actor": item.reviewed_by or item.initiated_by,
+            "created_at": _latest_datetime(item.applied_at, item.reviewed_at, item.initiated_at),
+        })
+    events.sort(
+        key=lambda item: _naive_utc(item["created_at"]) if item["created_at"] else datetime.min,
+        reverse=True,
+    )
+    selected = events[:limit]
+    alert_references = {
+        alert_id: reference
+        for alert_id, reference in db.query(Alert.id, Alert.client_reference).filter(
+            Alert.id.in_([item["alert_id"] for item in selected]),
+        ).all()
+    } if selected else {}
+    for item in selected:
+        item["alert_reference"] = alert_references.get(item["alert_id"]) or "Sans référence"
+    return selected
+
+
+def build_supervision_dashboard(
+    db: Session,
+    *,
+    focus: str | None = None,
+    analyst: str | None = None,
+    statut: str | None = None,
+    source: str | None = None,
+    now: datetime | None = None,
+) -> dict:
+    """Build the supervisor queue from the existing alert and history models."""
+    alerts = (
+        db.query(Alert)
+        .filter(~Alert.statut.in_(TERMINAL_ALERT_STATUSES))
+        .all()
+    )
+    annotate_alerts(alerts, now=now)
+    annotate_operational_activity(db, alerts, now=now)
+    alerts.sort(key=_supervision_priority)
+
+    analysts = eligible_assignees(db)
+    metrics = {
+        "active": len(alerts),
+        "critical_unassigned": sum(
+            item.niveau_alerte == "ALERTE_EXACTE" and not item.assigned_to_user_id
+            for item in alerts
+        ),
+        "out_sla": sum(item.sla_status == SLA_BREACHED for item in alerts),
+        "escalated": sum(bool(item.supervisor_escalated_at) for item in alerts),
+        "inactive": sum(bool(item.is_inactive) for item in alerts),
+    }
+
+    current_focus = (focus or "ALL").strip().upper()
+    if current_focus not in SUPERVISION_FOCUSES:
+        current_focus = "ALL"
+    filtered = list(alerts)
+    if current_focus == "CRITICAL_UNASSIGNED":
+        filtered = [item for item in filtered if item.niveau_alerte == "ALERTE_EXACTE" and not item.assigned_to_user_id]
+    elif current_focus == "OUT_SLA":
+        filtered = [item for item in filtered if item.sla_status == SLA_BREACHED]
+    elif current_focus == "ESCALATED":
+        filtered = [item for item in filtered if item.supervisor_escalated_at]
+    elif current_focus == "INACTIVE":
+        filtered = [item for item in filtered if item.is_inactive]
+
+    current_analyst = (analyst or "").strip()
+    if current_analyst:
+        if current_analyst.upper() == "NON_ASSIGNEE":
+            filtered = [item for item in filtered if not item.assigned_to_user_id]
+        else:
+            analyst_id = _as_uuid(current_analyst)
+            filtered = [item for item in filtered if analyst_id and item.assigned_to_user_id == analyst_id]
+    current_status = (statut or "").strip().upper()
+    if current_status:
+        filtered = [item for item in filtered if (item.statut or "").upper() == current_status]
+    current_source = (source or "").strip().upper()
+    if current_source:
+        filtered = [item for item in filtered if (item.source_liste or "").upper() == current_source]
+
+    return {
+        "alerts": filtered,
+        "metrics": metrics,
+        "workloads": analyst_workloads(alerts, analysts),
+        "history": recent_operational_history(db),
+        "analysts": analysts,
+        "sources": sorted({item.source_liste for item in alerts if item.source_liste}),
+        "focus": current_focus,
+        "analyst": current_analyst or None,
+        "statut": current_status or None,
+        "source": current_source or None,
+        "inactivity_hours": ALERT_INACTIVITY_HOURS,
+    }
 
 
 def filter_by_sla(alerts: list[Alert], sla_status: str | None) -> list[Alert]:
@@ -156,7 +386,7 @@ def eligible_assignees(db: Session) -> list[User]:
 def _eligible_user(db: Session, identifier) -> User:
     user_id = _as_uuid(identifier)
     user = db.query(User).filter(User.id == user_id).first() if user_id else None
-    if not user or user.statut != "ACTIF" or canonical_role(user.role) not in ASSIGNABLE_ROLES:
+    if not user or user.statut != "ACTIF" or user.role not in ASSIGNABLE_ROLES:
         raise ValueError("L'utilisateur cible n'est pas un analyste actif habilite.")
     return user
 

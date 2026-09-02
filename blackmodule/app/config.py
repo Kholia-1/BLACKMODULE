@@ -58,3 +58,7 @@ if any(hours <= 0 for hours in ALERT_SLA_HOURS.values()):
 ALERT_SLA_NEAR_RATIO = float(os.getenv("ALERT_SLA_NEAR_RATIO", "0.8"))
 if not 0 < ALERT_SLA_NEAR_RATIO < 1:
     raise ValueError("ALERT_SLA_NEAR_RATIO doit être compris entre 0 et 1.")
+
+ALERT_INACTIVITY_HOURS = float(os.getenv("ALERT_INACTIVITY_HOURS", "24"))
+if ALERT_INACTIVITY_HOURS <= 0:
+    raise ValueError("ALERT_INACTIVITY_HOURS doit être strictement positif.")

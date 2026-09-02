@@ -291,7 +291,7 @@ class Lot4AAlertQueueTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Analyste conformité (analyste) — Analyste conformité", response.text)
-        self.assertIn("Superviseur conformité (superviseur) — Superviseur conformité", response.text)
+        self.assertNotIn("Superviseur conformité (superviseur) — Superviseur conformité", response.text)
 
     def test_09c_web_filter_can_select_non_escalated_alerts(self):
         escalated = self.alert(reference="ESCALATED-WEB")

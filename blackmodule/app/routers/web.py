@@ -25,6 +25,7 @@ from app.services.authorization_service import (
     PERMISSION_INTERNAL_LISTS_SUBMIT, PERMISSION_INTERNAL_LISTS_VALIDATE,
     PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW,
     PERMISSION_ALERTS_ASSIGN, PERMISSION_ALERTS_REASSIGN, PERMISSION_ALERTS_ESCALATE,
+    PERMISSION_ALERTS_SUPERVISE,
     has_permission, permissions_for_role, refresh_session_user, role_label, session_user_payload,
 )
 from app.services.approval_service import (
@@ -42,8 +43,8 @@ from app.services.alert_decision_service import (
 )
 from app.services.alert_queue_service import (
     AlertAssignmentConflict, annotate_alerts, assign_alert, assignment_history,
-    eligible_assignees, escalate_to_supervisor, filter_by_sla, queue_ordering,
-    reassign_alert,
+    build_supervision_dashboard, eligible_assignees, escalate_to_supervisor,
+    filter_by_sla, queue_ordering, reassign_alert,
 )
 from app.services.import_service import (
     import_afb_ppe_csv,
@@ -1073,7 +1074,9 @@ def web_alerts(
 
 
 def _alert_queue_return(return_to: str | None, message: str) -> RedirectResponse:
-    destination = return_to if return_to in {"/web/alerts", "/web/critical-alerts"} else "/web/alerts"
+    destination = return_to if return_to in {
+        "/web/alerts", "/web/critical-alerts", "/web/alert-supervision",
+    } else "/web/alerts"
     return RedirectResponse(
         url=f"{destination}?{urlencode({'message': message})}", status_code=303,
     )
@@ -3371,6 +3374,41 @@ def web_approvals(request: Request, db: Session = Depends(get_db)):
             "can_validate": require_permission(request, PERMISSION_REVIEW_FOUR_EYES),
             "current_user_id": current_user.get("id"),
         },
+    )
+
+
+@router.get("/alert-supervision")
+def web_alert_supervision(
+    request: Request,
+    focus: str | None = Query(None),
+    analyste: str | None = Query(None),
+    statut: str | None = Query(None),
+    source: str | None = Query(None),
+    message: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_ALERTS_SUPERVISE):
+        log_access_denied(
+            db, request, "/web/alert-supervision",
+            "Accès refusé à la supervision opérationnelle des alertes.",
+        )
+        return forbidden_page(request)
+
+    dashboard = build_supervision_dashboard(
+        db, focus=focus, analyst=analyste, statut=statut, source=source,
+    )
+    write_audit_log(
+        db, current_username(request), "VIEW_ALERT_SUPERVISION", "AlertQueue", None,
+        "Consultation de la supervision opérationnelle des alertes.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return templates.TemplateResponse(
+        request=request,
+        name="alert_supervision.html",
+        context={"request": request, "message": message, **dashboard},
     )
 
 
