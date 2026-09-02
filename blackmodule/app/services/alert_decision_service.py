@@ -27,6 +27,22 @@ ALLOWED_TRANSITIONS = {
     "CLOTUREE": set(),
 }
 
+ALERT_STATUS_LABELS = {
+    "GENEREE": "Générée",
+    "EN_COURS": "En cours",
+    "ESCALADEE": "Escaladée",
+    "CONFIRMEE": "Confirmée",
+    "FAUX_POSITIF": "Faux positif",
+    "CLOTUREE": "Clôturée",
+}
+DECISION_STATUS_LABELS = {
+    PENDING_DECISION: "En attente de validation",
+    APPLIED_DECISION: "Appliquée",
+    APPROVED_DECISION: "Validée et appliquée",
+    REJECTED_DECISION: "Rejetée",
+    OBSOLETE_DECISION: "Obsolète",
+}
+
 
 class AlertDecisionConflict(ValueError):
     pass
@@ -34,6 +50,54 @@ class AlertDecisionConflict(ValueError):
 
 class ObsoleteAlertDecision(AlertDecisionConflict):
     pass
+
+
+def available_alert_decisions(alert: Alert) -> tuple[str, ...]:
+    """Return the transitions authorized by the central decision workflow."""
+    current = (alert.statut or "GENEREE").upper()
+    allowed = ALLOWED_TRANSITIONS.get(current, set())
+    display_order = ("EN_COURS", "FAUX_POSITIF", "CONFIRMEE", "ESCALADEE", "CLOTUREE")
+    return tuple(status for status in display_order if status in allowed)
+
+
+def _duration_label(started_at: datetime | None, ended_at: datetime | None) -> str:
+    if not started_at or not ended_at:
+        return "—"
+    seconds = max(0, int((ended_at - started_at).total_seconds()))
+    days, remainder = divmod(seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes = remainder // 60
+    if days:
+        return f"{days} j {hours} h"
+    if hours:
+        return f"{hours} h {minutes} min"
+    return f"{minutes} min"
+
+
+def decision_history_view(alert: Alert, rows: list[AlertDecisionHistory]) -> list[dict]:
+    """Build a readable view without altering the persisted business records."""
+    result = []
+    for row in rows:
+        decision_at = row.applied_at or row.reviewed_at
+        has_independent_review = row.approval_request_id is not None
+        result.append({
+            "old_status": ALERT_STATUS_LABELS.get(row.old_status, row.old_status or "—"),
+            "requested_status": ALERT_STATUS_LABELS.get(
+                row.requested_status, row.requested_status,
+            ),
+            "decision_status": DECISION_STATUS_LABELS.get(
+                row.decision_status, row.decision_status,
+            ),
+            "initiated_by": row.initiated_by,
+            "initiated_at": row.initiated_at,
+            "reviewed_by": row.reviewed_by if has_independent_review else None,
+            "reviewed_at": row.reviewed_at if has_independent_review else None,
+            "decision_at": decision_at,
+            "delay_label": _duration_label(alert.created_at, decision_at),
+            "reason": row.reason,
+            "reviewer_comment": row.reviewer_comment,
+        })
+    return result
 
 
 def _clean_reason(value: str | None) -> str | None:

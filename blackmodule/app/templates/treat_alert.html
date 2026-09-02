@@ -1011,12 +1011,12 @@
                     <div class="field"><div class="label">Escalade superviseur</div><div class="value">{{ alert.supervisor_escalated_at.strftime('%d/%m/%Y %H:%M') if alert.supervisor_escalated_at else "—" }}</div></div>
                 </div>
 
-                {% if not alert.assigned_to_user_id and "ALERTS_ASSIGN" in permissions %}
+                {% if not is_terminal and not alert.assigned_to_user_id and "ALERTS_ASSIGN" in permissions %}
                     <form method="post" action="/web/alerts/{{ alert.id }}/assign" class="form-actions">
                         <input type="hidden" name="return_to" value="/web/alerts">
                         <button type="submit">Prendre en charge</button>
                     </form>
-                {% elif "ALERTS_REASSIGN" in permissions %}
+                {% elif not is_terminal and "ALERTS_REASSIGN" in permissions %}
                     <form method="post" action="/web/alerts/{{ alert.id }}/reassign" class="form-actions">
                         <select name="assignee_user_id" required>
                             {% for item in analysts %}
@@ -1029,7 +1029,7 @@
                     </form>
                 {% endif %}
 
-                {% if "ALERTS_ESCALATE" in permissions and not alert.supervisor_escalated_at %}
+                {% if not is_terminal and "ALERTS_ESCALATE" in permissions and not alert.supervisor_escalated_at %}
                     <form method="post" action="/web/alerts/{{ alert.id }}/escalate" class="form-actions">
                         <input type="text" name="reason" placeholder="Motif d'escalade" required minlength="3">
                         <input type="hidden" name="return_to" value="/web/alerts">
@@ -1073,18 +1073,19 @@
 
                 {% if decision_history %}
                     <table class="analysis-table" aria-label="Historique des décisions">
-                        <thead><tr><th>Ancien</th><th>Demandé</th><th>État</th><th>Qui / quand</th><th>Motif</th></tr></thead>
+                        <thead><tr><th>Transition</th><th>État</th><th>Décideur</th><th>Validateur</th><th>Décision</th><th>Délai</th><th>Motif</th></tr></thead>
                         <tbody>
                             {% for item in decision_history %}
                                 <tr>
-                                    <td>{{ item.old_status or "—" }}</td>
-                                    <td>{{ item.requested_status }}</td>
+                                    <td>{{ item.old_status }} → {{ item.requested_status }}</td>
                                     <td>{{ item.decision_status }}</td>
                                     <td>
                                         {{ item.initiated_by }}<br>
                                         {{ item.initiated_at.strftime('%d/%m/%Y %H:%M') if item.initiated_at else "—" }}
-                                        {% if item.reviewed_by %}<br>Validation : {{ item.reviewed_by }}{% endif %}
                                     </td>
+                                    <td>{{ item.reviewed_by or "—" }}{% if item.reviewed_at %}<br>{{ item.reviewed_at.strftime('%d/%m/%Y %H:%M') }}{% endif %}</td>
+                                    <td>{{ item.decision_at.strftime('%d/%m/%Y %H:%M') if item.decision_at else "—" }}</td>
+                                    <td>{{ item.delay_label }}</td>
                                     <td>{{ item.reason or "—" }}{% if item.reviewer_comment %}<br>Réponse : {{ item.reviewer_comment }}{% endif %}</td>
                                 </tr>
                             {% endfor %}
@@ -1092,7 +1093,12 @@
                     </table>
                 {% endif %}
 
-                {% if pending_decision %}
+                {% if is_terminal %}
+                    <div class="history-note" style="margin-top:16px">
+                        Cette alerte a atteint le statut final <strong>{{ alert.statut }}</strong>. Elle est verrouillée et ne peut plus être modifiée.
+                    </div>
+                    <a class="back" href="/web/alerts">&larr; Retour aux alertes</a>
+                {% elif pending_decision %}
                     <div class="history-note" style="margin-top:16px">
                         Une décision {{ pending_decision.requested_status }} est déjà en attente de validation. Aucun autre traitement n'est possible avant sa décision.
                     </div>
@@ -1102,8 +1108,8 @@
 
                     <label>Nouveau statut</label>
                     <div class="status-options">
-                        <label class="status-option status-option--encours">
-                            <input type="radio" name="statut" value="EN_COURS" required {% if alert.statut == "EN_COURS" %}checked{% endif %}>
+                        {% if "EN_COURS" in available_statuses %}<label class="status-option status-option--encours">
+                            <input type="radio" name="statut" value="EN_COURS" required>
                             <span class="status-option-content">
                                 <span class="status-dot"></span>
                                 <span class="status-option-text">
@@ -1111,10 +1117,10 @@
                                     <span class="status-option-desc">Analyse en cours</span>
                                 </span>
                             </span>
-                        </label>
+                        </label>{% endif %}
 
-                        <label class="status-option status-option--fauxpositif">
-                            <input type="radio" name="statut" value="FAUX_POSITIF" required {% if alert.statut == "FAUX_POSITIF" %}checked{% endif %}>
+                        {% if "FAUX_POSITIF" in available_statuses %}<label class="status-option status-option--fauxpositif">
+                            <input type="radio" name="statut" value="FAUX_POSITIF" required>
                             <span class="status-option-content">
                                 <span class="status-dot"></span>
                                 <span class="status-option-text">
@@ -1122,10 +1128,10 @@
                                     <span class="status-option-desc">Pas la même personne</span>
                                 </span>
                             </span>
-                        </label>
+                        </label>{% endif %}
 
-                        <label class="status-option status-option--confirmee">
-                            <input type="radio" name="statut" value="CONFIRMEE" required {% if alert.statut == "CONFIRMEE" %}checked{% endif %}>
+                        {% if "CONFIRMEE" in available_statuses %}<label class="status-option status-option--confirmee">
+                            <input type="radio" name="statut" value="CONFIRMEE" required>
                             <span class="status-option-content">
                                 <span class="status-dot"></span>
                                 <span class="status-option-text">
@@ -1133,10 +1139,10 @@
                                     <span class="status-option-desc">Sanction avérée</span>
                                 </span>
                             </span>
-                        </label>
+                        </label>{% endif %}
 
-                        <label class="status-option status-option--escaladee">
-                            <input type="radio" name="statut" value="ESCALADEE" required {% if alert.statut == "ESCALADEE" %}checked{% endif %}>
+                        {% if "ESCALADEE" in available_statuses %}<label class="status-option status-option--escaladee">
+                            <input type="radio" name="statut" value="ESCALADEE" required>
                             <span class="status-option-content">
                                 <span class="status-dot"></span>
                                 <span class="status-option-text">
@@ -1144,10 +1150,10 @@
                                     <span class="status-option-desc">Vers un superviseur</span>
                                 </span>
                             </span>
-                        </label>
+                        </label>{% endif %}
 
-                        <label class="status-option status-option--cloturee wide">
-                            <input type="radio" name="statut" value="CLOTUREE" required {% if alert.statut == "CLOTUREE" %}checked{% endif %}>
+                        {% if "CLOTUREE" in available_statuses %}<label class="status-option status-option--cloturee wide">
+                            <input type="radio" name="statut" value="CLOTUREE" required>
                             <span class="status-option-content">
                                 <span class="status-dot"></span>
                                 <span class="status-option-text">
@@ -1155,7 +1161,7 @@
                                     <span class="status-option-desc">Dossier terminé, aucune suite requise</span>
                                 </span>
                             </span>
-                        </label>
+                        </label>{% endif %}
                     </div>
 
                     <label>Traité par</label>

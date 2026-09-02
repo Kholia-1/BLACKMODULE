@@ -475,13 +475,10 @@
                             {% if alert.statut in ["FAUX_POSITIF", "CLOTUREE"] %}
                                 <span class="badge badge-status">-</span>
                             {% else %}
+                                {% set allowed_statuses = available_alert_decisions(alert) %}
                                 <form method="post" action="/web/alerts/{{ alert.id }}/treat" class="quick-action-form" onsubmit="return confirm('Confirmer ce traitement rapide ?');">
                                     <select name="statut" required>
-                                        <option value="EN_COURS" {% if alert.statut == "EN_COURS" %}selected{% endif %}>EN_COURS</option>
-                                        <option value="CONFIRMEE">CONFIRMEE</option>
-                                        <option value="FAUX_POSITIF">FAUX_POSITIF</option>
-                                        <option value="ESCALADEE">ESCALADEE</option>
-                                        <option value="CLOTUREE">CLOTUREE</option>
+                                        {% for status in allowed_statuses %}<option value="{{ status }}">{{ status }}</option>{% endfor %}
                                     </select>
                                     <input type="text" name="treatment_comment" placeholder="Motif..." required>
                                     <input type="hidden" name="treated_by" value="{{ current_display_name }}">

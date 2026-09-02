@@ -39,7 +39,8 @@ from app.services.matching_service import (
 from app.services.audit_service import write_audit_log
 from app.services.alert_analysis_service import build_alert_analysis
 from app.services.alert_decision_service import (
-    AlertDecisionConflict, PENDING_DECISION, request_alert_decision,
+    AlertDecisionConflict, PENDING_DECISION, available_alert_decisions,
+    decision_history_view, request_alert_decision,
 )
 from app.services.alert_queue_service import (
     AlertAssignmentConflict, annotate_alerts, assign_alert, assignment_history,
@@ -87,6 +88,7 @@ templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["csrf_token"] = get_csrf_token
 templates.env.globals["permissions_for_role"] = permissions_for_role
 templates.env.globals["role_label"] = role_label
+templates.env.globals["available_alert_decisions"] = available_alert_decisions
 
 LIST_SOURCE_LABELS = {"OFAC_CONSOLIDATED": "OFAC Consolidated", "OFAC_SDN": "OFAC SDN", "FR_GEL": "France Gel", "UN": "ONU", "ONU": "ONU", "EU": "Union européenne", "UE": "Union européenne", "UKSL": "UK Sanctions List"}
 VERSION_STATUS_LABELS = {"ACTIVE": "Active", "ARCHIVED": "Archivée"}
@@ -1213,6 +1215,7 @@ def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends
     pending_decision = next(
         (item for item in decision_history if item.decision_status == PENDING_DECISION), None,
     )
+    available_statuses = available_alert_decisions(alert)
     write_audit_log(
         db, current_username(request), "VIEW_ALERT_ANALYSIS", "Alert", str(alert.id),
         "Consultation de l'analyse consolidée; chaque source reste indépendante.",
@@ -1231,8 +1234,10 @@ def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends
             "sanction_age": calculate_age(sanction_entry.date_naissance) if sanction_entry else None,
             "previous_alerts_count": previous_alerts_count,
             "alert_analysis": alert_analysis,
-            "decision_history": decision_history,
+            "decision_history": decision_history_view(alert, decision_history),
             "pending_decision": pending_decision,
+            "available_statuses": available_statuses,
+            "is_terminal": not available_statuses,
             "assignment_history": assignment_history(db, alert.id),
             "analysts": eligible_assignees(db),
         },
