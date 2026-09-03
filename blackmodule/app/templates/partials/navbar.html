@@ -1088,6 +1088,11 @@
             </button>
 
             <div class="nav-dropdown">
+                {% if "NOTIFICATIONS_VIEW" in permissions %}
+                <a href="/web/notifications" class="{% if path == '/web/notifications' %}active{% endif %}">
+                    Centre de notifications
+                </a>
+                {% endif %}
                 <a href="/web/profile" class="{% if path == '/web/profile' %}active{% endif %}">
                     Profil
                 </a>

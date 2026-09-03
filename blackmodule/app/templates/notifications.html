@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Notifications | BLACKMODULE</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .notification-summary { display:flex; gap:14px; flex-wrap:wrap; margin:18px 0; }
+        .notification-kpi { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px 18px; min-width:180px; }
+        .notification-kpi strong { display:block; font-size:25px; color:#991b1b; }
+        .notification-card { background:#fff; border:1px solid #e2e8f0; border-left:4px solid #cbd5e1; border-radius:10px; margin:12px 0; padding:16px; }
+        .notification-card.unread { border-left-color:#dc2626; background:#fffafa; }
+        .notification-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+        .notification-meta, .notification-history { color:#64748b; font-size:13px; margin-top:8px; }
+        .notification-actions { display:flex; align-items:center; gap:10px; margin-top:12px; }
+        .notification-actions form { margin:0; }
+        .notification-actions a { font-size:14px; }
+        .notification-empty { padding:28px; text-align:center; color:#64748b; background:#fff; border:1px dashed #cbd5e1; border-radius:10px; }
+        @media (max-width:700px) { .notification-head { flex-direction:column; } }
+    </style>
+</head>
+<body>
+    <div class="header"><h1>BLACKMODULE</h1>{% include "partials/navbar.html" %}</div>
+    <main class="container">
+        <h2>Centre de notifications</h2>
+        <p class="muted">Rappels d'échéance et escalades automatiques des actions correctives.</p>
+        <section class="notification-summary">
+            <div class="notification-kpi"><span>Non lues</span><strong>{{ unread_count }}</strong></div>
+            <div class="notification-kpi"><span>Historique affiché</span><strong>{{ notifications|length }}</strong></div>
+        </section>
+        <section>
+            {% for notification in notifications %}
+                <article class="notification-card {% if not notification.is_read %}unread{% endif %}">
+                    <div class="notification-head">
+                        <div><strong>{{ notification.title }}</strong><div class="notification-meta">{{ notification.message }}</div></div>
+                        <span class="badge">{% if notification.is_read %}Lue{% else %}Non lue{% endif %}</span>
+                    </div>
+                    <div class="notification-history">
+                        Créée le {{ notification.created_at.strftime('%d/%m/%Y %H:%M') if notification.created_at else '—' }}
+                        {% if notification.read_at %} · Lue le {{ notification.read_at.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+                    </div>
+                    <div class="notification-actions">
+                        <a href="/web/corrective-actions">Voir l'action corrective</a>
+                        {% if not notification.is_read %}
+                            <form method="post" action="/web/notifications/{{ notification.id }}/read">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                                <button class="btn" type="submit">Marquer comme lue</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </article>
+            {% else %}
+                <div class="notification-empty"><strong>Aucune notification.</strong><div>Les rappels et escalades apparaîtront ici.</div></div>
+            {% endfor %}
+        </section>
+    </main>
+</body>
+</html>

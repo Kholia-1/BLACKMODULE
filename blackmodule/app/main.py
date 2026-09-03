@@ -26,6 +26,7 @@ from app.routers import exports
 from app.scheduler import start_scheduler
 from app.routers import external_api
 from app.routers import internal_lists
+from app.routers import notifications
 
 app = FastAPI(
     title="BLACKMODULE API",
@@ -89,6 +90,24 @@ def startup():
                 END IF;
             END $$
         """))
+        conn.execute(text("""
+            CREATE OR REPLACE FUNCTION prevent_user_notification_history_mutation()
+            RETURNS trigger AS $$
+            BEGIN
+                RAISE EXCEPTION 'user_notification_history is append-only';
+            END;
+            $$ LANGUAGE plpgsql
+        """))
+        conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_user_notification_history_immutable') THEN
+                    CREATE TRIGGER trg_user_notification_history_immutable
+                    BEFORE UPDATE OR DELETE ON user_notification_history
+                    FOR EACH ROW EXECUTE FUNCTION prevent_user_notification_history_mutation();
+                END IF;
+            END $$
+        """))
 
         for column_def in [
             "client_nationalite VARCHAR(100)",
@@ -104,6 +123,11 @@ def startup():
             "supervisor_escalated_by VARCHAR(100)",
         ]:
             conn.execute(text(f"ALTER TABLE alerts ADD COLUMN IF NOT EXISTS {column_def}"))
+
+        conn.execute(text(
+            "ALTER TABLE corrective_actions ADD COLUMN IF NOT EXISTS "
+            "supervisor_escalated_at TIMESTAMP"
+        ))
 
         for column_def in [
             "lieu_naissance VARCHAR(255)",
@@ -247,6 +271,7 @@ app.include_router(web.router)
 app.include_router(exports.router)
 app.include_router(external_api.router)
 app.include_router(internal_lists.router)
+app.include_router(notifications.router)
 
 @app.get("/")
 def home():

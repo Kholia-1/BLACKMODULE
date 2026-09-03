@@ -29,6 +29,7 @@ from app.services.authorization_service import (
     PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW,
     PERMISSION_ALERTS_ASSIGN, PERMISSION_ALERTS_REASSIGN, PERMISSION_ALERTS_ESCALATE,
     PERMISSION_ALERTS_SUPERVISE,
+    PERMISSION_NOTIFICATIONS_VIEW,
     PERMISSION_COMPLIANCE_REPORT_VIEW,
     PERMISSION_QUALITY_REVIEW_VIEW, PERMISSION_QUALITY_REVIEW_MANAGE,
     PERMISSION_CORRECTIVE_ACTIONS_VIEW, PERMISSION_CORRECTIVE_ACTIONS_MANAGE,
@@ -109,6 +110,7 @@ from app.services.corrective_action_service import (
     create_corrective_action,
     update_corrective_action,
 )
+from app.services.notification_service import NotificationError, mark_notification_read, notification_center
 
 router = APIRouter(prefix="/web", tags=["Web Interface"])
 templates = Jinja2Templates(directory="app/templates")
@@ -3954,6 +3956,47 @@ def web_corrective_actions(request: Request, message: str | None = Query(None), 
         "can_update_assigned": require_permission(request, PERMISSION_CORRECTIVE_ACTIONS_UPDATE_ASSIGNED),
         **report,
     })
+
+
+@router.get("/notifications")
+def web_notifications(request: Request, db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_NOTIFICATIONS_VIEW):
+        log_access_denied(db, request, "/web/notifications", "Accès refusé aux notifications.")
+        return forbidden_page(request)
+    current_user = get_current_user(request)
+    center = notification_center(db, recipient_user_id=current_user.get("id"))
+    write_audit_log(db, current_username(request), "VIEW_USER_NOTIFICATIONS", "UserNotification", None,
+                    "Consultation du centre de notifications.", request.client.host if request.client else None)
+    db.commit()
+    return templates.TemplateResponse(request=request, name="notifications.html", context={
+        "request": request, "user": current_user, **center,
+    })
+
+
+@router.post("/notifications/{notification_id}/read")
+def web_mark_notification_read(notification_id: UUID, request: Request, db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_NOTIFICATIONS_VIEW):
+        log_access_denied(db, request, f"/web/notifications/{notification_id}/read", "Modification de notification non autorisée.")
+        return forbidden_page(request)
+    try:
+        mark_notification_read(
+            db, notification_id=notification_id, recipient_user_id=get_current_user(request).get("id"),
+            actor_username=current_username(request),
+        )
+    except PermissionError:
+        db.rollback()
+        return forbidden_page(request)
+    except NotificationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    write_audit_log(db, current_username(request), "USER_NOTIFICATION_READ", "UserNotification", str(notification_id),
+                    "Notification marquée comme lue.", request.client.host if request.client else None)
+    db.commit()
+    return RedirectResponse(url="/web/notifications", status_code=303)
 
 
 @router.post("/corrective-actions")

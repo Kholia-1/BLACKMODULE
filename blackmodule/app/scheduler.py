@@ -13,6 +13,7 @@ from app.services.list_update_service import (
     mark_interrupted_update_failed,
     OFFICIAL_SOURCES,
 )
+from app.services.notification_service import dispatch_corrective_action_notifications
 
 
 scheduler = BackgroundScheduler()
@@ -129,6 +130,24 @@ def run_freshness_check():
         db.close()
 
 
+def run_corrective_action_notification_check():
+    """Deliver deduplicated deadline reminders and overdue escalations."""
+    db = SessionLocal()
+    try:
+        result = dispatch_corrective_action_notifications(db)
+        db.commit()
+        print(
+            "[BLACKMODULE] Notifications actions correctives: "
+            f"{result['due_soon']} proche(s), {result['overdue']} retard(s), "
+            f"{result['escalated']} escalade(s)."
+        )
+    except Exception as error:
+        db.rollback()
+        print(f"[BLACKMODULE] Erreur notifications actions correctives: {error}")
+    finally:
+        db.close()
+
+
 def start_scheduler():
     if scheduler.running:
         return
@@ -202,6 +221,14 @@ def start_scheduler():
         hour=4,
         minute=0,
         id="list_freshness_check",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        run_corrective_action_notification_check,
+        trigger="cron",
+        minute=10,
+        id="corrective_action_notifications",
         replace_existing=True,
     )
 

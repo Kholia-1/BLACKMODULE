@@ -362,6 +362,7 @@ class CorrectiveAction(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     closed_at = Column(DateTime, nullable=True)
+    supervisor_escalated_at = Column(DateTime, nullable=True)
 
 
 class CorrectiveActionHistory(Base):
@@ -387,6 +388,49 @@ class CorrectiveActionHistory(Base):
 @event.listens_for(CorrectiveActionHistory, "before_delete")
 def _prevent_corrective_action_history_mutation(*_args, **_kwargs):
     raise ValueError("L'historique des actions correctives est immuable.")
+
+
+class UserNotification(Base):
+    """Persistent, recipient-scoped operational notification."""
+
+    __tablename__ = "user_notifications"
+    __table_args__ = (
+        UniqueConstraint("deduplication_key", name="uq_user_notifications_deduplication"),
+        Index("ix_user_notifications_recipient_read_created", "recipient_user_id", "is_read", "created_at"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    recipient_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    notification_type = Column(String(60), nullable=False)
+    entity_type = Column(String(60), nullable=False)
+    entity_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    message = Column(String(500), nullable=False)
+    deduplication_key = Column(String(255), nullable=False)
+    is_read = Column(Boolean, nullable=False, default=False, server_default="false")
+    read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class UserNotificationHistory(Base):
+    """Append-only delivery and read trail, without business comments."""
+
+    __tablename__ = "user_notification_history"
+    __table_args__ = (
+        Index("ix_user_notification_history_notification_created", "notification_id", "created_at"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    notification_id = Column(UUID(as_uuid=True), ForeignKey("user_notifications.id"), nullable=False, index=True)
+    event_type = Column(String(30), nullable=False)
+    actor_username = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+@event.listens_for(UserNotificationHistory, "before_update")
+@event.listens_for(UserNotificationHistory, "before_delete")
+def _prevent_user_notification_history_mutation(*_args, **_kwargs):
+    raise ValueError("L'historique des notifications est immuable.")
 
 
 class AuditLog(Base):

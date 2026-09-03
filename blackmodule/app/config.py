@@ -62,3 +62,11 @@ if not 0 < ALERT_SLA_NEAR_RATIO < 1:
 ALERT_INACTIVITY_HOURS = float(os.getenv("ALERT_INACTIVITY_HOURS", "24"))
 if ALERT_INACTIVITY_HOURS <= 0:
     raise ValueError("ALERT_INACTIVITY_HOURS doit être strictement positif.")
+
+# Les actions correctives portent une échéance au jour près. Cette fenêtre
+# centralisée pilote le rappel préventif, sans modifier les SLA des alertes.
+CORRECTIVE_ACTION_DUE_SOON_HOURS = float(
+    os.getenv("CORRECTIVE_ACTION_DUE_SOON_HOURS", "24")
+)
+if CORRECTIVE_ACTION_DUE_SOON_HOURS <= 0:
+    raise ValueError("CORRECTIVE_ACTION_DUE_SOON_HOURS doit être strictement positif.")
