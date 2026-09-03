@@ -1,7 +1,7 @@
 import csv
 import json
 from datetime import datetime, timedelta
-from io import StringIO
+from io import BytesIO, StringIO
 from typing import Optional
 from urllib.parse import urlencode
 from uuid import UUID
@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query, UploadFile, File
 from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from openpyxl import Workbook
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
@@ -85,7 +86,12 @@ from app.services.internal_list_service import (
     category_label, create_internal_entry, request_entry_change, serialize_internal_entry,
     submit_internal_entry, OP_INTERNAL_LIST_CHANGE,
 )
-from app.services.reporting_service import build_compliance_report, resolve_reporting_filters
+from app.services.reporting_service import (
+    build_compliance_report,
+    build_management_report,
+    management_export_rows,
+    resolve_reporting_filters,
+)
 
 router = APIRouter(prefix="/web", tags=["Web Interface"])
 templates = Jinja2Templates(directory="app/templates")
@@ -3441,6 +3447,26 @@ def _compliance_report(
     return build_compliance_report(db, filters)
 
 
+def _management_report(
+    db: Session,
+    *,
+    period: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    source: str | None,
+    statut: str | None,
+    analyste: str | None,
+):
+    try:
+        filters = resolve_reporting_filters(
+            period=period, date_from=date_from, date_to=date_to,
+            source=source, status=statut, analyst=analyste,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return build_management_report(db, filters)
+
+
 @router.get("/compliance-reporting")
 def web_compliance_reporting(
     request: Request,
@@ -3545,6 +3571,137 @@ def web_compliance_reporting_export(
         content="\ufeff" + output.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=reporting_conformite.csv"},
+    )
+
+
+@router.get("/management-reporting")
+def web_management_reporting(
+    request: Request,
+    period: str | None = Query("30"),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    source: str | None = Query(None),
+    statut: str | None = Query(None),
+    analyste: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_COMPLIANCE_REPORT_VIEW):
+        log_access_denied(
+            db, request, "/web/management-reporting",
+            "Accès refusé au reporting management.",
+        )
+        return forbidden_page(request)
+    report = _management_report(
+        db, period=period, date_from=date_from, date_to=date_to,
+        source=source, statut=statut, analyste=analyste,
+    )
+    write_audit_log(
+        db, current_username(request), "VIEW_MANAGEMENT_REPORT", "ManagementReport", None,
+        "Consultation du reporting management agrégé.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return templates.TemplateResponse(
+        request=request,
+        name="management_reporting.html",
+        context={"request": request, **report},
+    )
+
+
+def _management_export(
+    request: Request,
+    db: Session,
+    *,
+    period: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    source: str | None,
+    statut: str | None,
+    analyste: str | None,
+):
+    if not require_login(request):
+        return None, RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_COMPLIANCE_REPORT_VIEW):
+        log_access_denied(
+            db, request, "/web/management-reporting/export",
+            "Export reporting management non autorisé.",
+        )
+        return None, forbidden_page(request)
+    report = _management_report(
+        db, period=period, date_from=date_from, date_to=date_to,
+        source=source, statut=statut, analyste=analyste,
+    )
+    return report, None
+
+
+@router.get("/management-reporting/export.csv")
+def web_management_reporting_export_csv(
+    request: Request,
+    period: str | None = Query("30"),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    source: str | None = Query(None),
+    statut: str | None = Query(None),
+    analyste: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    report, denied = _management_export(
+        request, db, period=period, date_from=date_from, date_to=date_to,
+        source=source, statut=statut, analyste=analyste,
+    )
+    if denied is not None:
+        return denied
+    output = StringIO(newline="")
+    writer = csv.writer(output, delimiter=";")
+    writer.writerows(management_export_rows(report))
+    write_audit_log(
+        db, current_username(request), "EXPORT_MANAGEMENT_REPORT_CSV", "ManagementReport", None,
+        "Export CSV du reporting management agrégé.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=reporting_management.csv"},
+    )
+
+
+@router.get("/management-reporting/export.xlsx")
+def web_management_reporting_export_xlsx(
+    request: Request,
+    period: str | None = Query("30"),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    source: str | None = Query(None),
+    statut: str | None = Query(None),
+    analyste: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    report, denied = _management_export(
+        request, db, period=period, date_from=date_from, date_to=date_to,
+        source=source, statut=statut, analyste=analyste,
+    )
+    if denied is not None:
+        return denied
+    workbook = Workbook(write_only=True)
+    sheet = workbook.create_sheet("Synthèse management")
+    for row in management_export_rows(report):
+        sheet.append(row)
+    content = BytesIO()
+    workbook.save(content)
+    write_audit_log(
+        db, current_username(request), "EXPORT_MANAGEMENT_REPORT_XLSX", "ManagementReport", None,
+        "Export XLSX du reporting management agrégé.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return Response(
+        content=content.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=reporting_management.xlsx"},
     )
 
 

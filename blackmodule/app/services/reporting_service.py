@@ -26,6 +26,19 @@ from app.services.authorization_service import ROLE_ANALYSTE_CONFORMITE
 MAX_REPORT_DAYS = 366
 FINAL_DECISION_STATUSES = ("FAUX_POSITIF", "CONFIRMEE", "CLOTUREE")
 APPLIED_HISTORY_STATUSES = (APPLIED_DECISION, APPROVED_DECISION)
+MANAGEMENT_COMPARISON_KEYS = (
+    "backlog_total",
+    "backlog_critical",
+    "backlog_out_sla",
+    "created",
+    "closed",
+    "closure_rate",
+    "false_positive_rate",
+    "confirmation_rate",
+    "average_hours",
+    "median_hours",
+    "sla_compliance_rate",
+)
 
 
 @dataclass(frozen=True)
@@ -200,6 +213,32 @@ def _decision_rates(db: Session, filters: ReportingFilters) -> dict:
     }
 
 
+def _report_kpis(db: Session, filters: ReportingFilters, current_time: datetime) -> dict:
+    base_query = _apply_dimensions(db.query(Alert), filters, include_period=True)
+    sla_conditions = sla_sql_conditions(now=current_time)
+    row = base_query.with_entities(
+        func.count(Alert.id),
+        _count_case(Alert.statut == "GENEREE"),
+        _count_case(Alert.statut == "EN_COURS"),
+        _count_case(Alert.statut == "CONFIRMEE"),
+        _count_case(Alert.statut == "FAUX_POSITIF"),
+        _count_case(Alert.statut == "CLOTUREE"),
+        _count_case(Alert.niveau_alerte == "ALERTE_EXACTE"),
+        _count_case(and_(sla_conditions["active"], Alert.assigned_to_user_id.is_(None))),
+        _count_case(and_(sla_conditions["active"], Alert.supervisor_escalated_at.is_not(None))),
+        _count_case(sla_conditions[SLA_OK]),
+        _count_case(sla_conditions[SLA_NEAR]),
+        _count_case(sla_conditions[SLA_BREACHED]),
+        _count_case(_inactivity_condition(current_time)),
+    ).one()
+    names = (
+        "total", "generated", "in_progress", "confirmed", "false_positive", "closed",
+        "critical", "unassigned", "escalated", "within_sla", "near_sla", "out_sla",
+        "inactive",
+    )
+    return {name: int(value or 0) for name, value in zip(names, row)}
+
+
 def _analyst_supervision(
     db: Session,
     base_query: Query,
@@ -315,27 +354,7 @@ def build_compliance_report(
     current_time = now or datetime.utcnow()
     base_query = _apply_dimensions(db.query(Alert), filters, include_period=True)
     sla_conditions = sla_sql_conditions(now=current_time)
-    kpi_row = base_query.with_entities(
-        func.count(Alert.id),
-        _count_case(Alert.statut == "GENEREE"),
-        _count_case(Alert.statut == "EN_COURS"),
-        _count_case(Alert.statut == "CONFIRMEE"),
-        _count_case(Alert.statut == "FAUX_POSITIF"),
-        _count_case(Alert.statut == "CLOTUREE"),
-        _count_case(Alert.niveau_alerte == "ALERTE_EXACTE"),
-        _count_case(and_(sla_conditions["active"], Alert.assigned_to_user_id.is_(None))),
-        _count_case(and_(sla_conditions["active"], Alert.supervisor_escalated_at.is_not(None))),
-        _count_case(sla_conditions[SLA_OK]),
-        _count_case(sla_conditions[SLA_NEAR]),
-        _count_case(sla_conditions[SLA_BREACHED]),
-        _count_case(_inactivity_condition(current_time)),
-    ).one()
-    names = (
-        "total", "generated", "in_progress", "confirmed", "false_positive", "closed",
-        "critical", "unassigned", "escalated", "within_sla", "near_sla", "out_sla",
-        "inactive",
-    )
-    kpis = {name: int(value or 0) for name, value in zip(names, kpi_row)}
+    kpis = _report_kpis(db, filters, current_time)
     performance, duration_rows = _duration_metrics(db, filters)
     performance.update(_decision_rates(db, filters))
 
@@ -367,3 +386,230 @@ def build_compliance_report(
         "options": {"sources": sources, "statuses": statuses, "analysts": analyst_options},
         "inactivity_hours": ALERT_INACTIVITY_HOURS,
     }
+
+
+def previous_reporting_filters(filters: ReportingFilters) -> ReportingFilters:
+    """Return the immediately preceding period with identical dimensions."""
+    duration = filters.end_at - filters.start_at
+    return ReportingFilters(
+        period="previous",
+        start_at=filters.start_at - duration,
+        end_at=filters.start_at,
+        source=filters.source,
+        status=filters.status,
+        analyst_id=filters.analyst_id,
+    )
+
+
+def _terminal_before(as_of: datetime):
+    history_terminal = exists().where(and_(
+        AlertDecisionHistory.alert_id == Alert.id,
+        AlertDecisionHistory.decision_status.in_(APPLIED_HISTORY_STATUSES),
+        AlertDecisionHistory.requested_status.in_(TERMINAL_ALERT_STATUSES),
+        AlertDecisionHistory.applied_at.is_not(None),
+        AlertDecisionHistory.applied_at < as_of,
+    ))
+    legacy_terminal = and_(
+        Alert.statut.is_not(None),
+        Alert.statut.in_(TERMINAL_ALERT_STATUSES),
+        or_(Alert.treated_at.is_(None), Alert.treated_at < as_of),
+    )
+    return or_(history_terminal, legacy_terminal)
+
+
+def _backlog_snapshot(db: Session, filters: ReportingFilters, as_of: datetime) -> dict:
+    """Aggregate the backlog as it stood at ``as_of`` without loading alerts."""
+    active_at = not_(_terminal_before(as_of))
+    query = _apply_dimensions(db.query(Alert), filters, include_period=False).filter(
+        Alert.created_at.is_not(None),
+        Alert.created_at < as_of,
+    )
+    sla_conditions = sla_sql_conditions(now=as_of, active_condition=active_at)
+    one_day = as_of - timedelta(days=1)
+    three_days = as_of - timedelta(days=3)
+    seven_days = as_of - timedelta(days=7)
+    row = query.with_entities(
+        _count_case(active_at),
+        _count_case(and_(active_at, Alert.niveau_alerte == "ALERTE_EXACTE")),
+        _count_case(sla_conditions[SLA_BREACHED]),
+        _count_case(and_(active_at, Alert.created_at >= one_day)),
+        _count_case(and_(active_at, Alert.created_at < one_day, Alert.created_at >= three_days)),
+        _count_case(and_(active_at, Alert.created_at < three_days, Alert.created_at >= seven_days)),
+        _count_case(and_(active_at, Alert.created_at < seven_days)),
+    ).one()
+    total, critical, out_sla, less_24h, one_to_three, three_to_seven, over_seven = (
+        int(value or 0) for value in row
+    )
+    return {
+        "total": total,
+        "critical": critical,
+        "out_sla": out_sla,
+        "sla_compliance_rate": round((total - out_sla) / total * 100, 1) if total else 100.0,
+        "age_buckets": [
+            {"label": "Moins de 24 h", "count": less_24h},
+            {"label": "1 à 3 jours", "count": one_to_three},
+            {"label": "3 à 7 jours", "count": three_to_seven},
+            {"label": "Plus de 7 jours", "count": over_seven},
+        ],
+    }
+
+
+def _period_summary(db: Session, filters: ReportingFilters, as_of: datetime) -> dict:
+    created = int(
+        _apply_dimensions(db.query(func.count(Alert.id)), filters, include_period=True).scalar() or 0
+    )
+    performance, _ = _duration_metrics(db, filters)
+    performance.update(_decision_rates(db, filters))
+    backlog = _backlog_snapshot(db, filters, as_of)
+    closed = int(performance["closed_volume"])
+    return {
+        "backlog_total": backlog["total"],
+        "backlog_critical": backlog["critical"],
+        "backlog_out_sla": backlog["out_sla"],
+        "created": created,
+        "closed": closed,
+        "closure_rate": round(closed / created * 100, 1) if created else 0.0,
+        "false_positive_rate": performance["false_positive_rate"],
+        "confirmation_rate": performance["confirmation_rate"],
+        "average_hours": performance["average_hours"],
+        "median_hours": performance["median_hours"],
+        "sla_compliance_rate": backlog["sla_compliance_rate"],
+        "age_buckets": backlog["age_buckets"],
+    }
+
+
+def _variation(current, previous) -> dict:
+    absolute = round(float(current) - float(previous), 2)
+    if float(previous) == 0:
+        percent = 0.0 if float(current) == 0 else None
+    else:
+        percent = round(absolute / abs(float(previous)) * 100, 1)
+    return {
+        "current": current,
+        "previous": previous,
+        "absolute": absolute,
+        "percent": percent,
+    }
+
+
+def _management_attention(current: dict, previous: dict) -> list[dict]:
+    points = []
+    if current["backlog_critical"]:
+        points.append({
+            "level": "critical",
+            "message": f'{current["backlog_critical"]} alerte(s) critique(s) dans le backlog.',
+        })
+    if current["backlog_out_sla"]:
+        points.append({
+            "level": "warning",
+            "message": f'{current["backlog_out_sla"]} alerte(s) hors SLA à traiter en priorité.',
+        })
+    if current["created"] > current["closed"]:
+        points.append({
+            "level": "warning",
+            "message": "Le volume d’alertes créées dépasse le volume clôturé sur la période.",
+        })
+    if current["closure_rate"] < previous["closure_rate"]:
+        points.append({
+            "level": "info",
+            "message": "Le taux de clôture est inférieur à celui de la période précédente.",
+        })
+    if not points:
+        points.append({"level": "ok", "message": "Aucun point d’attention majeur détecté."})
+    return points
+
+
+def build_management_report(
+    db: Session,
+    filters: ReportingFilters,
+    *,
+    now: datetime | None = None,
+) -> dict:
+    """Build the management view from LOT 5A aggregates and historical snapshots."""
+    current_time = now or datetime.utcnow()
+    current_report = build_compliance_report(db, filters, now=current_time)
+    current_snapshot_at = min(filters.end_at, current_time)
+    current_backlog = _backlog_snapshot(db, filters, current_snapshot_at)
+    current = {
+        "backlog_total": current_backlog["total"],
+        "backlog_critical": current_backlog["critical"],
+        "backlog_out_sla": current_backlog["out_sla"],
+        "created": current_report["kpis"]["total"],
+        "closed": current_report["performance"]["closed_volume"],
+        "false_positive_rate": current_report["performance"]["false_positive_rate"],
+        "confirmation_rate": current_report["performance"]["confirmation_rate"],
+        "average_hours": current_report["performance"]["average_hours"],
+        "median_hours": current_report["performance"]["median_hours"],
+        "sla_compliance_rate": current_backlog["sla_compliance_rate"],
+        "closure_rate": round(
+            current_report["performance"]["closed_volume"] / current_report["kpis"]["total"] * 100,
+            1,
+        ) if current_report["kpis"]["total"] else 0.0,
+        "age_buckets": current_backlog["age_buckets"],
+    }
+    previous_filters = previous_reporting_filters(filters)
+    previous = _period_summary(db, previous_filters, previous_filters.end_at)
+    comparisons = {
+        key: _variation(current[key], previous[key])
+        for key in MANAGEMENT_COMPARISON_KEYS
+    }
+    return {
+        "filters": filters,
+        "previous_filters": previous_filters,
+        "current": current,
+        "previous": previous,
+        "comparisons": comparisons,
+        "top_sources": current_report["distributions"]["sources"][:5],
+        "top_matching_types": current_report["distributions"]["matching_types"][:5],
+        "analysts": current_report["analysts"],
+        "trends": current_report["trends"],
+        "attention_points": _management_attention(current, previous),
+        "options": current_report["options"],
+    }
+
+
+def management_export_rows(report: dict) -> list[list]:
+    """Return aggregate-only rows shared by CSV and XLSX exports."""
+    labels = {
+        "backlog_total": "Backlog total",
+        "backlog_critical": "Backlog critique",
+        "backlog_out_sla": "Backlog hors SLA",
+        "created": "Alertes créées",
+        "closed": "Alertes clôturées",
+        "closure_rate": "Taux de clôture (%)",
+        "false_positive_rate": "Taux de faux positifs (%)",
+        "confirmation_rate": "Taux de confirmation (%)",
+        "average_hours": "Délai moyen (h)",
+        "median_hours": "Délai médian (h)",
+        "sla_compliance_rate": "Respect SLA (%)",
+    }
+    rows = [
+        ["Synthèse management BLACKMODULE"],
+        ["Période courante", report["filters"].start_date, report["filters"].end_date],
+        ["Période précédente", report["previous_filters"].start_date, report["previous_filters"].end_date],
+        [],
+        ["Indicateur", "Période courante", "Période précédente", "Variation absolue", "Variation (%)"],
+    ]
+    for key in MANAGEMENT_COMPARISON_KEYS:
+        item = report["comparisons"][key]
+        rows.append([labels[key], item["current"], item["previous"], item["absolute"], item["percent"]])
+    rows.extend([[], ["Backlog par ancienneté", "Volume"]])
+    rows.extend([[item["label"], item["count"]] for item in report["current"]["age_buckets"]])
+    rows.extend([[], ["Top sources", "Volume", "Part (%)"]])
+    rows.extend([[item["label"], item["count"], item["percent"]] for item in report["top_sources"]])
+    rows.extend([[], ["Top types de matching", "Volume", "Part (%)"]])
+    rows.extend([[item["label"], item["count"], item["percent"]] for item in report["top_matching_types"]])
+    rows.extend([[], ["Analyste", "Identifiant", "Dossiers actifs", "Hors SLA", "Clôturés", "Délai moyen (h)"]])
+    rows.extend([
+        [
+            item["full_name"], item["username"], item["active"],
+            item["out_sla"], item["closed"], item["average_hours"],
+        ]
+        for item in report["analysts"]
+    ])
+    rows.extend([[], ["Date", "Créées", "Clôturées", "Faux positifs", "Confirmées"]])
+    rows.extend([
+        [item["date"], item["created"], item["closed"], item["false_positive"], item["confirmed"]]
+        for item in report["trends"]
+    ])
+    return rows

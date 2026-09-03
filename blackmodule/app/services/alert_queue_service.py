@@ -82,10 +82,17 @@ def calculate_alert_sla(alert: Alert, *, now: datetime | None = None) -> dict:
     }
 
 
-def sla_sql_conditions(*, now: datetime | None = None) -> dict[str, object]:
+def sla_sql_conditions(
+    *,
+    now: datetime | None = None,
+    active_condition=None,
+) -> dict[str, object]:
     """SQL predicates equivalent to ``calculate_alert_sla`` for reporting."""
     current_time = _naive_utc(now or datetime.utcnow())
-    active = or_(Alert.statut.is_(None), ~Alert.statut.in_(TERMINAL_ALERT_STATUSES))
+    active = active_condition if active_condition is not None else or_(
+        Alert.statut.is_(None),
+        ~Alert.statut.in_(TERMINAL_ALERT_STATUSES),
+    )
     known_levels = tuple(ALERT_SLA_HOURS)
     fallback_level = or_(
         Alert.niveau_alerte.is_(None),

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BLACKMODULE - Synthèse management</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #f8fafc; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        .header { background: #0f172a; color: white; padding: 22px 32px; }
+        .header h1 { margin: 0; font-size: 22px; }
+        .header p { margin: 6px 0 0; color: #94a3b8; font-size: 13px; }
+        .container { max-width: 1600px; margin: auto; padding: 28px 32px 42px; }
+        .page-head, .section-head, .actions { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .page-head { margin-bottom: 20px; }
+        h2, h3 { margin: 0; color: #0f172a; }
+        .page-head p, .section-head p { margin: 6px 0 0; color: #64748b; font-size: 13px; }
+        .btn { display: inline-flex; align-items: center; padding: 9px 13px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; color: #334155; font-size: 13px; font-weight: 650; text-decoration: none; }
+        .btn-primary { background: #b91c1c; border-color: #b91c1c; color: white; }
+        .filters, .panel, .kpi { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+        .filters { display: grid; grid-template-columns: repeat(6, minmax(130px, 1fr)); gap: 12px; align-items: end; margin-bottom: 20px; padding: 16px; }
+        .field label { display: block; margin-bottom: 6px; color: #475569; font-size: 12px; font-weight: 700; }
+        .field select, .field input { width: 100%; height: 38px; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; color: #1e293b; }
+        .filter-actions { display: flex; gap: 8px; }
+        .kpis { display: grid; grid-template-columns: repeat(5, minmax(145px, 1fr)); gap: 12px; margin-bottom: 18px; }
+        .kpi { padding: 14px; border-left: 3px solid #64748b; }
+        .kpi.danger { border-left-color: #dc2626; } .kpi.warning { border-left-color: #d97706; } .kpi.good { border-left-color: #16a34a; }
+        .kpi span { display: block; color: #64748b; font-size: 11.5px; font-weight: 650; }
+        .kpi strong { display: block; margin-top: 6px; color: #0f172a; font-size: 23px; }
+        .variation { display: block; margin-top: 4px; color: #64748b; font-size: 11px; }
+        .layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+        .panel { margin-bottom: 16px; padding: 18px; overflow: hidden; }
+        .layout .panel { margin-bottom: 0; }
+        .section-head { margin-bottom: 14px; }
+        .attention { display: grid; gap: 9px; }
+        .attention-item { padding: 10px 12px; border-left: 3px solid #64748b; border-radius: 6px; background: #f8fafc; font-size: 13px; }
+        .attention-item.critical { border-color: #dc2626; background: #fef2f2; }
+        .attention-item.warning { border-color: #d97706; background: #fffbeb; }
+        .attention-item.ok { border-color: #16a34a; background: #f0fdf4; }
+        .bar-list { display: grid; gap: 10px; }
+        .bar-row { display: grid; grid-template-columns: minmax(120px, 1.4fr) 3fr 55px; align-items: center; gap: 10px; font-size: 12.5px; }
+        .bar-track { height: 8px; overflow: hidden; border-radius: 99px; background: #e2e8f0; }
+        .bar-fill { display: block; height: 100%; border-radius: inherit; background: #b91c1c; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 12.5px; }
+        th { padding: 10px; text-align: left; background: #f1f5f9; color: #475569; text-transform: uppercase; font-size: 10.5px; letter-spacing: .35px; white-space: nowrap; }
+        td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+        .muted { color: #64748b; }
+        @media (max-width: 1150px) { .filters { grid-template-columns: repeat(3, 1fr); } .kpis { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 760px) { .header, .container { padding-left: 16px; padding-right: 16px; } .filters, .kpis, .layout { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 480px) { .filters, .kpis, .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="header"><h1>BLACKMODULE</h1><p>Pilotage management conformité</p>{% include "partials/navbar.html" %}</div>
+<main class="container">
+    {% set export_query = 'period=' ~ filters.period ~ '&date_from=' ~ filters.start_date ~ '&date_to=' ~ filters.end_date ~ ('&source=' ~ filters.source if filters.source else '') ~ ('&statut=' ~ filters.status if filters.status else '') ~ ('&analyste=' ~ filters.analyst_id if filters.analyst_id else '') %}
+    <div class="page-head">
+        <div><h2>Synthèse management</h2><p>Période courante du {{ filters.start_date.strftime('%d/%m/%Y') }} au {{ filters.end_date.strftime('%d/%m/%Y') }}, comparée à la période précédente équivalente.</p></div>
+        <div class="actions"><a class="btn" href="/web/compliance-reporting">Reporting opérationnel</a><a class="btn" href="/web/management-reporting/export.csv?{{ export_query }}">CSV</a><a class="btn" href="/web/management-reporting/export.xlsx?{{ export_query }}">XLSX</a></div>
+    </div>
+
+    <form class="filters" method="get" action="/web/management-reporting">
+        <div class="field"><label>Période</label><select name="period"><option value="7" {% if filters.period == '7' %}selected{% endif %}>7 jours</option><option value="30" {% if filters.period == '30' %}selected{% endif %}>30 jours</option><option value="custom" {% if filters.period == 'custom' %}selected{% endif %}>Personnalisée</option></select></div>
+        <div class="field"><label>Du</label><input type="date" name="date_from" value="{{ filters.start_date }}"></div>
+        <div class="field"><label>Au</label><input type="date" name="date_to" value="{{ filters.end_date }}"></div>
+        <div class="field"><label>Source</label><select name="source"><option value="">Toutes</option>{% for item in options.sources %}<option value="{{ item }}" {% if filters.source == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Statut</label><select name="statut"><option value="">Tous</option>{% for item in options.statuses %}<option value="{{ item }}" {% if filters.status == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Analyste</label><select name="analyste"><option value="">Tous</option>{% for item in options.analysts %}<option value="{{ item.id }}" {% if filters.analyst_id|string == item.id %}selected{% endif %}>{{ item.full_name }} ({{ item.username }})</option>{% endfor %}</select></div>
+        <div class="filter-actions"><button class="btn btn-primary" type="submit">Appliquer</button><a class="btn" href="/web/management-reporting">Réinitialiser</a></div>
+    </form>
+
+    <section class="kpis" aria-label="Indicateurs management">
+        {% for label, key, suffix, tone in [
+            ('Backlog total', 'backlog_total', '', ''), ('Backlog critique', 'backlog_critical', '', 'danger'), ('Backlog hors SLA', 'backlog_out_sla', '', 'warning'),
+            ('Taux de clôture', 'closure_rate', ' %', 'good'), ('Taux faux positifs', 'false_positive_rate', ' %', ''), ('Taux confirmation', 'confirmation_rate', ' %', ''),
+            ('Délai moyen', 'average_hours', ' h', ''), ('Délai médian', 'median_hours', ' h', ''), ('Respect SLA', 'sla_compliance_rate', ' %', 'good'),
+            ('Alertes créées', 'created', '', ''), ('Alertes clôturées', 'closed', '', 'good')
+        ] %}
+        {% set item = comparisons[key] %}
+        <div class="kpi {{ tone }}"><span>{{ label }}</span><strong>{{ item.current }}{{ suffix }}</strong><small class="variation">Précédente : {{ item.previous }}{{ suffix }}{% if item.percent is not none %} · {{ '%+.1f'|format(item.percent) }} %{% else %} · nouvelle base{% endif %}</small></div>
+        {% endfor %}
+    </section>
+
+    <div class="layout">
+        <section class="panel"><div class="section-head"><div><h3>Points d’attention</h3><p>Signaux agrégés nécessitant un pilotage.</p></div></div><div class="attention">{% for item in attention_points %}<div class="attention-item {{ item.level }}">{{ item.message }}</div>{% endfor %}</div></section>
+        <section class="panel"><div class="section-head"><div><h3>Backlog par ancienneté</h3><p>Situation à la fin de la période sélectionnée.</p></div></div><div class="bar-list">{% for item in current.age_buckets %}<div class="bar-row"><span>{{ item.label }}</span><div class="bar-track"><span class="bar-fill" style="width:{{ (item.count / current.backlog_total * 100) if current.backlog_total else 0 }}%"></span></div><strong>{{ item.count }}</strong></div>{% endfor %}</div></section>
+    </div>
+
+    <section class="panel"><div class="section-head"><div><h3>Comparaison des périodes</h3><p>Variations absolues et relatives sur des durées identiques.</p></div></div><div class="table-wrap"><table><thead><tr><th>Indicateur</th><th>Courante</th><th>Précédente</th><th>Variation</th><th>Variation %</th></tr></thead><tbody>
+        {% for label, key in [('Backlog total','backlog_total'),('Backlog critique','backlog_critical'),('Backlog hors SLA','backlog_out_sla'),('Alertes créées','created'),('Alertes clôturées','closed'),('Taux de clôture','closure_rate'),('Taux de faux positifs','false_positive_rate'),('Taux de confirmation','confirmation_rate'),('Délai moyen','average_hours'),('Délai médian','median_hours'),('Respect SLA','sla_compliance_rate')] %}{% set item = comparisons[key] %}<tr><td>{{ label }}</td><td>{{ item.current }}</td><td>{{ item.previous }}</td><td>{{ '%+.2f'|format(item.absolute) }}</td><td>{% if item.percent is none %}N/D{% else %}{{ '%+.1f'|format(item.percent) }} %{% endif %}</td></tr>{% endfor %}
+    </tbody></table></div></section>
+
+    <div class="layout">
+        {% for title, rows in [('Top sources génératrices', top_sources), ('Top types de matching', top_matching_types)] %}<section class="panel"><div class="section-head"><h3>{{ title }}</h3></div><div class="bar-list">{% for item in rows %}<div class="bar-row"><span>{{ item.label }}</span><div class="bar-track"><span class="bar-fill" style="width:{{ item.percent }}%"></span></div><strong>{{ item.count }}</strong></div>{% else %}<span class="muted">Aucune donnée.</span>{% endfor %}</div></section>{% endfor %}
+    </div>
+
+    <section class="panel"><div class="section-head"><div><h3>Performance par analyste</h3><p>Volumes et délais agrégés, sans donnée client ni commentaire métier.</p></div></div><div class="table-wrap"><table><thead><tr><th>Analyste</th><th>Dossiers actifs</th><th>Hors SLA</th><th>Clôturés</th><th>Délai moyen</th></tr></thead><tbody>{% for item in analysts %}<tr><td><strong>{{ item.full_name }}</strong><div class="muted">{{ item.username }}</div></td><td>{{ item.active }}</td><td>{{ item.out_sla }}</td><td>{{ item.closed }}</td><td>{{ item.average_hours }} h</td></tr>{% else %}<tr><td colspan="5">Aucun analyste.</td></tr>{% endfor %}</tbody></table></div></section>
+
+    <section class="panel"><div class="section-head"><div><h3>Évolution opérationnelle</h3><p>Alertes créées, clôturées, confirmées et faux positifs.</p></div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Créées</th><th>Clôturées</th><th>Faux positifs</th><th>Confirmées</th></tr></thead><tbody>{% for item in trends %}<tr><td>{{ item.date }}</td><td>{{ item.created }}</td><td>{{ item.closed }}</td><td>{{ item.false_positive }}</td><td>{{ item.confirmed }}</td></tr>{% endfor %}</tbody></table></div></section>
+</main>
+</body>
+</html>
