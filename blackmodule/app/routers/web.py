@@ -30,6 +30,7 @@ from app.services.authorization_service import (
     PERMISSION_ALERTS_ASSIGN, PERMISSION_ALERTS_REASSIGN, PERMISSION_ALERTS_ESCALATE,
     PERMISSION_ALERTS_SUPERVISE,
     PERMISSION_COMPLIANCE_REPORT_VIEW,
+    PERMISSION_QUALITY_REVIEW_VIEW, PERMISSION_QUALITY_REVIEW_MANAGE,
     has_permission, permissions_for_role, refresh_session_user, role_label, session_user_payload,
 )
 from app.services.approval_service import (
@@ -91,6 +92,13 @@ from app.services.reporting_service import (
     build_management_report,
     management_export_rows,
     resolve_reporting_filters,
+)
+from app.services.quality_review_service import (
+    QualityReviewError,
+    build_quality_review_dashboard,
+    create_quality_review,
+    quality_review_export_rows,
+    resolve_quality_review_filters,
 )
 
 router = APIRouter(prefix="/web", tags=["Web Interface"])
@@ -3702,6 +3710,217 @@ def web_management_reporting_export_xlsx(
         content=content.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=reporting_management.xlsx"},
+    )
+
+
+def _quality_review_report(
+    db: Session,
+    *,
+    period: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    source: str | None,
+    analyste: str | None,
+    decision: str | None,
+    review_status: str | None,
+    sample_size: int | str | None,
+):
+    try:
+        filters = resolve_quality_review_filters(
+            period=period, date_from=date_from, date_to=date_to,
+            source=source, analyst=analyste, decision=decision,
+            review_status=review_status, sample_size=sample_size,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return build_quality_review_dashboard(db, filters)
+
+
+@router.get("/quality-review")
+def web_quality_review(
+    request: Request,
+    period: str | None = Query("30"),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    source: str | None = Query(None),
+    analyste: str | None = Query(None),
+    decision: str | None = Query(None),
+    review_status: str | None = Query(None),
+    sample_size: int | None = Query(50),
+    message: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_QUALITY_REVIEW_VIEW):
+        log_access_denied(db, request, "/web/quality-review", "Accès refusé à la revue qualité.")
+        return forbidden_page(request)
+    report = _quality_review_report(
+        db, period=period, date_from=date_from, date_to=date_to,
+        source=source, analyste=analyste, decision=decision,
+        review_status=review_status, sample_size=sample_size,
+    )
+    write_audit_log(
+        db, current_username(request), "VIEW_QUALITY_REVIEW", "AlertQualityReview", None,
+        "Consultation du contrôle qualité agrégé.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return templates.TemplateResponse(
+        request=request,
+        name="quality_review.html",
+        context={
+            "request": request, "message": message,
+            "can_review": require_permission(request, PERMISSION_QUALITY_REVIEW_MANAGE),
+            **report,
+        },
+    )
+
+
+@router.post("/quality-review/{decision_id}")
+def web_create_quality_review(
+    decision_id: UUID,
+    request: Request,
+    review_status: str = Form(...),
+    quality_comment: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_QUALITY_REVIEW_MANAGE):
+        log_access_denied(
+            db, request, f"/web/quality-review/{decision_id}",
+            "Tentative de revue qualité non autorisée.",
+        )
+        return forbidden_page(request)
+    try:
+        review = create_quality_review(
+            db,
+            decision_id=decision_id,
+            review_status=review_status,
+            quality_comment=quality_comment,
+            actor=get_current_user(request),
+        )
+    except PermissionError:
+        db.rollback()
+        log_access_denied(
+            db, request, f"/web/quality-review/{decision_id}",
+            "Auto-contrôle qualité refusé.",
+        )
+        return forbidden_page(request)
+    except QualityReviewError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    write_audit_log(
+        db, current_username(request), "QUALITY_REVIEW_RECORDED", "AlertQualityReview", str(review.id),
+        "Revue qualité enregistrée.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return RedirectResponse(
+        url="/web/quality-review?message=Revue+qualité+enregistrée",
+        status_code=303,
+    )
+
+
+def _quality_review_export(
+    request: Request,
+    db: Session,
+    *,
+    period: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    source: str | None,
+    analyste: str | None,
+    decision: str | None,
+    review_status: str | None,
+    sample_size: int | None,
+):
+    if not require_login(request):
+        return None, RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_QUALITY_REVIEW_VIEW):
+        log_access_denied(db, request, "/web/quality-review/export", "Export qualité non autorisé.")
+        return None, forbidden_page(request)
+    report = _quality_review_report(
+        db, period=period, date_from=date_from, date_to=date_to,
+        source=source, analyste=analyste, decision=decision,
+        review_status=review_status, sample_size=sample_size,
+    )
+    return report, None
+
+
+@router.get("/quality-review/export.csv")
+def web_quality_review_export_csv(
+    request: Request,
+    period: str | None = Query("30"),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    source: str | None = Query(None),
+    analyste: str | None = Query(None),
+    decision: str | None = Query(None),
+    review_status: str | None = Query(None),
+    sample_size: int | None = Query(50),
+    db: Session = Depends(get_db),
+):
+    report, denied = _quality_review_export(
+        request, db, period=period, date_from=date_from, date_to=date_to,
+        source=source, analyste=analyste, decision=decision,
+        review_status=review_status, sample_size=sample_size,
+    )
+    if denied is not None:
+        return denied
+    output = StringIO(newline="")
+    writer = csv.writer(output, delimiter=";")
+    writer.writerows(quality_review_export_rows(report))
+    write_audit_log(
+        db, current_username(request), "EXPORT_QUALITY_REVIEW_CSV", "AlertQualityReview", None,
+        "Export CSV de la revue qualité.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=revue_qualite.csv"},
+    )
+
+
+@router.get("/quality-review/export.xlsx")
+def web_quality_review_export_xlsx(
+    request: Request,
+    period: str | None = Query("30"),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    source: str | None = Query(None),
+    analyste: str | None = Query(None),
+    decision: str | None = Query(None),
+    review_status: str | None = Query(None),
+    sample_size: int | None = Query(50),
+    db: Session = Depends(get_db),
+):
+    report, denied = _quality_review_export(
+        request, db, period=period, date_from=date_from, date_to=date_to,
+        source=source, analyste=analyste, decision=decision,
+        review_status=review_status, sample_size=sample_size,
+    )
+    if denied is not None:
+        return denied
+    workbook = Workbook(write_only=True)
+    sheet = workbook.create_sheet("Revue qualité")
+    for row in quality_review_export_rows(report):
+        sheet.append(row)
+    content = BytesIO()
+    workbook.save(content)
+    write_audit_log(
+        db, current_username(request), "EXPORT_QUALITY_REVIEW_XLSX", "AlertQualityReview", None,
+        "Export XLSX de la revue qualité.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return Response(
+        content=content.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=revue_qualite.xlsx"},
     )
 
 

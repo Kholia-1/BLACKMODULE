@@ -14,6 +14,7 @@ from sqlalchemy import (
     LargeBinary,
     UniqueConstraint,
     Index,
+    event,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -309,6 +310,34 @@ class AlertAssignmentHistory(Base):
     changed_by_username = Column(String(100), nullable=False)
     reason = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class AlertQualityReview(Base):
+    """Contrôle qualité immuable d'une décision d'alerte déjà appliquée."""
+
+    __tablename__ = "alert_quality_reviews"
+    __table_args__ = (
+        Index("ix_alert_quality_decision_reviewed", "decision_history_id", "reviewed_at"),
+        Index("ix_alert_quality_reviewer_reviewed", "reviewed_by_user_id", "reviewed_at"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    alert_id = Column(UUID(as_uuid=True), ForeignKey("alerts.id"), nullable=False, index=True)
+    decision_history_id = Column(
+        UUID(as_uuid=True), ForeignKey("alert_decision_history.id"), nullable=False, index=True,
+    )
+    review_status = Column(String(30), nullable=False)
+    quality_comment = Column(Text, nullable=True)
+    reviewed_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    reviewed_by = Column(String(100), nullable=False)
+    reviewed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+@event.listens_for(AlertQualityReview, "before_update")
+@event.listens_for(AlertQualityReview, "before_delete")
+def _prevent_alert_quality_review_mutation(*_args, **_kwargs):
+    """Quality reviews are append-only in every SQLAlchemy-backed runtime."""
+    raise ValueError("Les revues qualité sont immuables.")
 
 
 class AuditLog(Base):

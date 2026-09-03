@@ -50,6 +50,28 @@ def startup():
     Base.metadata.create_all(bind=engine)
 
     with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE OR REPLACE FUNCTION prevent_alert_quality_review_mutation()
+            RETURNS trigger AS $$
+            BEGIN
+                RAISE EXCEPTION 'alert_quality_reviews is append-only';
+            END;
+            $$ LANGUAGE plpgsql
+        """))
+        conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_trigger
+                    WHERE tgname = 'trg_alert_quality_review_immutable'
+                ) THEN
+                    CREATE TRIGGER trg_alert_quality_review_immutable
+                    BEFORE UPDATE OR DELETE ON alert_quality_reviews
+                    FOR EACH ROW EXECUTE FUNCTION prevent_alert_quality_review_mutation();
+                END IF;
+            END $$
+        """))
+
         for column_def in [
             "client_nationalite VARCHAR(100)",
             "client_pays_residence VARCHAR(100)",

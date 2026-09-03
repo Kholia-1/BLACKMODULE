@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BLACKMODULE - Revue qualité</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #f8fafc; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        .header { background: #0f172a; color: white; padding: 22px 32px; }
+        .header h1 { margin: 0; font-size: 22px; }
+        .header p { margin: 6px 0 0; color: #94a3b8; font-size: 13px; }
+        .container { max-width: 1600px; margin: auto; padding: 28px 32px 42px; }
+        .page-head, .section-head, .actions { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+        .page-head { margin-bottom: 20px; }
+        h2, h3 { margin: 0; color: #0f172a; }
+        .page-head p, .section-head p { margin: 6px 0 0; color: #64748b; font-size: 13px; }
+        .btn { display: inline-flex; align-items: center; padding: 9px 13px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; color: #334155; font-size: 13px; font-weight: 650; text-decoration: none; cursor: pointer; }
+        .btn-primary { background: #b91c1c; border-color: #b91c1c; color: white; }
+        .filters, .panel, .kpi { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+        .filters { display: grid; grid-template-columns: repeat(6, minmax(130px, 1fr)); gap: 12px; align-items: end; margin-bottom: 20px; padding: 16px; }
+        .field label { display: block; margin-bottom: 6px; color: #475569; font-size: 12px; font-weight: 700; }
+        .field select, .field input, .review-form textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; background: white; color: #1e293b; }
+        .field select, .field input { height: 38px; padding: 7px 9px; }
+        .filter-actions { display: flex; gap: 8px; }
+        .kpis { display: grid; grid-template-columns: repeat(6, minmax(140px, 1fr)); gap: 12px; margin-bottom: 18px; }
+        .kpi { padding: 14px; border-left: 3px solid #64748b; }
+        .kpi.good { border-left-color: #16a34a; } .kpi.warning { border-left-color: #d97706; } .kpi.danger { border-left-color: #dc2626; }
+        .kpi span { display: block; color: #64748b; font-size: 11.5px; font-weight: 650; }
+        .kpi strong { display: block; margin-top: 6px; color: #0f172a; font-size: 23px; }
+        .panel { margin-bottom: 16px; padding: 18px; overflow: hidden; }
+        .section-head { margin-bottom: 14px; }
+        .notice { margin-bottom: 16px; padding: 11px 13px; border-left: 3px solid #16a34a; border-radius: 7px; background: #f0fdf4; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 12.5px; }
+        th { padding: 10px; text-align: left; background: #f1f5f9; color: #475569; text-transform: uppercase; font-size: 10.5px; letter-spacing: .35px; white-space: nowrap; }
+        td { padding: 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+        .badge { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #f1f5f9; color: #475569; }
+        .badge.CONFORME { background: #dcfce7; color: #166534; } .badge.NON_CONFORME { background: #fee2e2; color: #991b1b; } .badge.A_REVOIR { background: #fef3c7; color: #92400e; }
+        .review-form { display: grid; gap: 7px; min-width: 240px; }
+        .review-form select { height: 34px; border: 1px solid #cbd5e1; border-radius: 7px; padding: 5px 7px; }
+        .review-form textarea { min-height: 54px; padding: 7px; resize: vertical; }
+        details { margin-top: 7px; }
+        summary { color: #475569; cursor: pointer; font-weight: 650; }
+        .history { margin-top: 7px; display: grid; gap: 6px; }
+        .history-item { padding: 8px; border-radius: 6px; background: #f8fafc; }
+        .muted { color: #64748b; }
+        @media (max-width: 1150px) { .filters { grid-template-columns: repeat(3, 1fr); } .kpis { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 760px) { .header, .container { padding-left: 16px; padding-right: 16px; } .filters, .kpis { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 480px) { .filters, .kpis { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="header"><h1>BLACKMODULE</h1><p>Contrôle qualité des décisions conformité</p>{% include "partials/navbar.html" %}</div>
+<main class="container">
+    {% set export_query = 'period=' ~ filters.period ~ '&date_from=' ~ filters.start_date ~ '&date_to=' ~ filters.end_date ~ '&sample_size=' ~ filters.sample_size ~ ('&source=' ~ filters.source if filters.source else '') ~ ('&analyste=' ~ filters.analyst if filters.analyst else '') ~ ('&decision=' ~ filters.decision if filters.decision else '') ~ ('&review_status=' ~ filters.review_status if filters.review_status else '') %}
+    <div class="page-head"><div><h2>Revue qualité périodique</h2><p>Échantillon de décisions appliquées du {{ filters.start_date.strftime('%d/%m/%Y') }} au {{ filters.end_date.strftime('%d/%m/%Y') }}.</p></div><div class="actions"><a class="btn" href="/web/quality-review/export.csv?{{ export_query }}">CSV</a><a class="btn" href="/web/quality-review/export.xlsx?{{ export_query }}">XLSX</a></div></div>
+    {% if message %}<div class="notice" role="status">{{ message }}</div>{% endif %}
+
+    <form class="filters" method="get" action="/web/quality-review">
+        <div class="field"><label>Période</label><select name="period"><option value="7" {% if filters.period == '7' %}selected{% endif %}>7 jours</option><option value="30" {% if filters.period == '30' %}selected{% endif %}>30 jours</option><option value="custom" {% if filters.period == 'custom' %}selected{% endif %}>Personnalisée</option></select></div>
+        <div class="field"><label>Du</label><input type="date" name="date_from" value="{{ filters.start_date }}"></div>
+        <div class="field"><label>Au</label><input type="date" name="date_to" value="{{ filters.end_date }}"></div>
+        <div class="field"><label>Source</label><select name="source"><option value="">Toutes</option>{% for item in options.sources %}<option value="{{ item }}" {% if filters.source == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Analyste</label><select name="analyste"><option value="">Tous</option>{% for item in options.analysts %}<option value="{{ item }}" {% if filters.analyst == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Décision</label><select name="decision"><option value="">Toutes</option>{% for key,label in options.decisions.items() %}<option value="{{ key }}" {% if filters.decision == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Statut revue</label><select name="review_status"><option value="">Tous</option>{% for key,label in options.review_statuses.items() %}<option value="{{ key }}" {% if filters.review_status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Échantillon</label><select name="sample_size">{% for size in [25,50,100,200] %}<option value="{{ size }}" {% if filters.sample_size == size %}selected{% endif %}>{{ size }}</option>{% endfor %}</select></div>
+        <div class="filter-actions"><button class="btn btn-primary" type="submit">Appliquer</button><a class="btn" href="/web/quality-review">Réinitialiser</a></div>
+    </form>
+
+    <section class="kpis">{% for label,value,tone in [('Décisions éligibles',kpis.total,''),('À revoir',kpis.pending,'warning'),('Conformes',kpis.compliant,'good'),('Non conformes',kpis.non_compliant,'danger'),('Taux de conformité',kpis.compliance_rate ~ ' %','good'),('Taux de non-conformité',kpis.non_compliance_rate ~ ' %','danger')] %}<div class="kpi {{ tone }}"><span>{{ label }}</span><strong>{{ value }}</strong></div>{% endfor %}</section>
+
+    <section class="panel"><div class="section-head"><div><h3>Qualité par analyste</h3><p>Indicateurs calculés sur la période et les filtres sélectionnés.</p></div></div><div class="table-wrap"><table><thead><tr><th>Analyste</th><th>Décisions</th><th>À revoir</th><th>Conformes</th><th>Non conformes</th><th>Taux conformité</th><th>Taux non-conformité</th></tr></thead><tbody>{% for item in analyst_kpis %}<tr><td>{{ item.analyst }}</td><td>{{ item.total }}</td><td>{{ item.pending }}</td><td>{{ item.compliant }}</td><td>{{ item.non_compliant }}</td><td>{{ item.compliance_rate }} %</td><td>{{ item.non_compliance_rate }} %</td></tr>{% else %}<tr><td colspan="7">Aucune décision éligible.</td></tr>{% endfor %}</tbody></table></div></section>
+
+    <section class="panel"><div class="section-head"><div><h3>Échantillon des décisions traitées</h3><p>Le contrôle qualité n’altère jamais la décision métier.</p></div></div><div class="table-wrap"><table><thead><tr><th>Alerte</th><th>Source</th><th>Décision</th><th>Analyste</th><th>Décidée le</th><th>Quatre-yeux</th><th>Revue</th><th>Contrôle</th></tr></thead><tbody>
+        {% for item in items %}<tr><td><span title="{{ item.alert_id }}">{{ item.alert_id[:8] }}…</span></td><td>{{ item.source }}</td><td>{{ item.decision_label }}</td><td>{{ item.analyst }}</td><td>{{ item.decision_at.strftime('%d/%m/%Y %H:%M') if item.decision_at else '—' }}</td><td>{{ item.approval_status }}</td><td><span class="badge {{ item.review_status }}">{{ item.review_status_label }}</span>{% if item.reviewed_by %}<div class="muted">{{ item.reviewed_by }} · {{ item.reviewed_at.strftime('%d/%m/%Y %H:%M') if item.reviewed_at else '—' }}</div>{% endif %}{% if item.history %}<details><summary>Historique ({{ item.history|length }})</summary><div class="history">{% for history in item.history %}<div class="history-item"><strong>{{ history.status_label }}</strong> — {{ history.reviewed_by }} · {{ history.reviewed_at.strftime('%d/%m/%Y %H:%M') if history.reviewed_at else '—' }}{% if history.comment %}<div>{{ history.comment }}</div>{% endif %}</div>{% endfor %}</div></details>{% endif %}</td><td>{% if can_review %}<form class="review-form" method="post" action="/web/quality-review/{{ item.decision_id }}"><input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}"><select name="review_status" required><option value="A_REVOIR">À revoir</option><option value="CONFORME">Conforme</option><option value="NON_CONFORME">Non conforme</option></select><textarea name="quality_comment" maxlength="2000" placeholder="Commentaire qualité (obligatoire pour une non-conformité)"></textarea><button class="btn btn-primary" type="submit">Enregistrer</button></form>{% else %}<span class="muted">Lecture seule</span>{% endif %}</td></tr>
+        {% else %}<tr><td colspan="8">Aucune décision traitée ne correspond aux filtres.</td></tr>{% endfor %}
+    </tbody></table></div></section>
+</main>
+</body>
+</html>
