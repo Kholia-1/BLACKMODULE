@@ -1,11 +1,13 @@
+import csv
 import json
 from datetime import datetime, timedelta
+from io import StringIO
 from typing import Optional
 from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query, UploadFile, File
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
@@ -26,6 +28,7 @@ from app.services.authorization_service import (
     PERMISSION_INTERNAL_LISTS_SENSITIVE_VIEW,
     PERMISSION_ALERTS_ASSIGN, PERMISSION_ALERTS_REASSIGN, PERMISSION_ALERTS_ESCALATE,
     PERMISSION_ALERTS_SUPERVISE,
+    PERMISSION_COMPLIANCE_REPORT_VIEW,
     has_permission, permissions_for_role, refresh_session_user, role_label, session_user_payload,
 )
 from app.services.approval_service import (
@@ -82,6 +85,7 @@ from app.services.internal_list_service import (
     category_label, create_internal_entry, request_entry_change, serialize_internal_entry,
     submit_internal_entry, OP_INTERNAL_LIST_CHANGE,
 )
+from app.services.reporting_service import build_compliance_report, resolve_reporting_filters
 
 router = APIRouter(prefix="/web", tags=["Web Interface"])
 templates = Jinja2Templates(directory="app/templates")
@@ -3414,6 +3418,133 @@ def web_alert_supervision(
         request=request,
         name="alert_supervision.html",
         context={"request": request, "message": message, **dashboard},
+    )
+
+
+def _compliance_report(
+    db: Session,
+    *,
+    period: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    source: str | None,
+    statut: str | None,
+    analyste: str | None,
+):
+    try:
+        filters = resolve_reporting_filters(
+            period=period, date_from=date_from, date_to=date_to,
+            source=source, status=statut, analyst=analyste,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return build_compliance_report(db, filters)
+
+
+@router.get("/compliance-reporting")
+def web_compliance_reporting(
+    request: Request,
+    period: str | None = Query("30"),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    source: str | None = Query(None),
+    statut: str | None = Query(None),
+    analyste: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_COMPLIANCE_REPORT_VIEW):
+        log_access_denied(
+            db, request, "/web/compliance-reporting",
+            "Accès refusé au reporting conformité.",
+        )
+        return forbidden_page(request)
+    report = _compliance_report(
+        db, period=period, date_from=date_from, date_to=date_to,
+        source=source, statut=statut, analyste=analyste,
+    )
+    write_audit_log(
+        db, current_username(request), "VIEW_COMPLIANCE_REPORT", "ComplianceReport", None,
+        "Consultation du reporting conformité agrégé.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return templates.TemplateResponse(
+        request=request,
+        name="compliance_reporting.html",
+        context={"request": request, **report},
+    )
+
+
+@router.get("/compliance-reporting/export.csv")
+def web_compliance_reporting_export(
+    request: Request,
+    period: str | None = Query("30"),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    source: str | None = Query(None),
+    statut: str | None = Query(None),
+    analyste: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_COMPLIANCE_REPORT_VIEW):
+        log_access_denied(
+            db, request, "/web/compliance-reporting/export.csv",
+            "Export reporting conformité non autorisé.",
+        )
+        return forbidden_page(request)
+    report = _compliance_report(
+        db, period=period, date_from=date_from, date_to=date_to,
+        source=source, statut=statut, analyste=analyste,
+    )
+    output = StringIO(newline="")
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["Reporting conformité BLACKMODULE"])
+    writer.writerow(["Période", report["filters"].start_date, report["filters"].end_date])
+    writer.writerow([])
+    writer.writerow(["Indicateur", "Valeur"])
+    for key, label in (
+        ("total", "Total alertes"), ("generated", "Générées"),
+        ("in_progress", "En cours"), ("confirmed", "Confirmées"),
+        ("false_positive", "Faux positifs"), ("closed", "Clôturées"),
+        ("critical", "Critiques"), ("unassigned", "Non assignées"),
+        ("escalated", "Escaladées"), ("within_sla", "Dans SLA"),
+        ("near_sla", "Proches SLA"), ("out_sla", "Hors SLA"),
+        ("inactive", "Sans activité"),
+    ):
+        writer.writerow([label, report["kpis"][key]])
+    writer.writerow(["Délai moyen (heures)", report["performance"]["average_hours"]])
+    writer.writerow(["Délai médian (heures)", report["performance"]["median_hours"]])
+    writer.writerow(["Volume clôturé sur la période", report["performance"]["closed_volume"]])
+    writer.writerow(["Taux faux positifs (%)", report["performance"]["false_positive_rate"]])
+    writer.writerow(["Taux confirmation (%)", report["performance"]["confirmation_rate"]])
+    writer.writerow([])
+    writer.writerow(["Analyste", "Identifiant", "Dossiers actifs", "Hors SLA", "Clôturés", "Délai moyen (h)"])
+    for analyst in report["analysts"]:
+        writer.writerow([
+            analyst["full_name"], analyst["username"], analyst["active"],
+            analyst["out_sla"], analyst["closed"], analyst["average_hours"],
+        ])
+    writer.writerow([])
+    writer.writerow(["Date", "Créées", "Clôturées", "Faux positifs", "Confirmées"])
+    for item in report["trends"]:
+        writer.writerow([
+            item["date"], item["created"], item["closed"],
+            item["false_positive"], item["confirmed"],
+        ])
+    write_audit_log(
+        db, current_username(request), "EXPORT_COMPLIANCE_REPORT", "ComplianceReport", None,
+        "Export CSV du reporting conformité agrégé.",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=reporting_conformite.csv"},
     )
 
 

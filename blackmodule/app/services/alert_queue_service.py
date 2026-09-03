@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import case, func
+from sqlalchemy import and_, case, func, not_, or_
 from sqlalchemy.orm import Query, Session
 
 from app.config import ALERT_INACTIVITY_HOURS, ALERT_SLA_HOURS, ALERT_SLA_NEAR_RATIO
@@ -79,6 +79,46 @@ def calculate_alert_sla(alert: Alert, *, now: datetime | None = None) -> dict:
         "sla_hours": sla_hours,
         "sla_deadline": deadline,
         "sla_status": status,
+    }
+
+
+def sla_sql_conditions(*, now: datetime | None = None) -> dict[str, object]:
+    """SQL predicates equivalent to ``calculate_alert_sla`` for reporting."""
+    current_time = _naive_utc(now or datetime.utcnow())
+    active = or_(Alert.statut.is_(None), ~Alert.statut.in_(TERMINAL_ALERT_STATUSES))
+    known_levels = tuple(ALERT_SLA_HOURS)
+    fallback_level = or_(
+        Alert.niveau_alerte.is_(None),
+        ~Alert.niveau_alerte.in_(known_levels),
+    )
+    out_parts = []
+    near_parts = []
+    for level, hours in ALERT_SLA_HOURS.items():
+        out_cutoff = current_time - timedelta(hours=hours)
+        near_cutoff = current_time - timedelta(hours=hours * ALERT_SLA_NEAR_RATIO)
+        out_parts.append(and_(Alert.niveau_alerte == level, Alert.created_at <= out_cutoff))
+        near_parts.append(and_(
+            Alert.niveau_alerte == level,
+            Alert.created_at > out_cutoff,
+            Alert.created_at <= near_cutoff,
+        ))
+    fallback_hours = ALERT_SLA_HOURS["ALERTE_POSSIBLE"]
+    fallback_out = current_time - timedelta(hours=fallback_hours)
+    fallback_near = current_time - timedelta(hours=fallback_hours * ALERT_SLA_NEAR_RATIO)
+    out_parts.append(and_(fallback_level, Alert.created_at <= fallback_out))
+    near_parts.append(and_(
+        fallback_level,
+        Alert.created_at > fallback_out,
+        Alert.created_at <= fallback_near,
+    ))
+    out_sla = and_(active, or_(*out_parts))
+    near_sla = and_(active, or_(*near_parts))
+    within_sla = and_(active, not_(or_(out_sla, near_sla)))
+    return {
+        "active": active,
+        SLA_OK: within_sla,
+        SLA_NEAR: near_sla,
+        SLA_BREACHED: out_sla,
     }
 
 

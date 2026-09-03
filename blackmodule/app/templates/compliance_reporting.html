@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BLACKMODULE - Reporting conformité</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #f8fafc; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        .header { background: #0f172a; color: white; padding: 22px 32px; }
+        .header h1 { margin: 0; font-size: 22px; }
+        .header p { margin: 6px 0 0; color: #94a3b8; font-size: 13px; }
+        .container { padding: 28px 32px 42px; max-width: 1600px; margin: auto; }
+        .page-head, .section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+        .page-head { margin-bottom: 20px; }
+        .page-head h2, .section-head h3 { margin: 0; color: #0f172a; }
+        .page-head p, .section-head p { margin: 6px 0 0; color: #64748b; font-size: 13px; }
+        .btn { display: inline-flex; align-items: center; border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px 13px; background: white; color: #334155; font-size: 13px; font-weight: 650; text-decoration: none; cursor: pointer; }
+        .btn-primary { background: #b91c1c; border-color: #b91c1c; color: white; }
+        .filters, .panel { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+        .filters { padding: 16px; display: grid; grid-template-columns: repeat(6, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; align-items: end; }
+        .field label { display: block; margin-bottom: 6px; color: #475569; font-size: 12px; font-weight: 700; }
+        .field select, .field input { width: 100%; height: 38px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 9px; background: white; color: #1e293b; }
+        .filter-actions { display: flex; gap: 8px; }
+        .kpis { display: grid; grid-template-columns: repeat(6, minmax(125px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .kpi { background: white; border: 1px solid #e2e8f0; border-left: 3px solid #64748b; border-radius: 10px; padding: 14px; }
+        .kpi.danger { border-left-color: #dc2626; } .kpi.warning { border-left-color: #d97706; } .kpi.good { border-left-color: #16a34a; }
+        .kpi span { display: block; color: #64748b; font-size: 11.5px; font-weight: 650; }
+        .kpi strong { display: block; margin-top: 6px; color: #0f172a; font-size: 23px; }
+        .layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+        .panel { padding: 18px; overflow: hidden; }
+        .section-head { margin-bottom: 14px; }
+        .performance { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+        .metric { padding: 13px; background: #f8fafc; border-radius: 9px; }
+        .metric span { display: block; color: #64748b; font-size: 11.5px; }
+        .metric strong { display: block; margin-top: 5px; font-size: 18px; color: #0f172a; }
+        .bar-list { display: grid; gap: 10px; }
+        .bar-row { display: grid; grid-template-columns: minmax(110px, 1.2fr) 3fr 55px; align-items: center; gap: 10px; font-size: 12.5px; }
+        .bar-track { height: 8px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+        .bar-fill { display: block; height: 100%; background: #b91c1c; border-radius: inherit; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 12.5px; }
+        th { padding: 10px; text-align: left; background: #f1f5f9; color: #475569; text-transform: uppercase; font-size: 10.5px; letter-spacing: .35px; white-space: nowrap; }
+        td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+        .muted { color: #64748b; }
+        @media (max-width: 1150px) { .filters { grid-template-columns: repeat(3, 1fr); } .kpis { grid-template-columns: repeat(4, 1fr); } .performance { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 760px) { .header, .container { padding-left: 16px; padding-right: 16px; } .filters, .kpis, .layout, .performance { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 480px) { .filters, .kpis, .layout, .performance { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="header"><h1>BLACKMODULE</h1><p>Pilotage et reporting conformité</p>{% include "partials/navbar.html" %}</div>
+<main class="container">
+    <div class="page-head">
+        <div><h2>Dashboard conformité</h2><p>Données agrégées du {{ filters.start_date.strftime('%d/%m/%Y') }} au {{ filters.end_date.strftime('%d/%m/%Y') }}.</p></div>
+        <a class="btn" href="/web/compliance-reporting/export.csv?period={{ filters.period }}&date_from={{ filters.start_date }}&date_to={{ filters.end_date }}{% if filters.source %}&source={{ filters.source }}{% endif %}{% if filters.status %}&statut={{ filters.status }}{% endif %}{% if filters.analyst_id %}&analyste={{ filters.analyst_id }}{% endif %}">Exporter CSV</a>
+    </div>
+
+    <form class="filters" method="get" action="/web/compliance-reporting">
+        <div class="field"><label>Période</label><select name="period"><option value="7" {% if filters.period == '7' %}selected{% endif %}>7 jours</option><option value="30" {% if filters.period == '30' %}selected{% endif %}>30 jours</option><option value="custom" {% if filters.period == 'custom' %}selected{% endif %}>Personnalisée</option></select></div>
+        <div class="field"><label>Du</label><input type="date" name="date_from" value="{{ filters.start_date }}"></div>
+        <div class="field"><label>Au</label><input type="date" name="date_to" value="{{ filters.end_date }}"></div>
+        <div class="field"><label>Source</label><select name="source"><option value="">Toutes</option>{% for item in options.sources %}<option value="{{ item }}" {% if filters.source == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Statut</label><select name="statut"><option value="">Tous</option>{% for item in options.statuses %}<option value="{{ item }}" {% if filters.status == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Analyste</label><select name="analyste"><option value="">Tous</option>{% for item in options.analysts %}<option value="{{ item.id }}" {% if filters.analyst_id|string == item.id %}selected{% endif %}>{{ item.full_name }} ({{ item.username }})</option>{% endfor %}</select></div>
+        <div class="filter-actions"><button class="btn btn-primary" type="submit">Appliquer</button><a class="btn" href="/web/compliance-reporting">Réinitialiser</a></div>
+    </form>
+
+    <section class="kpis" aria-label="Indicateurs conformité">
+        {% for label, value, tone in [
+            ('Total alertes', kpis.total, ''), ('Générées', kpis.generated, ''), ('En cours', kpis.in_progress, ''),
+            ('Confirmées', kpis.confirmed, 'danger'), ('Faux positifs', kpis.false_positive, 'good'), ('Clôturées', kpis.closed, 'good'),
+            ('Critiques', kpis.critical, 'danger'), ('Non assignées', kpis.unassigned, 'warning'), ('Escaladées', kpis.escalated, 'warning'),
+            ('Dans SLA', kpis.within_sla, 'good'), ('Proches SLA', kpis.near_sla, 'warning'), ('Hors SLA', kpis.out_sla, 'danger')
+        ] %}<div class="kpi {{ tone }}"><span>{{ label }}</span><strong>{{ value }}</strong></div>{% endfor %}
+    </section>
+
+    <section class="panel" style="margin-bottom:16px">
+        <div class="section-head"><div><h3>Performance de traitement</h3><p>Calculée sur les décisions appliquées pendant la période.</p></div></div>
+        <div class="performance">
+            <div class="metric"><span>Délai moyen</span><strong>{{ performance.average_hours }} h</strong></div>
+            <div class="metric"><span>Délai médian</span><strong>{{ performance.median_hours }} h</strong></div>
+            <div class="metric"><span>Volume clôturé</span><strong>{{ performance.closed_volume }}</strong></div>
+            <div class="metric"><span>Taux faux positifs</span><strong>{{ performance.false_positive_rate }} %</strong></div>
+            <div class="metric"><span>Taux confirmation</span><strong>{{ performance.confirmation_rate }} %</strong></div>
+            <div class="metric"><span>Sans activité ≥ {{ inactivity_hours|int }} h</span><strong>{{ kpis.inactive }}</strong></div>
+        </div>
+    </section>
+
+    <div class="layout">
+        {% for title, rows in [('Répartition par source', distributions.sources), ('Répartition par statut', distributions.statuses), ('Par niveau d’alerte', distributions.levels), ('Par type de matching', distributions.matching_types)] %}
+        <section class="panel"><div class="section-head"><h3>{{ title }}</h3></div><div class="bar-list">
+            {% for item in rows %}<div class="bar-row"><span>{{ item.label }}</span><div class="bar-track"><span class="bar-fill" style="width:{{ item.percent }}%"></span></div><strong>{{ item.count }}</strong></div>{% else %}<span class="muted">Aucune donnée.</span>{% endfor %}
+        </div></section>
+        {% endfor %}
+    </div>
+
+    <section class="panel" style="margin-bottom:16px">
+        <div class="section-head"><div><h3>Supervision des analystes</h3><p>Volumes agrégés uniquement, sans donnée client ni commentaire métier.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Analyste</th><th>Dossiers actifs</th><th>Hors SLA</th><th>Clôturés</th><th>Délai moyen</th></tr></thead><tbody>
+            {% for item in analysts %}<tr><td><strong>{{ item.full_name }}</strong><div class="muted">{{ item.username }}</div></td><td>{{ item.active }}</td><td>{{ item.out_sla }}</td><td>{{ item.closed }}</td><td>{{ item.average_hours }} h</td></tr>{% else %}<tr><td colspan="5">Aucun analyste.</td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+
+    <section class="panel">
+        <div class="section-head"><div><h3>Tendances temporelles</h3><p>Créations et décisions appliquées.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Date</th><th>Créées</th><th>Clôturées</th><th>Faux positifs</th><th>Confirmées</th></tr></thead><tbody>
+            {% for item in trends %}<tr><td>{{ item.date }}</td><td>{{ item.created }}</td><td>{{ item.closed }}</td><td>{{ item.false_positive }}</td><td>{{ item.confirmed }}</td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+</main>
+</body>
+</html>
