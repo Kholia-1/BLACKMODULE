@@ -108,6 +108,24 @@ def startup():
                 END IF;
             END $$
         """))
+        conn.execute(text("""
+            CREATE OR REPLACE FUNCTION prevent_external_notification_attempt_mutation()
+            RETURNS trigger AS $$
+            BEGIN
+                RAISE EXCEPTION 'external_notification_attempts is append-only';
+            END;
+            $$ LANGUAGE plpgsql
+        """))
+        conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_external_notification_attempt_immutable') THEN
+                    CREATE TRIGGER trg_external_notification_attempt_immutable
+                    BEFORE UPDATE OR DELETE ON external_notification_attempts
+                    FOR EACH ROW EXECUTE FUNCTION prevent_external_notification_attempt_mutation();
+                END IF;
+            END $$
+        """))
 
         for column_def in [
             "client_nationalite VARCHAR(100)",

@@ -75,6 +75,15 @@ def _create_notification(
         # Another scheduler instance has already delivered this event.
         return None
     _history(db, notification, NOTIFICATION_EVENT_CREATED, "SYSTEM")
+    # LOT 7B is deliberately optional: a disabled or misconfigured external
+    # channel must never prevent the durable in-app notification from existing.
+    try:
+        from app.services.external_notification_service import queue_email_notification
+        queue_email_notification(db, notification)
+    except Exception:
+        # Delivery supervision records safe failures where possible; do not
+        # leak SMTP details or make the parent notification workflow fail.
+        pass
     return notification
 
 

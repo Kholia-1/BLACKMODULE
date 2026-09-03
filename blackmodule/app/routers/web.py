@@ -30,6 +30,7 @@ from app.services.authorization_service import (
     PERMISSION_ALERTS_ASSIGN, PERMISSION_ALERTS_REASSIGN, PERMISSION_ALERTS_ESCALATE,
     PERMISSION_ALERTS_SUPERVISE,
     PERMISSION_NOTIFICATIONS_VIEW,
+    PERMISSION_NOTIFICATION_DELIVERY_VIEW,
     PERMISSION_COMPLIANCE_REPORT_VIEW,
     PERMISSION_QUALITY_REVIEW_VIEW, PERMISSION_QUALITY_REVIEW_MANAGE,
     PERMISSION_CORRECTIVE_ACTIONS_VIEW, PERMISSION_CORRECTIVE_ACTIONS_MANAGE,
@@ -111,6 +112,7 @@ from app.services.corrective_action_service import (
     update_corrective_action,
 )
 from app.services.notification_service import NotificationError, mark_notification_read, notification_center
+from app.services.external_notification_service import external_delivery_dashboard
 
 router = APIRouter(prefix="/web", tags=["Web Interface"])
 templates = Jinja2Templates(directory="app/templates")
@@ -3997,6 +3999,22 @@ def web_mark_notification_read(notification_id: UUID, request: Request, db: Sess
                     "Notification marquée comme lue.", request.client.host if request.client else None)
     db.commit()
     return RedirectResponse(url="/web/notifications", status_code=303)
+
+
+@router.get("/notification-deliveries")
+def web_notification_deliveries(request: Request, db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_NOTIFICATION_DELIVERY_VIEW):
+        log_access_denied(db, request, "/web/notification-deliveries", "Accès refusé à la supervision des envois.")
+        return forbidden_page(request)
+    report = external_delivery_dashboard(db)
+    write_audit_log(db, current_username(request), "VIEW_NOTIFICATION_DELIVERIES", "ExternalNotificationDelivery", None,
+                    "Consultation de la supervision des envois.", request.client.host if request.client else None)
+    db.commit()
+    return templates.TemplateResponse(request=request, name="notification_deliveries.html", context={
+        "request": request, "user": get_current_user(request), **report,
+    })
 
 
 @router.post("/corrective-actions")

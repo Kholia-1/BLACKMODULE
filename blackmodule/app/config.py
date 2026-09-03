@@ -70,3 +70,21 @@ CORRECTIVE_ACTION_DUE_SOON_HOURS = float(
 )
 if CORRECTIVE_ACTION_DUE_SOON_HOURS <= 0:
     raise ValueError("CORRECTIVE_ACTION_DUE_SOON_HOURS doit être strictement positif.")
+
+# Canal externe facultatif : il reste désactivé tant que l'environnement ne
+# l'active pas explicitement. Aucun secret SMTP n'est stocké dans le code.
+EMAIL_NOTIFICATIONS_ENABLED = os.getenv("EMAIL_NOTIFICATIONS_ENABLED", "false").lower() == "true"
+EMAIL_SMTP_HOST = os.getenv("EMAIL_SMTP_HOST")
+EMAIL_SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT", "587"))
+EMAIL_SMTP_USERNAME = os.getenv("EMAIL_SMTP_USERNAME")
+EMAIL_SMTP_PASSWORD = os.getenv("EMAIL_SMTP_PASSWORD")
+EMAIL_SMTP_FROM = os.getenv("EMAIL_SMTP_FROM")
+EMAIL_SMTP_STARTTLS = os.getenv("EMAIL_SMTP_STARTTLS", "true").lower() == "true"
+EMAIL_NOTIFICATION_MAX_ATTEMPTS = int(os.getenv("EMAIL_NOTIFICATION_MAX_ATTEMPTS", "3"))
+EMAIL_NOTIFICATION_RETRY_MINUTES = int(os.getenv("EMAIL_NOTIFICATION_RETRY_MINUTES", "15"))
+if EMAIL_SMTP_PORT <= 0:
+    raise ValueError("EMAIL_SMTP_PORT doit être strictement positif.")
+if EMAIL_NOTIFICATION_MAX_ATTEMPTS <= 0:
+    raise ValueError("EMAIL_NOTIFICATION_MAX_ATTEMPTS doit être strictement positif.")
+if EMAIL_NOTIFICATION_RETRY_MINUTES <= 0:
+    raise ValueError("EMAIL_NOTIFICATION_RETRY_MINUTES doit être strictement positif.")

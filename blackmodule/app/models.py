@@ -433,6 +433,73 @@ def _prevent_user_notification_history_mutation(*_args, **_kwargs):
     raise ValueError("L'historique des notifications est immuable.")
 
 
+class NotificationTemplate(Base):
+    """Configurable presentation model for an external notification channel."""
+
+    __tablename__ = "notification_templates"
+    __table_args__ = (
+        UniqueConstraint("template_key", "channel", name="uq_notification_templates_key_channel"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    template_key = Column(String(80), nullable=False, index=True)
+    channel = Column(String(30), nullable=False, default="EMAIL")
+    subject_template = Column(String(300), nullable=False)
+    body_template = Column(Text, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ExternalNotificationDelivery(Base):
+    """Durable outbox entry; e-mail addresses are never copied to audit logs."""
+
+    __tablename__ = "external_notification_deliveries"
+    __table_args__ = (
+        UniqueConstraint("user_notification_id", "channel", name="uq_external_delivery_notification_channel"),
+        Index("ix_external_delivery_status_next_attempt", "status", "next_attempt_at"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_notification_id = Column(UUID(as_uuid=True), ForeignKey("user_notifications.id"), nullable=False, index=True)
+    channel = Column(String(30), nullable=False, default="EMAIL")
+    recipient_username = Column(String(100), nullable=False)
+    recipient_email = Column(String(150), nullable=True)
+    template_key = Column(String(80), nullable=False)
+    subject = Column(String(300), nullable=False)
+    body = Column(Text, nullable=False)
+    status = Column(String(30), nullable=False, default="EN_ATTENTE")
+    attempt_count = Column(Integer, nullable=False, default=0)
+    max_attempts = Column(Integer, nullable=False, default=3)
+    next_attempt_at = Column(DateTime, nullable=True)
+    sent_at = Column(DateTime, nullable=True)
+    last_error_code = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ExternalNotificationAttempt(Base):
+    """Immutable, safe attempt history for external delivery supervision."""
+
+    __tablename__ = "external_notification_attempts"
+    __table_args__ = (
+        Index("ix_external_notification_attempt_delivery_created", "delivery_id", "created_at"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    delivery_id = Column(UUID(as_uuid=True), ForeignKey("external_notification_deliveries.id"), nullable=False, index=True)
+    attempt_number = Column(Integer, nullable=False)
+    status = Column(String(30), nullable=False)
+    error_code = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+@event.listens_for(ExternalNotificationAttempt, "before_update")
+@event.listens_for(ExternalNotificationAttempt, "before_delete")
+def _prevent_external_notification_attempt_mutation(*_args, **_kwargs):
+    raise ValueError("L'historique des envois externes est immuable.")
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

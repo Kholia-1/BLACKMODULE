@@ -14,6 +14,7 @@ from app.services.list_update_service import (
     OFFICIAL_SOURCES,
 )
 from app.services.notification_service import dispatch_corrective_action_notifications
+from app.services.external_notification_service import process_pending_email_deliveries
 
 
 scheduler = BackgroundScheduler()
@@ -148,6 +149,24 @@ def run_corrective_action_notification_check():
         db.close()
 
 
+def run_external_notification_delivery():
+    """Process the optional durable e-mail outbox without affecting in-app flow."""
+    db = SessionLocal()
+    try:
+        result = process_pending_email_deliveries(db)
+        db.commit()
+        if result["enabled"]:
+            print(
+                "[BLACKMODULE] Envois e-mail: "
+                f"{result['sent']} envoyé(s), {result['failed']} échec(s)."
+            )
+    except Exception as error:
+        db.rollback()
+        print(f"[BLACKMODULE] Erreur envois e-mail: {type(error).__name__}")
+    finally:
+        db.close()
+
+
 def start_scheduler():
     if scheduler.running:
         return
@@ -229,6 +248,14 @@ def start_scheduler():
         trigger="cron",
         minute=10,
         id="corrective_action_notifications",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        run_external_notification_delivery,
+        trigger="cron",
+        minute="*/5",
+        id="external_notification_delivery",
         replace_existing=True,
     )
 

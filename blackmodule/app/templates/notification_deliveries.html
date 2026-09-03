@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Supervision des envois | BLACKMODULE</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .delivery-kpis { display:flex; flex-wrap:wrap; gap:14px; margin:18px 0; }
+        .delivery-kpi { min-width:150px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px 18px; }
+        .delivery-kpi strong { display:block; font-size:24px; color:#334155; }
+        .delivery-kpi.failed strong { color:#b91c1c; }.delivery-kpi.sent strong { color:#15803d; }
+        .channel-state { border-radius:8px; padding:10px 14px; margin:14px 0; font-weight:600; }
+        .channel-state.enabled { background:#dcfce7; color:#166534; }.channel-state.disabled { background:#f1f5f9; color:#475569; }
+        .attempt { color:#64748b; font-size:12px; margin:3px 0; }
+    </style>
+</head>
+<body>
+    <div class="header"><h1>BLACKMODULE</h1>{% include "partials/navbar.html" %}</div>
+    <main class="container">
+        <h2>Supervision des envois e-mail</h2>
+        <p class="muted">File persistante des notifications externes. Les adresses e-mail ne sont pas affichées.</p>
+        <div class="channel-state {% if enabled %}enabled{% else %}disabled{% endif %}">
+            Canal e-mail : {% if enabled %}activé{% else %}désactivé{% endif %}
+        </div>
+        <section class="delivery-kpis">
+            <div class="delivery-kpi"><span>En attente</span><strong>{{ kpis.pending }}</strong></div>
+            <div class="delivery-kpi sent"><span>Envoyés</span><strong>{{ kpis.sent }}</strong></div>
+            <div class="delivery-kpi failed"><span>En échec</span><strong>{{ kpis.failed }}</strong></div>
+        </section>
+        <section class="panel">
+            <table class="table"><thead><tr><th>Destinataire</th><th>Modèle</th><th>Statut</th><th>Tentatives</th><th>Créée le</th><th>Historique</th></tr></thead><tbody>
+                {% for delivery in deliveries %}<tr>
+                    <td>{{ delivery.recipient_username }}</td><td>{{ delivery.template_key }}</td><td><span class="badge">{{ delivery.status }}</span></td>
+                    <td>{{ delivery.attempt_count }} / {{ delivery.max_attempts }}</td>
+                    <td>{{ delivery.created_at.strftime('%d/%m/%Y %H:%M') if delivery.created_at else '—' }}</td>
+                    <td>{% for attempt in delivery.history %}<div class="attempt">{{ attempt.created_at.strftime('%d/%m/%Y %H:%M') if attempt.created_at else '—' }} — {{ attempt.status }}{% if attempt.error_code %} ({{ attempt.error_code }}){% endif %}</div>{% endfor %}</td>
+                </tr>{% else %}<tr><td colspan="6">Aucun envoi e-mail en file.</td></tr>{% endfor %}
+            </tbody></table>
+        </section>
+    </main>
+</body>
+</html>
