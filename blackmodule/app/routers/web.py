@@ -1,6 +1,6 @@
 import csv
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from io import BytesIO, StringIO
 from typing import Optional
 from urllib.parse import urlencode
@@ -31,6 +31,8 @@ from app.services.authorization_service import (
     PERMISSION_ALERTS_SUPERVISE,
     PERMISSION_COMPLIANCE_REPORT_VIEW,
     PERMISSION_QUALITY_REVIEW_VIEW, PERMISSION_QUALITY_REVIEW_MANAGE,
+    PERMISSION_CORRECTIVE_ACTIONS_VIEW, PERMISSION_CORRECTIVE_ACTIONS_MANAGE,
+    PERMISSION_CORRECTIVE_ACTIONS_UPDATE_ASSIGNED,
     has_permission, permissions_for_role, refresh_session_user, role_label, session_user_payload,
 )
 from app.services.approval_service import (
@@ -99,6 +101,13 @@ from app.services.quality_review_service import (
     create_quality_review,
     quality_review_export_rows,
     resolve_quality_review_filters,
+)
+from app.services.corrective_action_service import (
+    ACTION_STATUS_LABELS,
+    CorrectiveActionError,
+    corrective_action_dashboard,
+    create_corrective_action,
+    update_corrective_action,
 )
 
 router = APIRouter(prefix="/web", tags=["Web Interface"])
@@ -3922,6 +3931,78 @@ def web_quality_review_export_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=revue_qualite.xlsx"},
     )
+
+
+@router.get("/corrective-actions")
+def web_corrective_actions(request: Request, message: str | None = Query(None), db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_CORRECTIVE_ACTIONS_VIEW):
+        log_access_denied(db, request, "/web/corrective-actions", "Accès refusé aux actions correctives.")
+        return forbidden_page(request)
+    current_user = get_current_user(request)
+    report = corrective_action_dashboard(
+        db,
+        responsible_user_id=None if require_permission(request, PERMISSION_CORRECTIVE_ACTIONS_MANAGE) else current_user.get("id"),
+    )
+    write_audit_log(db, current_username(request), "VIEW_CORRECTIVE_ACTIONS", "CorrectiveAction", None,
+                    "Consultation des actions correctives.", request.client.host if request.client else None)
+    db.commit()
+    return templates.TemplateResponse(request=request, name="corrective_actions.html", context={
+        "request": request, "user": current_user, "message": message, "status_labels": ACTION_STATUS_LABELS,
+        "can_manage": require_permission(request, PERMISSION_CORRECTIVE_ACTIONS_MANAGE),
+        "can_update_assigned": require_permission(request, PERMISSION_CORRECTIVE_ACTIONS_UPDATE_ASSIGNED),
+        **report,
+    })
+
+
+@router.post("/corrective-actions")
+def web_create_corrective_action(
+    request: Request, quality_review_id: UUID = Form(...), responsible_user_id: UUID = Form(...),
+    due_date: date = Form(...), priority: str = Form(...), comment: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not require_permission(request, PERMISSION_CORRECTIVE_ACTIONS_MANAGE):
+        log_access_denied(db, request, "/web/corrective-actions", "Création d'action corrective non autorisée.")
+        return forbidden_page(request)
+    try:
+        action = create_corrective_action(db, quality_review_id=quality_review_id, responsible_user_id=responsible_user_id,
+                                          due_date=due_date, priority=priority, comment=comment,
+                                          actor=get_current_user(request))
+    except CorrectiveActionError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    write_audit_log(db, current_username(request), "CORRECTIVE_ACTION_CREATED", "CorrectiveAction", str(action.id),
+                    "Action corrective créée.", request.client.host if request.client else None)
+    db.commit()
+    return RedirectResponse(url="/web/corrective-actions?message=Action+corrective+créée", status_code=303)
+
+
+@router.post("/corrective-actions/{action_id}")
+def web_update_corrective_action(
+    action_id: UUID, request: Request, status: str = Form(...), comment: str | None = Form(None),
+    responsible_user_id: UUID | None = Form(None), db: Session = Depends(get_db),
+):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+    if not (require_permission(request, PERMISSION_CORRECTIVE_ACTIONS_MANAGE) or require_permission(request, PERMISSION_CORRECTIVE_ACTIONS_UPDATE_ASSIGNED)):
+        log_access_denied(db, request, f"/web/corrective-actions/{action_id}", "Modification d'action corrective non autorisée.")
+        return forbidden_page(request)
+    try:
+        action = update_corrective_action(db, action_id=action_id, status=status, comment=comment,
+                                          responsible_user_id=responsible_user_id, actor=get_current_user(request))
+    except PermissionError:
+        db.rollback()
+        return forbidden_page(request)
+    except CorrectiveActionError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    write_audit_log(db, current_username(request), "CORRECTIVE_ACTION_UPDATED", "CorrectiveAction", str(action.id),
+                    "Action corrective mise à jour.", request.client.host if request.client else None)
+    db.commit()
+    return RedirectResponse(url="/web/corrective-actions?message=Action+corrective+mise+à+jour", status_code=303)
 
 
 @router.post("/approvals/{approval_id}/review")

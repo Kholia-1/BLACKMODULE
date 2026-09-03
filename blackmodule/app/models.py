@@ -340,6 +340,55 @@ def _prevent_alert_quality_review_mutation(*_args, **_kwargs):
     raise ValueError("Les revues qualité sont immuables.")
 
 
+class CorrectiveAction(Base):
+    """Action corrective issue from a quality review."""
+
+    __tablename__ = "corrective_actions"
+    __table_args__ = (
+        Index("ix_corrective_actions_status_due", "status", "due_date"),
+        Index("ix_corrective_actions_responsible_status", "responsible_user_id", "status"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    quality_review_id = Column(UUID(as_uuid=True), ForeignKey("alert_quality_reviews.id"), nullable=False, index=True)
+    alert_id = Column(UUID(as_uuid=True), ForeignKey("alerts.id"), nullable=False, index=True)
+    responsible_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    responsible_username = Column(String(100), nullable=False)
+    due_date = Column(Date, nullable=False)
+    priority = Column(String(20), nullable=False, default="MOYENNE")
+    status = Column(String(20), nullable=False, default="OUVERT")
+    comment = Column(Text, nullable=True)
+    created_by = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    closed_at = Column(DateTime, nullable=True)
+
+
+class CorrectiveActionHistory(Base):
+    """Immutable operational history of a corrective action."""
+
+    __tablename__ = "corrective_action_history"
+    __table_args__ = (
+        Index("ix_corrective_action_history_action_created", "corrective_action_id", "created_at"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    corrective_action_id = Column(UUID(as_uuid=True), ForeignKey("corrective_actions.id"), nullable=False, index=True)
+    old_status = Column(String(20), nullable=True)
+    new_status = Column(String(20), nullable=False)
+    old_responsible = Column(String(100), nullable=True)
+    new_responsible = Column(String(100), nullable=True)
+    changed_by = Column(String(100), nullable=False)
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+@event.listens_for(CorrectiveActionHistory, "before_update")
+@event.listens_for(CorrectiveActionHistory, "before_delete")
+def _prevent_corrective_action_history_mutation(*_args, **_kwargs):
+    raise ValueError("L'historique des actions correctives est immuable.")
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

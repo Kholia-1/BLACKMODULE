@@ -71,6 +71,24 @@ def startup():
                 END IF;
             END $$
         """))
+        conn.execute(text("""
+            CREATE OR REPLACE FUNCTION prevent_corrective_action_history_mutation()
+            RETURNS trigger AS $$
+            BEGIN
+                RAISE EXCEPTION 'corrective_action_history is append-only';
+            END;
+            $$ LANGUAGE plpgsql
+        """))
+        conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_corrective_action_history_immutable') THEN
+                    CREATE TRIGGER trg_corrective_action_history_immutable
+                    BEFORE UPDATE OR DELETE ON corrective_action_history
+                    FOR EACH ROW EXECUTE FUNCTION prevent_corrective_action_history_mutation();
+                END IF;
+            END $$
+        """))
 
         for column_def in [
             "client_nationalite VARCHAR(100)",
