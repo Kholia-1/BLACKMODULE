@@ -55,6 +55,24 @@ services:
     ports:
       - "127.0.0.1:10000:10000"
 
+  migrate:
+    build: .
+    profiles: ["database-migration"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      BLACKMODULE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER doit etre defini}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit etre defini}@db:5432/${POSTGRES_DB:?POSTGRES_DB doit etre defini}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY doit etre defini}
+      BLACKMODULE_API_KEY: ${BLACKMODULE_API_KEY:?BLACKMODULE_API_KEY doit etre defini}
+    entrypoint: ["alembic", "-c", "/code/alembic.ini"]
+    command: ["upgrade", "head"]
+    restart: "no"
+    cpus: "1.0"
+    mem_limit: 1g
+    pids_limit: 128
+
   db-tools:
     image: postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
     profiles: ["database-tools"]

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.config import INITIAL_ADMIN_PASSWORD, SECRET_KEY, SESSION_HTTPS_ONLY
+from app.config import INITIAL_ADMIN_PASSWORD, IS_PRODUCTION, SECRET_KEY, SESSION_HTTPS_ONLY
 from app.database import Base, engine, get_db, SessionLocal
 from app import models
 from app.services.auth_service import create_default_admin
@@ -45,9 +45,46 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+REQUIRED_SCHEMA_REVISION = "p3_0001_current_schema"
+
+
+def _verify_managed_schema():
+    """Refuse un démarrage de production sur un schéma non migré."""
+    with engine.connect() as conn:
+        version_table_exists = conn.execute(
+            text("SELECT to_regclass('public.alembic_version') IS NOT NULL")
+        ).scalar()
+        current_revision = None
+        if version_table_exists:
+            current_revision = conn.execute(
+                text("SELECT version_num FROM alembic_version LIMIT 1")
+            ).scalar()
+
+    if current_revision != REQUIRED_SCHEMA_REVISION:
+        raise RuntimeError(
+            "Schéma PostgreSQL non migré pour cette version de BLACKMODULE. "
+            "Exécuter 'alembic upgrade head' avant de démarrer l'application."
+        )
+
 
 @app.on_event("startup")
 def startup():
+    if IS_PRODUCTION:
+        _verify_managed_schema()
+    else:
+        _initialize_local_schema()
+
+    db = SessionLocal()
+    try:
+        create_default_admin(db, INITIAL_ADMIN_PASSWORD)
+    finally:
+        db.close()
+
+    start_scheduler()
+
+
+def _initialize_local_schema():
+    """Compatibilité locale historique ; la production passe par Alembic."""
     Base.metadata.create_all(bind=engine)
 
     with engine.begin() as conn:
@@ -269,15 +306,6 @@ def startup():
             SET role_assigned_at = COALESCE(role_assigned_at, created_at, NOW())
             WHERE role_assigned_at IS NULL
         """))
-
-    db = SessionLocal()
-    try:
-        create_default_admin(db, INITIAL_ADMIN_PASSWORD)
-    finally:
-        db.close()
-
-    start_scheduler()
-
 
 app.include_router(sanctions.router)
 app.include_router(matching.router)

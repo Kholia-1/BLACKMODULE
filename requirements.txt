@@ -3,6 +3,7 @@ uvicorn[standard]
 
 sqlalchemy
 psycopg2-binary
+alembic==1.18.4
 
 python-dotenv
 python-multipart

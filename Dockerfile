@@ -22,6 +22,8 @@ RUN pip install --upgrade pip \
 
 COPY --chown=10001:10001 blackmodule/app /code/app
 COPY --chown=10001:10001 blackmodule/data /code/data
+COPY --chown=10001:10001 alembic.ini /code/alembic.ini
+COPY --chown=10001:10001 blackmodule/alembic /code/blackmodule/alembic
 
 EXPOSE 10000
 
