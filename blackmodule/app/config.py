@@ -85,6 +85,29 @@ if min(
 ) <= 0:
     raise ValueError("Les paramètres de rate limiting doivent être strictement positifs.")
 
+# Observabilité P5. Les métriques restent internes au processus et n'embarquent
+# ni paramètres de requête, ni identifiants métier, ni contenu de réponse.
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+if LOG_LEVEL not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+    raise ValueError("LOG_LEVEL invalide.")
+MONITORING_ERROR_THRESHOLD = int(os.getenv("MONITORING_ERROR_THRESHOLD", "5"))
+MONITORING_ERROR_WINDOW_SECONDS = int(
+    os.getenv("MONITORING_ERROR_WINDOW_SECONDS", "60")
+)
+MONITORING_LATENCY_WARNING_MS = float(
+    os.getenv("MONITORING_LATENCY_WARNING_MS", "2000")
+)
+MONITORING_HEALTHCHECK_INTERVAL_SECONDS = int(
+    os.getenv("MONITORING_HEALTHCHECK_INTERVAL_SECONDS", "60")
+)
+if min(
+    MONITORING_ERROR_THRESHOLD,
+    MONITORING_ERROR_WINDOW_SECONDS,
+    MONITORING_LATENCY_WARNING_MS,
+    MONITORING_HEALTHCHECK_INTERVAL_SECONDS,
+) <= 0:
+    raise ValueError("Les paramètres de supervision P5 doivent être strictement positifs.")
+
 # A source update is blocked before any mutation when its parsed active volume
 # drops by more than this percentage compared with the current version.
 LIST_MAX_ENTRY_DROP_PERCENT = float(os.getenv("LIST_MAX_ENTRY_DROP_PERCENT", "30"))

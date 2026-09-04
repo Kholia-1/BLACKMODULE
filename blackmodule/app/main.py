@@ -2,13 +2,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, Depends, HTTPException
+import secrets
+
+from fastapi import FastAPI, Depends, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.config import INITIAL_ADMIN_PASSWORD, IS_PRODUCTION, SECRET_KEY, SESSION_HTTPS_ONLY
+from app.config import (
+    BLACKMODULE_API_KEY,
+    INITIAL_ADMIN_PASSWORD,
+    IS_PRODUCTION,
+    SECRET_KEY,
+    SESSION_HTTPS_ONLY,
+)
 from app.database import Base, engine, get_db, SessionLocal
 from app import models
 from app.services.auth_service import create_default_admin
@@ -18,6 +26,12 @@ from app.security import (
     SecurityRateLimitMiddleware,
 )
 from app.services.session_security_service import SessionActivityMiddleware
+from app.services.observability_service import (
+    ObservabilityMiddleware,
+    configure_structured_logging,
+    monitoring_registry,
+    record_health,
+)
 
 from app.routers import sanctions
 from app.routers import matching
@@ -27,10 +41,13 @@ from app.routers import dashboard
 from app.routers import imports
 from app.routers import web
 from app.routers import exports
-from app.scheduler import start_scheduler
+from app.scheduler import get_scheduler_status, start_scheduler
 from app.routers import external_api
 from app.routers import internal_lists
 from app.routers import notifications
+
+configure_structured_logging()
+
 
 app = FastAPI(
     title="BLACKMODULE API",
@@ -51,6 +68,7 @@ app.add_middleware(
     same_site="lax",
     https_only=SESSION_HTTPS_ONLY,
 )
+app.add_middleware(ObservabilityMiddleware)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
@@ -90,6 +108,8 @@ def startup():
         db.close()
 
     start_scheduler()
+    record_health("application", True)
+    record_health("scheduler", get_scheduler_status()["running"])
 
 
 def _initialize_local_schema():
@@ -341,6 +361,7 @@ def home():
 
 @app.get("/health/live")
 def health_live():
+    record_health("application", True)
     return {"status": "OK"}
 
 
@@ -349,8 +370,29 @@ def health_ready(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1")).scalar()
     except Exception:
+        record_health("database", False)
         raise HTTPException(status_code=503, detail="Database unavailable")
+    record_health("database", True)
+    record_health("scheduler", get_scheduler_status()["running"])
     return {"status": "OK", "database": "ready"}
+
+
+@app.get("/health/metrics")
+def health_metrics(x_api_key: str | None = Header(None)):
+    """Expose non-sensitive process metrics for an authorized local collector."""
+    if IS_PRODUCTION and not (
+        isinstance(x_api_key, str)
+        and secrets.compare_digest(x_api_key.strip(), BLACKMODULE_API_KEY.strip())
+    ):
+        raise HTTPException(status_code=403, detail="Monitoring access denied")
+    scheduler_status = get_scheduler_status()
+    record_health("scheduler", scheduler_status["running"])
+    result = monitoring_registry.snapshot()
+    result["scheduler"] = {
+        "running": scheduler_status["running"],
+        "jobs_count": len(scheduler_status["jobs"]),
+    }
+    return result
 
 
 @app.get("/db-check")

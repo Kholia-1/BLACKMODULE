@@ -18,6 +18,7 @@ from app.services.matching_service import (
 from app.services.matching_settings_service import get_or_create_matching_settings
 from app.config import BLACKMODULE_API_KEY
 from app.services.performance import log_slow_operation, performance_timer
+from app.services.observability_service import get_request_id
 
 
 router = APIRouter(
@@ -74,7 +75,7 @@ def verify_api_key(
     return True
 
 def build_request_id() -> str:
-    return f"REQ-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
+    return get_request_id() or f"REQ-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
 
 
 class ExternalClientCheckRequest(BaseModel):

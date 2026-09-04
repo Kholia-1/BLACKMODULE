@@ -1,5 +1,6 @@
 import csv
 import hashlib
+import logging
 from datetime import datetime, date
 from io import StringIO
 
@@ -13,6 +14,9 @@ from app.services.parsers.ofsi_parser import parse_ofsi_csv, parse_ofsi_excel
 from app.services.parsers.ofac_consolidated_parser import parse_ofac_consolidated_xml
 from app.services.parsers.france_gel_parser import parse_france_gel_json, parse_france_gel_xml
 from app.services.parsers.uksl_parser import parse_uksl_csv
+
+
+logger = logging.getLogger("blackmodule.imports")
 
 
 
@@ -1279,7 +1283,10 @@ def import_uksl_csv(db: Session, file_content: bytes) -> dict:
 
         except Exception as e:
             rejected_records += 1
-            print("ERREUR PREPARATION UKSL :", str(e))
+            logger.error(
+                "UKSL import preparation failed.",
+                extra={"event": "list_import_failed", "error_type": type(e).__name__},
+            )
 
     # 2) Chargement des hash déjà présents en base pour éviter les UniqueViolation
     existing_hashes = set()
@@ -1361,7 +1368,10 @@ def import_uksl_csv(db: Session, file_content: bytes) -> dict:
 
         except Exception as e:
             rejected_records += 1
-            print("ERREUR IMPORT UKSL :", str(e))
+            logger.error(
+                "UKSL import failed.",
+                extra={"event": "list_import_failed", "error_type": type(e).__name__},
+            )
 
     return {
         "total_records": total_records,

@@ -1,3 +1,9 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: ${DOCKER_LOG_MAX_SIZE:-10m}
+    max-file: ${DOCKER_LOG_MAX_FILES:-5}
+
 services:
   db:
     image: postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
@@ -19,6 +25,7 @@ services:
     mem_limit: 2g
     mem_reservation: 512m
     pids_limit: 256
+    logging: *default-logging
 
   app:
     build: .
@@ -46,6 +53,11 @@ services:
       LOGIN_RATE_LIMIT_WINDOW_SECONDS: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:-300}
       SENSITIVE_RATE_LIMIT_ATTEMPTS: ${SENSITIVE_RATE_LIMIT_ATTEMPTS:-120}
       SENSITIVE_RATE_LIMIT_WINDOW_SECONDS: ${SENSITIVE_RATE_LIMIT_WINDOW_SECONDS:-60}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      MONITORING_ERROR_THRESHOLD: ${MONITORING_ERROR_THRESHOLD:-5}
+      MONITORING_ERROR_WINDOW_SECONDS: ${MONITORING_ERROR_WINDOW_SECONDS:-60}
+      MONITORING_LATENCY_WARNING_MS: ${MONITORING_LATENCY_WARNING_MS:-2000}
+      MONITORING_HEALTHCHECK_INTERVAL_SECONDS: ${MONITORING_HEALTHCHECK_INTERVAL_SECONDS:-60}
       EMAIL_NOTIFICATIONS_ENABLED: ${EMAIL_NOTIFICATIONS_ENABLED:-false}
       EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-}
       EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-587}
@@ -61,6 +73,13 @@ services:
     pids_limit: 256
     ports:
       - "127.0.0.1:10000:10000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://127.0.0.1:10000/health/ready || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *default-logging
 
   migrate:
     build: .
@@ -79,6 +98,7 @@ services:
     cpus: "1.0"
     mem_limit: 1g
     pids_limit: 128
+    logging: *default-logging
 
   db-tools:
     image: postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
@@ -103,6 +123,7 @@ services:
     cpus: "1.0"
     mem_limit: 512m
     pids_limit: 128
+    logging: *default-logging
 
 volumes:
   blackmodule_postgres_data:

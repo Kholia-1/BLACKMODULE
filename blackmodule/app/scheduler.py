@@ -1,6 +1,11 @@
-from apscheduler.schedulers.background import BackgroundScheduler
+import logging
+import time
 
-from app.database import SessionLocal
+from apscheduler.schedulers.background import BackgroundScheduler
+from sqlalchemy import text
+
+from app.config import MONITORING_HEALTHCHECK_INTERVAL_SECONDS
+from app.database import SessionLocal, engine
 from app.services.list_update_service import (
     auto_update_ofac_sdn,
     auto_update_ofac_consolidated,
@@ -15,9 +20,17 @@ from app.services.list_update_service import (
 )
 from app.services.notification_service import dispatch_corrective_action_notifications
 from app.services.external_notification_service import process_pending_email_deliveries
+from app.services.observability_service import monitoring_registry, record_health
 
 
 scheduler = BackgroundScheduler()
+logger = logging.getLogger("blackmodule.scheduler")
+
+
+def _job_finished(job_id: str, started_at: float, success: bool) -> None:
+    monitoring_registry.record_scheduler_job(
+        job_id, success, (time.perf_counter() - started_at) * 1000
+    )
 
 
 MANUAL_UPDATE_FUNCTIONS = {
@@ -31,35 +44,62 @@ MANUAL_UPDATE_FUNCTIONS = {
 
 
 def run_job(job_name: str, update_function, imported_by: str):
+    started_at = time.perf_counter()
     db = SessionLocal()
 
     try:
-        print(f"[BLACKMODULE] Début job : {job_name}")
+        logger.info(
+            "Scheduler job started.",
+            extra={"event": "scheduler_job_started", "job_id": job_name},
+        )
 
         update_function(
             db=db,
             imported_by=imported_by
         )
 
-        print(f"[BLACKMODULE] Fin job : {job_name}")
+        _job_finished(job_name, started_at, True)
+        logger.info(
+            "Scheduler job completed.",
+            extra={"event": "scheduler_job_completed", "job_id": job_name},
+        )
 
-    except Exception as e:
-        print(f"[BLACKMODULE] Erreur job {job_name} : {e}")
+    except Exception as error:
+        _job_finished(job_name, started_at, False)
+        logger.error(
+            "Scheduler job failed.",
+            extra={
+                "event": "scheduler_job_failed",
+                "job_id": job_name,
+                "error_type": type(error).__name__,
+            },
+        )
 
     finally:
         db.close()
 
 
 def run_manual_update(source_key: str, batch_id, imported_by: str) -> None:
+    started_at = time.perf_counter()
+    job_id = f"manual_update_{source_key}"
     db = SessionLocal()
     try:
         MANUAL_UPDATE_FUNCTIONS[source_key](
             db=db, imported_by=imported_by, existing_batch_id=batch_id,
         )
+        _job_finished(job_id, started_at, True)
     except Exception as error:
         db.rollback()
         mark_interrupted_update_failed(db, batch_id, source_key, imported_by, error)
-        print(f"[BLACKMODULE] Erreur mise a jour programmee {source_key}: {error}")
+        _job_finished(job_id, started_at, False)
+        logger.error(
+            "Scheduled list update failed.",
+            extra={
+                "event": "scheduler_job_failed",
+                "job_id": job_id,
+                "error_type": type(error).__name__,
+            },
+        )
     finally:
         db.close()
 
@@ -76,13 +116,24 @@ def enqueue_manual_update(source_key: str, batch_id, imported_by: str) -> None:
 
 
 def run_queued_restore(approval_id: str) -> None:
+    started_at = time.perf_counter()
+    job_id = "queued_restore"
     from app.services.approval_service import process_queued_restore
     db = SessionLocal()
     try:
         process_queued_restore(db, approval_id)
+        _job_finished(job_id, started_at, True)
     except Exception as error:
         db.rollback()
-        print(f"[BLACKMODULE] Erreur restauration programmee {approval_id}: {error}")
+        _job_finished(job_id, started_at, False)
+        logger.error(
+            "Scheduled restore failed.",
+            extra={
+                "event": "scheduler_job_failed",
+                "job_id": job_id,
+                "error_type": type(error).__name__,
+            },
+        )
     finally:
         db.close()
 
@@ -121,50 +172,120 @@ def recover_interrupted_work() -> tuple[int, int]:
 
 
 def run_freshness_check():
+    started_at = time.perf_counter()
+    job_id = "list_freshness_check"
     db = SessionLocal()
     try:
         alerts = emit_list_freshness_alerts(db=db)
-        print(f"[BLACKMODULE] Controle de fraicheur des listes: {len(alerts)} alerte(s).")
+        _job_finished(job_id, started_at, True)
+        logger.info(
+            "List freshness check completed.",
+            extra={
+                "event": "scheduler_job_completed",
+                "job_id": job_id,
+                "result_count": len(alerts),
+            },
+        )
     except Exception as error:
-        print(f"[BLACKMODULE] Erreur controle de fraicheur des listes: {error}")
+        _job_finished(job_id, started_at, False)
+        logger.error(
+            "List freshness check failed.",
+            extra={
+                "event": "scheduler_job_failed",
+                "job_id": job_id,
+                "error_type": type(error).__name__,
+            },
+        )
     finally:
         db.close()
 
 
 def run_corrective_action_notification_check():
     """Deliver deduplicated deadline reminders and overdue escalations."""
+    started_at = time.perf_counter()
+    job_id = "corrective_action_notifications"
     db = SessionLocal()
     try:
         result = dispatch_corrective_action_notifications(db)
         db.commit()
-        print(
-            "[BLACKMODULE] Notifications actions correctives: "
-            f"{result['due_soon']} proche(s), {result['overdue']} retard(s), "
-            f"{result['escalated']} escalade(s)."
+        _job_finished(job_id, started_at, True)
+        logger.info(
+            "Corrective action notification check completed.",
+            extra={
+                "event": "scheduler_job_completed",
+                "job_id": job_id,
+                "result_count": sum(result[key] for key in ("due_soon", "overdue", "escalated")),
+            },
         )
     except Exception as error:
         db.rollback()
-        print(f"[BLACKMODULE] Erreur notifications actions correctives: {error}")
+        _job_finished(job_id, started_at, False)
+        logger.error(
+            "Corrective action notification check failed.",
+            extra={
+                "event": "scheduler_job_failed",
+                "job_id": job_id,
+                "error_type": type(error).__name__,
+            },
+        )
     finally:
         db.close()
 
 
 def run_external_notification_delivery():
     """Process the optional durable e-mail outbox without affecting in-app flow."""
+    started_at = time.perf_counter()
+    job_id = "external_notification_delivery"
     db = SessionLocal()
     try:
         result = process_pending_email_deliveries(db)
         db.commit()
+        _job_finished(job_id, started_at, True)
         if result["enabled"]:
-            print(
-                "[BLACKMODULE] Envois e-mail: "
-                f"{result['sent']} envoyé(s), {result['failed']} échec(s)."
+            logger.info(
+                "External notification delivery completed.",
+                extra={
+                    "event": "scheduler_job_completed",
+                    "job_id": job_id,
+                    "result_count": result["sent"] + result["failed"],
+                },
             )
     except Exception as error:
         db.rollback()
-        print(f"[BLACKMODULE] Erreur envois e-mail: {type(error).__name__}")
+        _job_finished(job_id, started_at, False)
+        logger.error(
+            "External notification delivery failed.",
+            extra={
+                "event": "scheduler_job_failed",
+                "job_id": job_id,
+                "error_type": type(error).__name__,
+            },
+        )
     finally:
         db.close()
+
+
+def run_health_supervision_check():
+    """Probe dependencies and expose only component-level health state."""
+    started_at = time.perf_counter()
+    database_ready = False
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1")).scalar()
+        database_ready = True
+    except Exception as error:
+        logger.error(
+            "Database health probe failed.",
+            extra={
+                "event": "health_probe_failed",
+                "component": "database",
+                "error_type": type(error).__name__,
+            },
+        )
+    record_health("database", database_ready)
+    record_health("scheduler", scheduler.running)
+    success = database_ready and scheduler.running
+    _job_finished("health_supervision", started_at, success)
 
 
 def start_scheduler():
@@ -259,13 +380,31 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        run_health_supervision_check,
+        trigger="interval",
+        seconds=MONITORING_HEALTHCHECK_INTERVAL_SECONDS,
+        id="health_supervision",
+        replace_existing=True,
+    )
+
     scheduler.start()
 
     recovered_updates, recovered_restores = recover_interrupted_work()
     if recovered_updates or recovered_restores:
-        print(f"[BLACKMODULE] Reprise: {recovered_updates} mise(s) à jour, {recovered_restores} restauration(s).")
+        logger.info(
+            "Interrupted work recovery completed.",
+            extra={
+                "event": "scheduler_recovery_completed",
+                "job_id": "startup_recovery",
+                "result_count": recovered_updates + recovered_restores,
+            },
+        )
 
-    print("[BLACKMODULE] Scheduler multi-listes actif.")
+    logger.info(
+        "Scheduler started.",
+        extra={"event": "scheduler_started", "job_id": "scheduler"},
+    )
 
 
 def get_scheduler_status():

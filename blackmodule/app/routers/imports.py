@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -40,6 +41,7 @@ router = APIRouter(
     prefix="/api/imports",
     tags=["Imports"],
 )
+logger = logging.getLogger("blackmodule.imports")
 
 
 def _queue_api_official_update(db: Session, source_key: str, username: str) -> ImportBatch:
@@ -504,7 +506,10 @@ def manual_auto_update_ofac_sdn(
         return _queue_api_official_update(db, "OFAC_SDN", user.get("username"))
 
     except Exception as e:
-        print("ERREUR AUTO UPDATE OFAC SDN =", repr(e))
+        logger.error(
+            "Manual OFAC SDN update failed.",
+            extra={"event": "manual_import_failed", "error_type": type(e).__name__},
+        )
 
         raise HTTPException(
             status_code=400,
@@ -521,7 +526,10 @@ def manual_auto_update_ofac_consolidated(
         return _queue_api_official_update(db, "OFAC_CONSOLIDATED", user.get("username"))
 
     except Exception as e:
-        print("ERREUR AUTO UPDATE OFAC CONSOLIDATED =", repr(e))
+        logger.error(
+            "Manual OFAC Consolidated update failed.",
+            extra={"event": "manual_import_failed", "error_type": type(e).__name__},
+        )
 
         raise HTTPException(
             status_code=400,
@@ -631,7 +639,10 @@ def manual_auto_update_france_gel(
         return _queue_api_official_update(db, "FR_GEL", user.get("username"))
 
     except Exception as e:
-        print("ERREUR AUTO UPDATE FRANCE GEL =", repr(e))
+        logger.error(
+            "Manual France Gel update failed.",
+            extra={"event": "manual_import_failed", "error_type": type(e).__name__},
+        )
 
         raise HTTPException(
             status_code=400,
@@ -648,7 +659,10 @@ def manual_auto_update_eu(
         return _queue_api_official_update(db, "UE", user.get("username"))
 
     except Exception as e:
-        print("ERREUR AUTO UPDATE UE =", repr(e))
+        logger.error(
+            "Manual EU update failed.",
+            extra={"event": "manual_import_failed", "error_type": type(e).__name__},
+        )
 
         raise HTTPException(
             status_code=400,
@@ -665,7 +679,10 @@ def manual_auto_update_un(
         return _queue_api_official_update(db, "ONU", user.get("username"))
 
     except Exception as e:
-        print("ERREUR AUTO UPDATE ONU =", repr(e))
+        logger.error(
+            "Manual UN update failed.",
+            extra={"event": "manual_import_failed", "error_type": type(e).__name__},
+        )
 
         raise HTTPException(
             status_code=400,
