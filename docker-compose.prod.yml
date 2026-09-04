@@ -55,5 +55,32 @@ services:
     ports:
       - "127.0.0.1:10000:10000"
 
+  db-tools:
+    image: postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+    profiles: ["database-tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:?POSTGRES_DB doit etre defini}
+      PGUSER: ${POSTGRES_USER:?POSTGRES_USER doit etre defini}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit etre defini}
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - blackmodule_postgres_backups:/backups
+      - ./scripts:/opt/blackmodule/scripts:ro
+    entrypoint: ["/bin/sh"]
+    command: ["/opt/blackmodule/scripts/postgres_backup.sh"]
+    restart: "no"
+    cpus: "1.0"
+    mem_limit: 512m
+    pids_limit: 128
+
 volumes:
   blackmodule_postgres_data:
+  blackmodule_postgres_backups:
+    external: true
+    name: ${POSTGRES_BACKUP_VOLUME:-blackmodule_postgres_backups}
