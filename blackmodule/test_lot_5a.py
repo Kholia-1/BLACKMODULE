@@ -50,7 +50,10 @@ class Lot5AComplianceReportingTests(unittest.TestCase):
         )
         Base.metadata.create_all(self.engine)
         self.db = sessionmaker(bind=self.engine, expire_on_commit=False)()
-        self.now = datetime(2026, 9, 2, 12, 0)
+        # Keep fixture timestamps relative to the same current reference used
+        # by the Web reporting route.  A fixed calendar date made the seven-day
+        # export assertion fail as time passed.
+        self.now = datetime.utcnow().replace(microsecond=0)
         self.analyst1 = self.user("analyste-report-1", ROLE_ANALYSTE_CONFORMITE, "Alice Analyste")
         self.analyst2 = self.user("analyste-report-2", ROLE_ANALYSTE_CONFORMITE, "Bruno Analyste")
         self.supervisor = self.user("superviseur-report", ROLE_SUPERVISEUR_CONFORMITE, "Sophie Superviseur")
@@ -174,7 +177,9 @@ class Lot5AComplianceReportingTests(unittest.TestCase):
         self.assertEqual(self.report(period="7")["kpis"]["total"], 6)
         self.assertEqual(self.report(period="30")["kpis"]["total"], 7)
         custom = self.report(
-            period="custom", date_from="2026-09-01", date_to="2026-09-02",
+            period="custom",
+            date_from=(self.now.date() - timedelta(days=1)).isoformat(),
+            date_to=self.now.date().isoformat(),
         )
         self.assertEqual(custom["kpis"]["total"], 4)
         onu = self.report(period="7", source="ONU")
