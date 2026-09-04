@@ -1,26 +1,38 @@
 services:
   db:
-    image: postgres:16
+    image: postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
     container_name: blackmodule_postgres
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB doit etre defini}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER doit etre defini}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit etre defini}
     volumes:
       - blackmodule_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    cpus: "2.0"
+    mem_limit: 2g
+    mem_reservation: 512m
+    pids_limit: 256
 
   app:
     build: .
     container_name: blackmodule_app
     restart: always
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      SECRET_KEY: ${SECRET_KEY}
-      BLACKMODULE_API_KEY: ${BLACKMODULE_API_KEY}
-      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD}
+      BLACKMODULE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER doit etre defini}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit etre defini}@db:5432/${POSTGRES_DB:?POSTGRES_DB doit etre defini}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY doit etre defini}
+      BLACKMODULE_API_KEY: ${BLACKMODULE_API_KEY:?BLACKMODULE_API_KEY doit etre defini}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
       SESSION_HTTPS_ONLY: "true"
       ALERT_SLA_EXACT_HOURS: ${ALERT_SLA_EXACT_HOURS:-4}
       ALERT_SLA_PROBABLE_HOURS: ${ALERT_SLA_PROBABLE_HOURS:-24}
@@ -36,6 +48,10 @@ services:
       EMAIL_SMTP_STARTTLS: ${EMAIL_SMTP_STARTTLS:-true}
       EMAIL_NOTIFICATION_MAX_ATTEMPTS: ${EMAIL_NOTIFICATION_MAX_ATTEMPTS:-3}
       EMAIL_NOTIFICATION_RETRY_MINUTES: ${EMAIL_NOTIFICATION_RETRY_MINUTES:-15}
+    cpus: "2.0"
+    mem_limit: 2g
+    mem_reservation: 512m
+    pids_limit: 256
     ports:
       - "127.0.0.1:10000:10000"
 

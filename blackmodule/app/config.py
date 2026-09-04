@@ -3,24 +3,56 @@ import os
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+BLACKMODULE_ENV = os.getenv("BLACKMODULE_ENV", "development").strip().lower()
+IS_PRODUCTION = BLACKMODULE_ENV in {"production", "preproduction", "staging"}
 
-if DATABASE_URL is None:
-    raise ValueError("DATABASE_URL n'est pas défini dans le fichier .env")
 
-SECRET_KEY = os.getenv("SECRET_KEY")
+def _required_value(name: str) -> str:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        raise ValueError(f"{name} doit être défini et non vide.")
+    return value.strip()
 
-if SECRET_KEY is None:
-    raise ValueError("SECRET_KEY n'est pas défini dans le fichier .env")
 
-BLACKMODULE_API_KEY = os.getenv("BLACKMODULE_API_KEY")
+def _is_placeholder(value: str) -> bool:
+    normalized = value.strip().upper().replace("-", "_")
+    return (
+        "CHANGE_ME" in normalized
+        or "CHANGEME" in normalized
+        or "BLACKMODULE_PASSWORD" in normalized
+    )
 
-if BLACKMODULE_API_KEY is None:
-    raise ValueError("BLACKMODULE_API_KEY n'est pas défini dans le fichier .env")
+
+def _validate_production_secret(name: str, value: str, minimum_length: int = 32) -> None:
+    if not IS_PRODUCTION:
+        return
+    if _is_placeholder(value):
+        raise ValueError(f"{name} contient une valeur d'exemple interdite en production.")
+    if len(value) < minimum_length:
+        raise ValueError(
+            f"{name} doit contenir au moins {minimum_length} caractères en production."
+        )
+
+
+DATABASE_URL = _required_value("DATABASE_URL")
+SECRET_KEY = _required_value("SECRET_KEY")
+BLACKMODULE_API_KEY = _required_value("BLACKMODULE_API_KEY")
+
+if IS_PRODUCTION:
+    if not DATABASE_URL.startswith(("postgresql://", "postgresql+psycopg2://")):
+        raise ValueError("DATABASE_URL doit utiliser PostgreSQL en production.")
+    if _is_placeholder(DATABASE_URL):
+        raise ValueError("DATABASE_URL contient une valeur d'exemple interdite en production.")
+
+_validate_production_secret("SECRET_KEY", SECRET_KEY)
+_validate_production_secret("BLACKMODULE_API_KEY", BLACKMODULE_API_KEY)
 
 # Utilisé uniquement lors de l'initialisation d'une base vide. Il ne doit
 # jamais avoir de valeur par défaut dans le code ou dans les fichiers d'exemple.
-INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD")
+INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD") or None
+if INITIAL_ADMIN_PASSWORD is not None:
+    INITIAL_ADMIN_PASSWORD = INITIAL_ADMIN_PASSWORD.strip()
+    _validate_production_secret("INITIAL_ADMIN_PASSWORD", INITIAL_ADMIN_PASSWORD, 12)
 
 # En développement local HTTP peut être pratique ; en production cette valeur
 # doit impérativement être définie à true.
