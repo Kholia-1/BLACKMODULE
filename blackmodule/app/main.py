@@ -12,7 +12,11 @@ from app.config import INITIAL_ADMIN_PASSWORD, IS_PRODUCTION, SECRET_KEY, SESSIO
 from app.database import Base, engine, get_db, SessionLocal
 from app import models
 from app.services.auth_service import create_default_admin
-from app.security import CSRFMiddleware
+from app.security import (
+    CSRFMiddleware,
+    ForcedPasswordChangeMiddleware,
+    SecurityRateLimitMiddleware,
+)
 from app.services.session_security_service import SessionActivityMiddleware
 
 from app.routers import sanctions
@@ -31,11 +35,16 @@ from app.routers import notifications
 app = FastAPI(
     title="BLACKMODULE API",
     description="Prototype API REST pour le filtrage des clients blacklistés",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
 )
 
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(SessionActivityMiddleware)
+app.add_middleware(SecurityRateLimitMiddleware)
+app.add_middleware(ForcedPasswordChangeMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
@@ -45,7 +54,7 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-REQUIRED_SCHEMA_REVISION = "p3_0001_current_schema"
+REQUIRED_SCHEMA_REVISION = "p4_0002_security_hardening"
 
 
 def _verify_managed_schema():
@@ -278,6 +287,9 @@ def _initialize_local_schema():
             "last_activity_at TIMESTAMP",
             "failed_login_attempts INTEGER NOT NULL DEFAULT 0",
             "locked_at TIMESTAMP",
+            "must_change_password BOOLEAN NOT NULL DEFAULT FALSE",
+            "password_changed_at TIMESTAMP",
+            "bootstrap_credential_expires_at TIMESTAMP",
         ]:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {column_def}"))
 
@@ -343,6 +355,8 @@ def health_ready(db: Session = Depends(get_db)):
 
 @app.get("/db-check")
 def db_check(db: Session = Depends(get_db)):
+    if IS_PRODUCTION:
+        raise HTTPException(status_code=404, detail="Not found")
     try:
         result = db.execute(text("SELECT 1")).scalar()
 
@@ -353,10 +367,5 @@ def db_check(db: Session = Depends(get_db)):
             "message": "FastAPI est bien connecté à PostgreSQL"
         }
 
-    except Exception as e:
-        return {
-            "database": "PostgreSQL",
-            "connection": "FAILED",
-            "error": str(e),
-            "message": "FastAPI n'arrive pas à se connecter à PostgreSQL"
-        }
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")

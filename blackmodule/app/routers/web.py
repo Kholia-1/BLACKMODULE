@@ -18,6 +18,7 @@ from app.database import get_db
 from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, AlertDecisionHistory, AuditLog, ImportBatch, ListVersion, ListVersionActivation, ListVersionEntry, User, MatchingSetting, InternalListHistory
 from app.schemas import ClientCheckRequest
 from app.services.auth_service import authenticate_user, hash_password, verify_password
+from app.services.password_policy_service import validate_password_policy
 from app.services.authorization_service import (
     ALL_ROLES, PERMISSION_LISTS_IMPORT, PERMISSION_MANAGE_LISTS, PERMISSION_MANAGE_MATCHING_SETTINGS,
     PERMISSION_MANAGE_TECHNICAL_CONFIGURATION, PERMISSION_MANAGE_USERS,
@@ -538,6 +539,16 @@ def login_submit(
                 description="Compte verrouillé après cinq échecs de connexion.",
                 ip_address=request.client.host if request.client else None,
             )
+        if result.reason == "BOOTSTRAP_EXPIRED":
+            write_audit_log(
+                db=db,
+                user_identifier=username.strip() or None,
+                action="BOOTSTRAP_CREDENTIAL_EXPIRED",
+                entity_type="User",
+                entity_id=None,
+                description="Tentative de connexion avec un secret bootstrap expiré.",
+                ip_address=request.client.host if request.client else None,
+            )
         db.commit()
         return templates.TemplateResponse(
             request=request,
@@ -572,7 +583,8 @@ def login_submit(
         )
     db.commit()
 
-    return RedirectResponse(url="/web/dashboard", status_code=303)
+    destination = "/web/change-password" if user.must_change_password else "/web/dashboard"
+    return RedirectResponse(url=destination, status_code=303)
 
 
 @router.get("/logout")
@@ -2261,8 +2273,9 @@ def web_create_user(
     if role not in allowed_roles:
         raise HTTPException(status_code=400, detail="Rôle invalide.")
 
-    if len(password) < 6:
-        return RedirectResponse(url="/web/users?message=Le mot de passe doit contenir au moins 6 caractères", status_code=303)
+    policy_error = validate_password_policy(password, username=username)
+    if policy_error:
+        return RedirectResponse(url=f"/web/users?{urlencode({'message': policy_error})}", status_code=303)
 
     if db.query(User).filter(User.username == username.strip()).first():
         return RedirectResponse(url="/web/users?message=Nom utilisateur déjà utilisé", status_code=303)
@@ -2620,14 +2633,37 @@ def change_password_submit(
         request.session.clear()
         return RedirectResponse(url="/web/login", status_code=303)
 
+    def reject_password_change(message: str):
+        write_audit_log(
+            db=db,
+            user_identifier=user.username,
+            action="PASSWORD_CHANGE_FAILED",
+            entity_type="User",
+            entity_id=str(user.id),
+            description="Changement de mot de passe refusé par un contrôle de sécurité.",
+            ip_address=request.client.host if request.client else None,
+        )
+        db.commit()
+        return templates.TemplateResponse(
+            request=request,
+            name="change_password.html",
+            context={"request": request, "message": message, "success": False},
+        )
+
     if not verify_password(old_password, user.password_hash):
-        return templates.TemplateResponse(request=request, name="change_password.html", context={"request": request, "message": "Ancien mot de passe incorrect.", "success": False})
+        return reject_password_change("Ancien mot de passe incorrect.")
     if new_password != confirm_password:
-        return templates.TemplateResponse(request=request, name="change_password.html", context={"request": request, "message": "Les deux nouveaux mots de passe ne correspondent pas.", "success": False})
-    if len(new_password) < 6:
-        return templates.TemplateResponse(request=request, name="change_password.html", context={"request": request, "message": "Le nouveau mot de passe doit contenir au moins 6 caractères.", "success": False})
+        return reject_password_change("Les deux nouveaux mots de passe ne correspondent pas.")
+    if verify_password(new_password, user.password_hash):
+        return reject_password_change("Le nouveau mot de passe doit être différent de l'ancien.")
+    policy_error = validate_password_policy(new_password, username=user.username)
+    if policy_error:
+        return reject_password_change(policy_error)
 
     user.password_hash = hash_password(new_password)
+    user.must_change_password = False
+    user.bootstrap_credential_expires_at = None
+    user.password_changed_at = datetime.utcnow()
     write_audit_log(
         db=db,
         user_identifier=user.username,
@@ -2638,6 +2674,7 @@ def change_password_submit(
         ip_address=request.client.host if request.client else None,
     )
     db.commit()
+    request.session["user"] = session_user_payload(user)
 
     return templates.TemplateResponse(request=request, name="change_password.html", context={"request": request, "message": "Mot de passe modifié avec succès.", "success": True})
 

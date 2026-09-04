@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from app.config import MAX_FAILED_LOGIN_ATTEMPTS
+from app.config import BOOTSTRAP_PASSWORD_TTL_HOURS, IS_PRODUCTION, MAX_FAILED_LOGIN_ATTEMPTS
 from app.models import User
 from app.services.authorization_service import ROLE_ADMIN_TECHNIQUE
+from app.services.password_policy_service import validate_password_policy
 
 
 pwd_context = CryptContext(
@@ -49,6 +50,13 @@ def authenticate_user(
     if user.locked_at is not None:
         return AuthenticationResult(user=None, reason="LOCKED")
 
+    if (
+        user.must_change_password
+        and user.bootstrap_credential_expires_at
+        and datetime.utcnow() >= user.bootstrap_credential_expires_at
+    ):
+        return AuthenticationResult(user=None, reason="BOOTSTRAP_EXPIRED")
+
     if not verify_password(password, user.password_hash):
         user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
         locked_now = user.failed_login_attempts >= MAX_FAILED_LOGIN_ATTEMPTS
@@ -63,7 +71,12 @@ def authenticate_user(
     return AuthenticationResult(user=user, reason="SUCCESS")
 
 
-def create_default_admin(db: Session, initial_password: str | None = None):
+def create_default_admin(
+    db: Session,
+    initial_password: str | None = None,
+    *,
+    production: bool | None = None,
+):
     existing_admin = db.query(User).filter(
         User.username == "admin"
     ).first()
@@ -76,6 +89,15 @@ def create_default_admin(db: Session, initial_password: str | None = None):
             "INITIAL_ADMIN_PASSWORD doit être défini pour initialiser une base vide."
         )
 
+    enforced_production = IS_PRODUCTION if production is None else production
+    policy_error = validate_password_policy(
+        initial_password, username="admin", production=enforced_production
+    )
+    if policy_error:
+        raise RuntimeError(f"INITIAL_ADMIN_PASSWORD non conforme : {policy_error}")
+
+    now = datetime.utcnow()
+
     admin = User(
         username="admin",
         full_name="Administrateur BLACKMODULE",
@@ -83,7 +105,12 @@ def create_default_admin(db: Session, initial_password: str | None = None):
         password_hash=hash_password(initial_password),
         role=ROLE_ADMIN_TECHNIQUE,
         statut="ACTIF",
-        role_assigned_at=datetime.utcnow(),
+        role_assigned_at=now,
+        must_change_password=enforced_production,
+        bootstrap_credential_expires_at=(
+            now + timedelta(hours=BOOTSTRAP_PASSWORD_TTL_HOURS)
+            if enforced_production else None
+        ),
     )
 
     db.add(admin)

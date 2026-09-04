@@ -1,4 +1,5 @@
 from datetime import datetime
+import secrets
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -53,7 +54,7 @@ def verify_api_key(
     received_key = x_api_key.strip()
     expected_key = EXTERNAL_API_KEY.strip()
 
-    if received_key != expected_key:
+    if not secrets.compare_digest(received_key, expected_key):
         write_audit_log(
             db=db,
             user_identifier="EXTERNAL_API",

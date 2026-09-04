@@ -64,6 +64,27 @@ SESSION_ACTIVITY_PERSIST_INTERVAL_MINUTES = int(
 )
 MAX_FAILED_LOGIN_ATTEMPTS = int(os.getenv("MAX_FAILED_LOGIN_ATTEMPTS", "5"))
 
+# Durcissement authentification P4. Les valeurs de développement conservent
+# la compatibilité historique ; la production impose une politique renforcée.
+PASSWORD_MIN_LENGTH = int(os.getenv("PASSWORD_MIN_LENGTH", "12" if IS_PRODUCTION else "6"))
+PASSWORD_MAX_LENGTH = int(os.getenv("PASSWORD_MAX_LENGTH", "128"))
+BOOTSTRAP_PASSWORD_TTL_HOURS = int(os.getenv("BOOTSTRAP_PASSWORD_TTL_HOURS", "24"))
+LOGIN_RATE_LIMIT_ATTEMPTS = int(os.getenv("LOGIN_RATE_LIMIT_ATTEMPTS", "10"))
+LOGIN_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("LOGIN_RATE_LIMIT_WINDOW_SECONDS", "300"))
+SENSITIVE_RATE_LIMIT_ATTEMPTS = int(os.getenv("SENSITIVE_RATE_LIMIT_ATTEMPTS", "120"))
+SENSITIVE_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("SENSITIVE_RATE_LIMIT_WINDOW_SECONDS", "60"))
+if not 6 <= PASSWORD_MIN_LENGTH <= PASSWORD_MAX_LENGTH <= 256:
+    raise ValueError("Configuration de longueur des mots de passe invalide.")
+if BOOTSTRAP_PASSWORD_TTL_HOURS <= 0:
+    raise ValueError("BOOTSTRAP_PASSWORD_TTL_HOURS doit être strictement positif.")
+if min(
+    LOGIN_RATE_LIMIT_ATTEMPTS,
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+    SENSITIVE_RATE_LIMIT_ATTEMPTS,
+    SENSITIVE_RATE_LIMIT_WINDOW_SECONDS,
+) <= 0:
+    raise ValueError("Les paramètres de rate limiting doivent être strictement positifs.")
+
 # A source update is blocked before any mutation when its parsed active volume
 # drops by more than this percentage compared with the current version.
 LIST_MAX_ENTRY_DROP_PERCENT = float(os.getenv("LIST_MAX_ENTRY_DROP_PERCENT", "30"))

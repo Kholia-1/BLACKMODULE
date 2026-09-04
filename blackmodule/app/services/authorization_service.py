@@ -241,9 +241,14 @@ def has_permission(user: dict | None, permission: str) -> bool:
 
 def session_user_payload(user) -> dict:
     role = canonical_role(user.role)
+    bootstrap_expiry = getattr(user, "bootstrap_credential_expires_at", None)
     return refresh_session_user({
         "id": str(user.id),
         "username": user.username,
         "full_name": user.full_name,
         "role": role,
+        "must_change_password": bool(getattr(user, "must_change_password", False)),
+        "bootstrap_credential_expires_at": (
+            bootstrap_expiry.isoformat() if bootstrap_expiry else None
+        ),
     })

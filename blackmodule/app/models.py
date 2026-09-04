@@ -548,6 +548,9 @@ class User(Base):
     last_activity_at = Column(DateTime, nullable=True)
     failed_login_attempts = Column(Integer, nullable=False, default=0)
     locked_at = Column(DateTime, nullable=True)
+    must_change_password = Column(Boolean, nullable=False, default=False)
+    password_changed_at = Column(DateTime, nullable=True)
+    bootstrap_credential_expires_at = Column(DateTime, nullable=True)
 
 
 class ApprovalRequest(Base):
