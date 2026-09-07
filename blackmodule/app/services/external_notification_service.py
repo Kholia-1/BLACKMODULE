@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import smtplib
+import ssl
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 
@@ -35,6 +36,7 @@ STATUS_PENDING = "EN_ATTENTE"
 STATUS_SENT = "ENVOYE"
 STATUS_FAILED = "ECHEC"
 ATTEMPT_QUEUED = "EN_ATTENTE"
+SMTP_STARTTLS_PORT = 587
 
 DEFAULT_EMAIL_TEMPLATE = {
     "subject": "BLACKMODULE — {title}",
@@ -50,6 +52,14 @@ class DeliveryConfigurationError(ExternalNotificationError):
     def __init__(self, code: str):
         self.code = code
         super().__init__(code)
+
+
+def _secure_tls_context() -> ssl.SSLContext:
+    """Build the system-CA TLS context required for SMTP STARTTLS."""
+    context = ssl.create_default_context()
+    if context.verify_mode != ssl.CERT_REQUIRED or not context.check_hostname:
+        raise DeliveryConfigurationError("SMTP_TLS_CONFIGURATION_INVALIDE")
+    return context
 
 
 def _template_key(notification: UserNotification) -> str:
@@ -136,18 +146,19 @@ def queue_email_notification(db: Session, notification: UserNotification) -> Ext
 def _send_email(delivery: ExternalNotificationDelivery) -> None:
     if not delivery.recipient_email:
         raise DeliveryConfigurationError("DESTINATAIRE_EMAIL_ABSENT")
-    if not EMAIL_SMTP_HOST or not EMAIL_SMTP_FROM:
+    if not (EMAIL_SMTP_HOST or "").strip() or not (EMAIL_SMTP_FROM or "").strip():
         raise DeliveryConfigurationError("SMTP_NON_CONFIGURE")
-    if EMAIL_SMTP_USERNAME and not EMAIL_SMTP_PASSWORD:
+    if bool(EMAIL_SMTP_USERNAME) != bool(EMAIL_SMTP_PASSWORD):
         raise DeliveryConfigurationError("SMTP_AUTH_NON_CONFIGUREE")
+    if not EMAIL_SMTP_STARTTLS or EMAIL_SMTP_PORT != SMTP_STARTTLS_PORT:
+        raise DeliveryConfigurationError("SMTP_TLS_CONFIGURATION_INVALIDE")
     message = EmailMessage()
     message["From"] = EMAIL_SMTP_FROM
     message["To"] = delivery.recipient_email
     message["Subject"] = delivery.subject
     message.set_content(delivery.body)
     with smtplib.SMTP(EMAIL_SMTP_HOST, EMAIL_SMTP_PORT, timeout=15) as smtp:
-        if EMAIL_SMTP_STARTTLS:
-            smtp.starttls()
+        smtp.starttls(context=_secure_tls_context())
         if EMAIL_SMTP_USERNAME:
             smtp.login(EMAIL_SMTP_USERNAME, EMAIL_SMTP_PASSWORD)
         smtp.send_message(message)
@@ -158,6 +169,8 @@ def _error_code(error: Exception) -> str:
         return error.code
     if isinstance(error, smtplib.SMTPAuthenticationError):
         return "SMTP_AUTHENTIFICATION"
+    if isinstance(error, ssl.SSLError):
+        return "SMTP_TLS"
     if isinstance(error, smtplib.SMTPException):
         return "SMTP_ERREUR"
     return "SMTP_TRANSPORT"
