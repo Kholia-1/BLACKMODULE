@@ -17,8 +17,9 @@ RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.l
 
 COPY requirements.txt /code/requirements.txt
 
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -r /code/requirements.txt
+RUN python -m pip install --no-cache-dir pip==26.1.2 \
+    && python -m pip install --no-cache-dir --requirement /code/requirements.txt \
+    && python -m pip check
 
 COPY --chown=10001:10001 blackmodule/app /code/app
 COPY --chown=10001:10001 blackmodule/data /code/data

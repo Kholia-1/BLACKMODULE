@@ -54,7 +54,9 @@ class Lot5BManagementReportingTests(unittest.TestCase):
         )
         Base.metadata.create_all(self.engine)
         self.db = sessionmaker(bind=self.engine, expire_on_commit=False)()
-        self.now = datetime(2026, 9, 3, 12, 0)
+        # Keep seeded alerts within the reporting windows used by the Web routes.
+        # Those routes resolve their period from the current UTC date.
+        self.now = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
         self.analyst1 = self.user("analyste-management-1", ROLE_ANALYSTE_CONFORMITE, "Alice Analyste")
         self.analyst2 = self.user("analyste-management-2", ROLE_ANALYSTE_CONFORMITE, "Bruno Analyste")
         self.supervisor = self.user("superviseur-management", ROLE_SUPERVISEUR_CONFORMITE, "Sophie Superviseur")
