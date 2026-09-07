@@ -23,6 +23,36 @@ from app.services.audit_service import write_audit_log
 
 CSRF_SESSION_KEY = "csrf_token"
 
+CONTENT_SECURITY_POLICY = "; ".join(
+    (
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data:",
+        "font-src 'self'",
+        "connect-src 'self'",
+    )
+)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Ajoute les protections navigateur compatibles avec l'interface actuelle."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        )
+        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+        return response
+
 
 @dataclass(frozen=True)
 class RateLimitResult:

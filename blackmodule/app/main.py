@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import (
     BLACKMODULE_API_KEY,
@@ -16,6 +17,7 @@ from app.config import (
     IS_PRODUCTION,
     SECRET_KEY,
     SESSION_HTTPS_ONLY,
+    TRUSTED_HOSTS,
 )
 from app.database import Base, engine, get_db, SessionLocal
 from app import models
@@ -23,6 +25,7 @@ from app.services.auth_service import create_default_admin
 from app.security import (
     CSRFMiddleware,
     ForcedPasswordChangeMiddleware,
+    SecurityHeadersMiddleware,
     SecurityRateLimitMiddleware,
 )
 from app.services.session_security_service import SessionActivityMiddleware
@@ -69,6 +72,8 @@ app.add_middleware(
     https_only=SESSION_HTTPS_ONLY,
 )
 app.add_middleware(ObservabilityMiddleware)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=TRUSTED_HOSTS)
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 

@@ -1,5 +1,7 @@
 from dotenv import load_dotenv
+import ipaddress
 import os
+import re
 
 load_dotenv()
 
@@ -57,6 +59,70 @@ if INITIAL_ADMIN_PASSWORD is not None:
 # En développement local HTTP peut être pratique ; en production cette valeur
 # doit impérativement être définie à true.
 SESSION_HTTPS_ONLY = os.getenv("SESSION_HTTPS_ONLY", "false").lower() == "true"
+
+# Reverse proxy / exposition HTTPS P9A. En production, l'application ne doit
+# accepter qu'un nom DNS public explicite et uniquement les en-tetes transmis
+# par les adresses du reverse proxy gere par l'infrastructure.
+PUBLIC_HOSTNAME = (
+    _required_value("PUBLIC_HOSTNAME")
+    if IS_PRODUCTION
+    else os.getenv("PUBLIC_HOSTNAME", "localhost").strip()
+)
+FORWARDED_ALLOW_IPS = (
+    _required_value("FORWARDED_ALLOW_IPS")
+    if IS_PRODUCTION
+    else os.getenv("FORWARDED_ALLOW_IPS", "127.0.0.1").strip()
+)
+
+
+def _validate_public_hostname(value: str) -> None:
+    if not IS_PRODUCTION:
+        return
+    if (
+        value == "*"
+        or value.lower() == "localhost"
+        or "://" in value
+        or "/" in value
+        or ":" in value
+        or not re.fullmatch(
+            r"(?=.{1,253}\Z)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
+            r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?",
+            value,
+        )
+    ):
+        raise ValueError("PUBLIC_HOSTNAME doit etre un nom DNS explicite sans schema ni port.")
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return
+    raise ValueError("PUBLIC_HOSTNAME ne doit pas etre une adresse IP en production.")
+
+
+def _validate_forwarded_allow_ips(value: str) -> None:
+    if not IS_PRODUCTION:
+        return
+    entries = [entry.strip() for entry in value.split(",")]
+    if not entries or any(not entry or entry == "*" for entry in entries):
+        raise ValueError(
+            "FORWARDED_ALLOW_IPS doit contenir uniquement les IP/CIDR explicites du proxy."
+        )
+    for entry in entries:
+        try:
+            network = ipaddress.ip_network(entry, strict=False)
+        except ValueError as error:
+            raise ValueError(
+                "FORWARDED_ALLOW_IPS doit contenir uniquement des IP ou CIDR valides."
+            ) from error
+        if network.prefixlen == 0:
+            raise ValueError("FORWARDED_ALLOW_IPS ne peut pas autoriser tout Internet.")
+
+
+_validate_public_hostname(PUBLIC_HOSTNAME)
+_validate_forwarded_allow_ips(FORWARDED_ALLOW_IPS)
+if IS_PRODUCTION and not SESSION_HTTPS_ONLY:
+    raise ValueError("SESSION_HTTPS_ONLY=true est obligatoire en production.")
+
+TRUSTED_HOSTS = [PUBLIC_HOSTNAME] if IS_PRODUCTION else ["*"]
 
 SESSION_IDLE_TIMEOUT_MINUTES = int(os.getenv("SESSION_IDLE_TIMEOUT_MINUTES", "15"))
 SESSION_ACTIVITY_PERSIST_INTERVAL_MINUTES = int(

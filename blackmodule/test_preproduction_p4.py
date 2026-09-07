@@ -176,6 +176,9 @@ class PreproductionP4Tests(unittest.TestCase):
                 "SECRET_KEY": "pilot-session-secret-with-at-least-32-characters",
                 "BLACKMODULE_API_KEY": "pilot-api-key-with-at-least-32-characters",
                 "INITIAL_ADMIN_PASSWORD": "",
+                "PUBLIC_HOSTNAME": "blackmodule-pilot.example.bank",
+                "FORWARDED_ALLOW_IPS": "172.18.0.1",
+                "SESSION_HTTPS_ONLY": "true",
             }
         )
         command = (

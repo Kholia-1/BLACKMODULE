@@ -40,6 +40,8 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY doit etre defini}
       BLACKMODULE_API_KEY: ${BLACKMODULE_API_KEY:?BLACKMODULE_API_KEY doit etre defini}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?PUBLIC_HOSTNAME doit etre defini}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:?FORWARDED_ALLOW_IPS doit etre defini}
       SESSION_HTTPS_ONLY: "true"
       ALERT_SLA_EXACT_HOURS: ${ALERT_SLA_EXACT_HOURS:-4}
       ALERT_SLA_PROBABLE_HOURS: ${ALERT_SLA_PROBABLE_HOURS:-24}
@@ -73,8 +75,20 @@ services:
     pids_limit: 256
     ports:
       - "127.0.0.1:10000:10000"
+    command:
+      - python
+      - -m
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "10000"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - ${FORWARDED_ALLOW_IPS:?FORWARDED_ALLOW_IPS doit etre defini}
     healthcheck:
-      test: ["CMD-SHELL", "curl --fail http://127.0.0.1:10000/health/ready || exit 1"]
+      test: ["CMD-SHELL", "curl --fail --header \"Host: $${PUBLIC_HOSTNAME}\" http://127.0.0.1:10000/health/ready || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -92,6 +106,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER doit etre defini}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit etre defini}@db:5432/${POSTGRES_DB:?POSTGRES_DB doit etre defini}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY doit etre defini}
       BLACKMODULE_API_KEY: ${BLACKMODULE_API_KEY:?BLACKMODULE_API_KEY doit etre defini}
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?PUBLIC_HOSTNAME doit etre defini}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:?FORWARDED_ALLOW_IPS doit etre defini}
+      SESSION_HTTPS_ONLY: "true"
     entrypoint: ["alembic", "-c", "/code/alembic.ini"]
     command: ["upgrade", "head"]
     restart: "no"
