@@ -27,10 +27,10 @@
         <p class="muted">Rappels d'échéance et escalades automatiques des actions correctives.</p>
         <section class="notification-summary">
             <div class="notification-kpi"><span>Non lues</span><strong>{{ unread_count }}</strong></div>
-            <div class="notification-kpi"><span>Historique affiché</span><strong>{{ notifications|length }}</strong></div>
+            <div class="notification-kpi"><span>Historique affiché</span><strong>{{ notification_items|length }}</strong></div>
         </section>
         <section>
-            {% for notification in notifications %}
+            {% for notification in notification_items %}
                 <article class="notification-card {% if not notification.is_read %}unread{% endif %}">
                     <div class="notification-head">
                         <div><strong>{{ notification.title }}</strong><div class="notification-meta">{{ notification.message }}</div></div>

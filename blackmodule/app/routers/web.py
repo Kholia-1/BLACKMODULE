@@ -4148,12 +4148,17 @@ def web_notifications(request: Request, db: Session = Depends(get_db)):
         log_access_denied(db, request, "/web/notifications", "Accès refusé aux notifications.")
         return forbidden_page(request)
     current_user = get_current_user(request)
-    center = notification_center(db, recipient_user_id=current_user.get("id"))
     write_audit_log(db, current_username(request), "VIEW_USER_NOTIFICATIONS", "UserNotification", None,
                     "Consultation du centre de notifications.", request.client.host if request.client else None)
     db.commit()
+    # Load after the audit commit so the template receives the same fresh,
+    # recipient-scoped rows as the API endpoint.
+    center = notification_center(db, recipient_user_id=current_user.get("id"))
     return templates.TemplateResponse(request=request, name="notifications.html", context={
-        "request": request, "user": current_user, **center,
+        "request": request,
+        "user": current_user,
+        "notification_items": center["notifications"],
+        "unread_count": center["unread_count"],
     })
 
 

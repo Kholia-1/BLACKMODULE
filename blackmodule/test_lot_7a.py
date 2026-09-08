@@ -135,6 +135,43 @@ class Lot7ANotificationTests(unittest.TestCase):
         with self.assertRaises(NotificationError):
             notification_center(self.db, recipient_user_id="not-a-uuid")
 
+    def test_06_web_center_uses_the_same_personal_notifications_as_the_api(self):
+        self._dispatch()
+        self.db.add(UserNotification(
+            recipient_user_id=self.base.analyst2.id,
+            notification_type=NOTIFICATION_DUE_SOON,
+            entity_type="CorrectiveAction",
+            entity_id=self.near_action.id,
+            title="Notification d'un autre utilisateur",
+            message="Cette notification ne doit pas être visible par analyste_test.",
+            deduplication_key="test-other-recipient-notification",
+        ))
+        self.db.commit()
+
+        app = test_lot_6a._test_app(self.db)
+        app.include_router(notifications.router)
+        with TestClient(app) as client:
+            client.get("/_test/login/ANALYSTE_CONFORMITE")
+            api = client.get("/api/notifications/")
+            page = client.get("/web/notifications")
+
+            self.assertEqual(api.status_code, 200)
+            self.assertEqual(api.json()["unread_count"], 2)
+            self.assertEqual(len(api.json()["items"]), 2)
+            self.assertEqual(page.status_code, 200)
+            self.assertIn("Historique affiché</span><strong>2", page.text)
+            self.assertEqual(page.text.count('<article class="notification-card unread">'), 2)
+            self.assertNotIn("Notification d'un autre utilisateur", page.text)
+            self.assertIn('href="/web/notifications" class="bell-btn"', page.text)
+            self.assertIn("fetch('/api/notifications/'", page.text)
+            self.assertNotIn("fetch('/api/alerts/critical-notifications'", page.text)
+
+            notification_id = api.json()["items"][0]["id"]
+            read = client.post(f"/web/notifications/{notification_id}/read", follow_redirects=False)
+            self.assertEqual(read.status_code, 303)
+            refreshed_api = client.get("/api/notifications/")
+            self.assertEqual(refreshed_api.json()["unread_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
