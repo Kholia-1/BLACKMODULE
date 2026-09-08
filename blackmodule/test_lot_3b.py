@@ -320,7 +320,7 @@ class Lot3BAlertDecisionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Alerte CLIENT-3B — OFAC_SDN", response.text)
-        self.assertIn(f'/web/alerts/{alert.id}/treat', response.text)
+        self.assertIn(f'/web/alerts/{alert.id}', response.text)
         self.assertIn("Voir alerte", response.text)
         self.assertEqual(approval.status, PENDING)
 

@@ -645,6 +645,7 @@
                             {% endif %}
                         </td>
                        <td>
+                            <a class="btn-outline" href="/web/alerts/{{ alert.id }}">Voir détail</a>
                             {% if "ALERTS_TREAT" in permissions %}
                                 <a class="btn" href="/web/alerts/{{ alert.id }}/treat">Traiter</a>
                             {% else %}

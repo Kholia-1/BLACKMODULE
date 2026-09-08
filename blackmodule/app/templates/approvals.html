@@ -111,7 +111,7 @@
                                             {% endif %}
                                             {% if alert_id and can_validate %}
                                                 {% if internal_entry_id %}<span class="action-separator">|</span>{% endif %}
-                                                <a class="detail-link" href="/web/alerts/{{ alert_id }}/treat">Voir alerte</a>
+                                                <a class="detail-link" href="/web/alerts/{{ alert_id }}">Voir alerte</a>
                                             {% endif %}
                                             {% if approval.status == pending_status and can_validate and approval.initiator_user_id != current_user_id %}
                                                 {% if internal_entry_id or (alert_id and can_validate) %}<span class="action-separator">|</span>{% endif %}

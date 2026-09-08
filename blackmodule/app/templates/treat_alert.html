@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>BLACKMODULE - Traitement Alerte</title>
+    <title>BLACKMODULE - {{ page_title or "Traitement de l'alerte" }}</title>
     <link rel="stylesheet" href="/static/css/styles.css">
     <style>
         * {
@@ -708,7 +708,7 @@
     {% endif %}
 
     <div class="breadcrumb">
-        <a href="/web/alerts">Alertes</a> / Traitement de l'alerte
+        <a href="/web/alerts">Alertes</a> / {{ page_title or "Traitement de l'alerte" }}
     </div>
 
     <div class="summary-bar {{ level_class }}">
@@ -1011,12 +1011,12 @@
                     <div class="field"><div class="label">Escalade superviseur</div><div class="value">{{ alert.supervisor_escalated_at.strftime('%d/%m/%Y %H:%M') if alert.supervisor_escalated_at else "—" }}</div></div>
                 </div>
 
-                {% if not is_terminal and not alert.assigned_to_user_id and "ALERTS_ASSIGN" in permissions %}
+                {% if can_manage_alert_actions and not is_terminal and not alert.assigned_to_user_id and "ALERTS_ASSIGN" in permissions %}
                     <form method="post" action="/web/alerts/{{ alert.id }}/assign" class="form-actions">
                         <input type="hidden" name="return_to" value="/web/alerts">
                         <button type="submit">Prendre en charge</button>
                     </form>
-                {% elif not is_terminal and "ALERTS_REASSIGN" in permissions %}
+                {% elif can_manage_alert_actions and not is_terminal and "ALERTS_REASSIGN" in permissions %}
                     <form method="post" action="/web/alerts/{{ alert.id }}/reassign" class="form-actions">
                         <select name="assignee_user_id" required>
                             {% for item in analysts %}
@@ -1029,7 +1029,7 @@
                     </form>
                 {% endif %}
 
-                {% if not is_terminal and "ALERTS_ESCALATE" in permissions and not alert.supervisor_escalated_at %}
+                {% if can_manage_alert_actions and not is_terminal and "ALERTS_ESCALATE" in permissions and not alert.supervisor_escalated_at %}
                     <form method="post" action="/web/alerts/{{ alert.id }}/escalate" class="form-actions">
                         <input type="text" name="reason" placeholder="Motif d'escalade" required minlength="3">
                         <input type="hidden" name="return_to" value="/web/alerts">
@@ -1093,7 +1093,12 @@
                     </table>
                 {% endif %}
 
-                {% if is_terminal %}
+                {% if not can_treat %}
+                    <div class="history-note" style="margin-top:16px">
+                        Consultation en lecture seule. Les décisions et actions de traitement restent réservées aux utilisateurs habilités.
+                    </div>
+                    <a class="back" href="/web/alerts">&larr; Retour aux alertes</a>
+                {% elif is_terminal %}
                     <div class="history-note" style="margin-top:16px">
                         Cette alerte a atteint le statut final <strong>{{ alert.statut }}</strong>. Elle est verrouillée et ne peut plus être modifiée.
                     </div>

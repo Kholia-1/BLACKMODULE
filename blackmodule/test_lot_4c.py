@@ -32,7 +32,10 @@ from app.services.alert_queue_service import (
 )
 from app.services.approval_service import APPROVED, REJECTED, review_approval_request
 from app.services.authorization_service import (
+    ROLE_ADMIN_TECHNIQUE,
     ROLE_ANALYSTE_CONFORMITE,
+    ROLE_CONSULTATION,
+    ROLE_GESTIONNAIRE_LISTES,
     ROLE_SUPERVISEUR_CONFORMITE,
     role_label,
 )
@@ -70,6 +73,9 @@ class Lot4CAlertDecisionTests(unittest.TestCase):
         self.db = sessionmaker(bind=self.engine, expire_on_commit=False)()
         self.analyst = self.user("analyste-4c", ROLE_ANALYSTE_CONFORMITE)
         self.supervisor = self.user("superviseur-4c", ROLE_SUPERVISEUR_CONFORMITE)
+        self.technical_admin = self.user("admin-tech-4c", ROLE_ADMIN_TECHNIQUE)
+        self.viewer = self.user("consultation-4c", ROLE_CONSULTATION)
+        self.list_manager = self.user("listes-4c", ROLE_GESTIONNAIRE_LISTES)
         self.db.commit()
 
     def tearDown(self):
@@ -294,6 +300,37 @@ class Lot4CAlertDecisionTests(unittest.TestCase):
         self.assertNotIn(f'/web/alerts/{alert.id}/assign', response.text)
         self.assertNotIn(f'/web/alerts/{alert.id}/reassign', response.text)
         self.assertNotIn(f'/web/alerts/{alert.id}/escalate', response.text)
+
+    def test_06b_alert_detail_is_available_to_viewers_without_exposing_actions(self):
+        alert = self.alert("DETAIL-READ-ONLY", status="EN_COURS")
+        self.db.commit()
+        client = TestClient(_test_app(self.db))
+
+        for role in (ROLE_ADMIN_TECHNIQUE, ROLE_CONSULTATION):
+            with self.subTest(role=role):
+                self.assertEqual(200, client.get(f"/_test/login/{role}").status_code)
+                detail = client.get(f"/web/alerts/{alert.id}")
+                self.assertEqual(200, detail.status_code)
+                self.assertIn("Consultation en lecture seule", detail.text)
+                self.assertNotIn('id="treatForm"', detail.text)
+                self.assertNotIn(f'/web/alerts/{alert.id}/assign', detail.text)
+                self.assertNotIn(f'/web/alerts/{alert.id}/reassign', detail.text)
+                self.assertNotIn(f'/web/alerts/{alert.id}/escalate', detail.text)
+
+        self.assertEqual(200, client.get(f"/_test/login/{ROLE_CONSULTATION}").status_code)
+        listing = client.get("/web/alerts")
+        self.assertEqual(200, listing.status_code)
+        self.assertIn(f'href="/web/alerts/{alert.id}"', listing.text)
+        self.assertNotIn(f'href="/web/alerts/{alert.id}/treat"', listing.text)
+        self.assertEqual(403, client.get(f"/web/alerts/{alert.id}/treat").status_code)
+
+        self.assertEqual(200, client.get(f"/_test/login/{ROLE_GESTIONNAIRE_LISTES}").status_code)
+        self.assertEqual(403, client.get(f"/web/alerts/{alert.id}").status_code)
+
+        self.assertEqual(200, client.get(f"/_test/login/{ROLE_ANALYSTE_CONFORMITE}").status_code)
+        treatment = client.get(f"/web/alerts/{alert.id}/treat")
+        self.assertEqual(200, treatment.status_code)
+        self.assertIn('id="treatForm"', treatment.text)
 
     def test_07_api_and_web_filters_support_closed_alerts(self):
         closed = self.alert("FILTER-CLOSED", status="CLOTUREE")

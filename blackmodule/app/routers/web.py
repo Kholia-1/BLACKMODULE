@@ -1211,20 +1211,14 @@ def web_escalate_alert(
         return _alert_queue_return(return_to, str(exc))
 
 
-@router.get("/alerts/{alert_id}/treat")
-def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends(get_db)):
-    if not require_login(request):
-        return RedirectResponse(url="/web/login", status_code=303)
-
-    if not require_permission(request, PERMISSION_TREAT_ALERTS):
-        log_access_denied(
-            db=db,
-            request=request,
-            route=f"/web/alerts/{alert_id}/treat",
-            description="Tentative d'accès refusée au traitement d'une alerte.",
-        )
-        return forbidden_page(request)
-
+def _render_alert_detail(
+    alert_id: UUID,
+    request: Request,
+    db: Session,
+    *,
+    can_treat: bool,
+):
+    """Render the shared alert analysis without granting a write capability."""
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alerte introuvable")
@@ -1283,8 +1277,46 @@ def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends
             "is_terminal": not available_statuses,
             "assignment_history": assignment_history(db, alert.id),
             "analysts": eligible_assignees(db),
+            "can_treat": can_treat,
+            "can_manage_alert_actions": can_treat,
+            "page_title": "Traitement de l'alerte" if can_treat else "Détail de l'alerte",
         },
     )
+
+
+@router.get("/alerts/{alert_id}")
+def web_alert_detail(alert_id: UUID, request: Request, db: Session = Depends(get_db)):
+    """Allow every ALERTS_VIEW user to inspect one alert in read-only mode."""
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+
+    if not require_permission(request, PERMISSION_VIEW_ALERTS):
+        log_access_denied(
+            db=db,
+            request=request,
+            route=f"/web/alerts/{alert_id}",
+            description="Tentative d'accès refusée au détail d'une alerte.",
+        )
+        return forbidden_page(request)
+
+    return _render_alert_detail(alert_id, request, db, can_treat=False)
+
+
+@router.get("/alerts/{alert_id}/treat")
+def web_treat_alert_page(alert_id: UUID, request: Request, db: Session = Depends(get_db)):
+    if not require_login(request):
+        return RedirectResponse(url="/web/login", status_code=303)
+
+    if not require_permission(request, PERMISSION_TREAT_ALERTS):
+        log_access_denied(
+            db=db,
+            request=request,
+            route=f"/web/alerts/{alert_id}/treat",
+            description="Tentative d'accès refusée au traitement d'une alerte.",
+        )
+        return forbidden_page(request)
+
+    return _render_alert_detail(alert_id, request, db, can_treat=True)
 
 
 @router.post("/alerts/{alert_id}/treat")
