@@ -13,13 +13,14 @@ from app.services.audit_service import write_audit_log
 
 
 USER_DEACTIVATED_ACTION = "USER_DEACTIVATED"
+USER_PASSWORD_RESET_ACTION = "USER_PASSWORD_RESET"
 SESSION_DEACTIVATION_REVISION_KEY = "account_deactivation_revision"
 
 
 def account_deactivation_revision(db, user_id) -> int:
-    """Return the immutable deactivation-event count for a user account."""
+    """Return the immutable account-security-event count for session revocation."""
     return db.query(AuditLog).filter(
-        AuditLog.action == USER_DEACTIVATED_ACTION,
+        AuditLog.action.in_((USER_DEACTIVATED_ACTION, USER_PASSWORD_RESET_ACTION)),
         AuditLog.entity_type == "User",
         AuditLog.entity_id == str(user_id),
     ).count()

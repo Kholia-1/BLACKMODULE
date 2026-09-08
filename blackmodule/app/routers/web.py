@@ -14,6 +14,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 
+from app.config import BOOTSTRAP_PASSWORD_TTL_HOURS
 from app.database import get_db
 from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, AlertDecisionHistory, AuditLog, ImportBatch, ListVersion, ListVersionActivation, ListVersionEntry, User, MatchingSetting, InternalListHistory
 from app.schemas import ClientCheckRequest
@@ -22,6 +23,7 @@ from app.services.password_policy_service import validate_password_policy
 from app.services.session_security_service import (
     SESSION_DEACTIVATION_REVISION_KEY,
     USER_DEACTIVATED_ACTION,
+    USER_PASSWORD_RESET_ACTION,
     account_deactivation_revision,
 )
 from app.services.authorization_service import (
@@ -2504,6 +2506,67 @@ def web_edit_user_submit(
     return RedirectResponse(url="/web/users?message=Utilisateur modifié avec succès", status_code=303)
 
 
+@router.post("/users/{user_id}/reset-password")
+def web_reset_user_password(
+    user_id: UUID,
+    request: Request,
+    temporary_password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    denied_response = require_admin_or_403(
+        request,
+        db,
+        f"/web/users/{user_id}/reset-password",
+        "Tentative de réinitialisation de mot de passe non autorisée.",
+    )
+    if denied_response:
+        return denied_response
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+
+    if temporary_password != confirm_password:
+        return RedirectResponse(
+            url=f"/web/users?{urlencode({'message': 'Les mots de passe temporaires ne correspondent pas.'})}",
+            status_code=303,
+        )
+
+    policy_error = validate_password_policy(temporary_password, username=user.username)
+    if policy_error:
+        return RedirectResponse(
+            url=f"/web/users?{urlencode({'message': policy_error})}",
+            status_code=303,
+        )
+
+    reset_at = datetime.utcnow()
+    user.password_hash = hash_password(temporary_password)
+    user.failed_login_attempts = 0
+    user.locked_at = None
+    user.must_change_password = True
+    user.password_changed_at = None
+    user.bootstrap_credential_expires_at = reset_at + timedelta(
+        hours=BOOTSTRAP_PASSWORD_TTL_HOURS
+    )
+
+    write_audit_log(
+        db=db,
+        user_identifier=current_username(request),
+        action=USER_PASSWORD_RESET_ACTION,
+        entity_type="User",
+        entity_id=str(user.id),
+        description="Mot de passe temporaire défini par un administrateur technique.",
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/web/users?{urlencode({'message': 'Mot de passe temporaire défini avec succès'})}",
+        status_code=303,
+    )
+
+
 @router.post("/users/{user_id}/unlock")
 def web_unlock_user(user_id: UUID, request: Request, db: Session = Depends(get_db)):
     denied_response = require_admin_or_403(
@@ -2702,7 +2765,13 @@ def change_password_submit(
     if not current_user:
         return RedirectResponse(url="/web/login", status_code=303)
 
-    user = db.query(User).filter(User.id == current_user.get("id")).first()
+    try:
+        current_user_id = UUID(str(current_user.get("id")))
+    except (TypeError, ValueError):
+        request.session.clear()
+        return RedirectResponse(url="/web/login", status_code=303)
+
+    user = db.query(User).filter(User.id == current_user_id).first()
     if not user:
         request.session.clear()
         return RedirectResponse(url="/web/login", status_code=303)

@@ -554,6 +554,12 @@
                             <td>
                             <div class="row-actions">
                                 <a href="/web/users/{{ user.id }}/edit" class="btn-secondary">Modifier</a>
+                                <button
+                                    type="button"
+                                    class="btn-secondary reset-password-button"
+                                    data-user-id="{{ user.id }}"
+                                    data-user-label="{{ user.username }}"
+                                >Réinitialiser le mot de passe</button>
 
                                 <form method="post" action="/web/users/{{ user.id }}/toggle-status"{% if user.statut == "ACTIF" %} data-confirm="Confirmer la désactivation de ce compte ?"{% endif %}>
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -623,6 +629,32 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="reset-password-overlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reset-password-title">
+            <div class="modal-header">
+                <h2 id="reset-password-title">Réinitialiser le mot de passe</h2>
+                <button type="button" class="modal-close" id="close-reset-password" aria-label="Fermer">&times;</button>
+            </div>
+            <div class="card-sub">
+                Définissez un mot de passe temporaire pour <strong id="reset-password-user"></strong>.
+                L'utilisateur devra le remplacer à sa prochaine connexion.
+            </div>
+
+            <form method="post" id="reset-password-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+
+                <label for="temporary-password">Mot de passe temporaire</label>
+                <input id="temporary-password" type="password" name="temporary_password" autocomplete="new-password" required>
+                <small>En production : 12 caractères minimum avec majuscule, minuscule, chiffre et caractère spécial.</small>
+
+                <label for="confirm-temporary-password">Confirmer le mot de passe temporaire</label>
+                <input id="confirm-temporary-password" type="password" name="confirm_password" autocomplete="new-password" required>
+
+                <button type="submit">Définir le mot de passe temporaire</button>
+            </form>
+        </div>
+    </div>
+
 <script>
 (function () {
     document.querySelectorAll('form[data-confirm]').forEach(function (form) {
@@ -631,6 +663,47 @@
                 event.preventDefault();
             }
         });
+    });
+})();
+
+(function () {
+    var overlay = document.getElementById('reset-password-overlay');
+    var form = document.getElementById('reset-password-form');
+    var userLabel = document.getElementById('reset-password-user');
+    var closeBtn = document.getElementById('close-reset-password');
+    var temporaryPassword = document.getElementById('temporary-password');
+    var confirmPassword = document.getElementById('confirm-temporary-password');
+
+    if (!overlay || !form || !userLabel) {
+        return;
+    }
+
+    function closeModal() {
+        overlay.classList.remove('open');
+        form.removeAttribute('action');
+        temporaryPassword.value = '';
+        confirmPassword.value = '';
+    }
+
+    document.querySelectorAll('.reset-password-button').forEach(function (button) {
+        button.addEventListener('click', function () {
+            form.action = '/web/users/' + encodeURIComponent(button.dataset.userId) + '/reset-password';
+            userLabel.textContent = button.dataset.userLabel;
+            overlay.classList.add('open');
+            temporaryPassword.focus();
+        });
+    });
+
+    closeBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', function (event) {
+        if (event.target === overlay) {
+            closeModal();
+        }
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && overlay.classList.contains('open')) {
+            closeModal();
+        }
     });
 })();
 
