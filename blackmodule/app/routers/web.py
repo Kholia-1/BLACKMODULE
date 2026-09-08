@@ -2410,8 +2410,8 @@ def web_edit_user_submit(
 
     allowed_roles = ALL_ROLES
     allowed_statuses = ["ACTIF", "INACTIF"]
-    role = role.upper()
-    statut = statut.upper()
+    role = role.strip().upper()
+    statut = statut.strip().upper()
 
     if role not in allowed_roles:
         raise HTTPException(status_code=400, detail="Rôle invalide.")
@@ -2421,6 +2421,24 @@ def web_edit_user_submit(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+
+    # An e-mail address remains optional, but a case-only variant must not
+    # bypass the unique account rule when an administrator edits a user.
+    normalized_email = email.strip().lower() if email and email.strip() else None
+    if normalized_email and (
+        normalized_email.count("@") != 1
+        or normalized_email.startswith("@")
+        or normalized_email.endswith("@")
+    ):
+        raise HTTPException(status_code=400, detail="Email invalide.")
+    if normalized_email and db.query(User).filter(
+        func.lower(User.email) == normalized_email,
+        User.id != user.id,
+    ).first():
+        return RedirectResponse(
+            url=f"/web/users/{user.id}/edit?{urlencode({'message': 'Email déjà utilisé'})}",
+            status_code=303,
+        )
 
     current_user = get_current_user(request)
     if current_user and current_user.get("id") == str(user.id) and statut == "INACTIF":
@@ -2437,8 +2455,19 @@ def web_edit_user_submit(
 
     old_role = user.role
     old_status = user.statut
-    user.full_name = full_name.strip() if full_name else None
-    user.email = email.strip() if email else None
+    normalized_full_name = full_name.strip() if full_name and full_name.strip() else None
+    changed_fields = []
+    if user.full_name != normalized_full_name:
+        changed_fields.append("nom complet")
+    if user.email != normalized_email:
+        changed_fields.append("email")
+    if old_role != role:
+        changed_fields.append("rôle")
+    if old_status != statut:
+        changed_fields.append("statut")
+
+    user.full_name = normalized_full_name
+    user.email = normalized_email
     user.role = role
     user.statut = statut
     if old_role != role:
@@ -2451,9 +2480,8 @@ def web_edit_user_submit(
         entity_type="User",
         entity_id=str(user.id),
         description=(
-            f"Modification de l'utilisateur {user.username}. "
-            f"Ancien rôle : {old_role}, nouveau rôle : {role}. "
-            f"Ancien statut : {old_status}, nouveau statut : {statut}."
+            f"Mise à jour du compte utilisateur {user.username} : "
+            f"{', '.join(changed_fields) if changed_fields else 'attributs confirmés'}."
         ),
         ip_address=request.client.host if request.client else None,
     )
