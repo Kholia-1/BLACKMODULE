@@ -19,6 +19,11 @@ from app.models import ApprovalRequest, SanctionEntry, SanctionAlias, Alert, Ale
 from app.schemas import ClientCheckRequest
 from app.services.auth_service import authenticate_user, hash_password, verify_password
 from app.services.password_policy_service import validate_password_policy
+from app.services.session_security_service import (
+    SESSION_DEACTIVATION_REVISION_KEY,
+    USER_DEACTIVATED_ACTION,
+    account_deactivation_revision,
+)
 from app.services.authorization_service import (
     ALL_ROLES, PERMISSION_LISTS_IMPORT, PERMISSION_MANAGE_LISTS, PERMISSION_MANAGE_MATCHING_SETTINGS,
     PERMISSION_MANAGE_TECHNICAL_CONFIGURATION, PERMISSION_MANAGE_USERS,
@@ -559,6 +564,7 @@ def login_submit(
     user = result.user
 
     request.session["user"] = session_user_payload(user)
+    request.session[SESSION_DEACTIVATION_REVISION_KEY] = account_deactivation_revision(db, user.id)
     request.session["last_activity_at"] = user.last_activity_at.isoformat()
     request.session["last_activity_persisted_at"] = user.last_activity_at.isoformat()
 
@@ -2352,6 +2358,9 @@ def web_toggle_user_status(user_id: UUID, request: Request, db: Session = Depend
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
 
+    if user.statut not in {"ACTIF", "INACTIF"}:
+        raise HTTPException(status_code=409, detail="Statut utilisateur incompatible avec cette opération.")
+
     current_user = get_current_user(request)
     if current_user and current_user.get("id") == str(user.id):
         return RedirectResponse(url="/web/users?message=Impossible de désactiver votre propre compte", status_code=303)
@@ -2370,15 +2379,20 @@ def web_toggle_user_status(user_id: UUID, request: Request, db: Session = Depend
     write_audit_log(
         db=db,
         user_identifier=current_username(request),
-        action="TOGGLE_USER_STATUS",
+        action=USER_DEACTIVATED_ACTION if next_status == "INACTIF" else "USER_REACTIVATED",
         entity_type="User",
         entity_id=str(user.id),
-        description=f"Changement du statut de l'utilisateur {user.username} vers {user.statut}.",
+        description=(
+            "Compte utilisateur désactivé."
+            if next_status == "INACTIF"
+            else "Compte utilisateur réactivé."
+        ),
         ip_address=request.client.host if request.client else None,
     )
     db.commit()
 
-    return RedirectResponse(url="/web/users?message=Statut utilisateur mis à jour", status_code=303)
+    result_message = "Utilisateur désactivé avec succès" if next_status == "INACTIF" else "Utilisateur réactivé avec succès"
+    return RedirectResponse(url=f"/web/users?{urlencode({'message': result_message})}", status_code=303)
 
 
 @router.get("/users/{user_id}/edit")

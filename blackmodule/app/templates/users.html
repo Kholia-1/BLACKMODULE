@@ -555,11 +555,12 @@
                             <div class="row-actions">
                                 <a href="/web/users/{{ user.id }}/edit" class="btn-secondary">Modifier</a>
 
-                                <form method="post" action="/web/users/{{ user.id }}/toggle-status">
+                                <form method="post" action="/web/users/{{ user.id }}/toggle-status"{% if user.statut == "ACTIF" %} data-confirm="Confirmer la désactivation de ce compte ?"{% endif %}>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                                     {% if user.statut == "ACTIF" %}
                                         <button class="btn-danger" type="submit">Désactiver</button>
                                     {% else %}
-                                        <button class="btn-success" type="submit">Activer</button>
+                                        <button class="btn-success" type="submit">Réactiver</button>
                                     {% endif %}
                                 </form>
                                 {% if user.locked_at %}
@@ -623,6 +624,16 @@
     </div>
 
 <script>
+(function () {
+    document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!window.confirm(form.getAttribute('data-confirm'))) {
+                event.preventDefault();
+            }
+        });
+    });
+})();
+
 (function () {
     var input = document.getElementById('user-search');
     var rows = Array.prototype.slice.call(document.querySelectorAll('#user-table-body tr[data-search]'));
